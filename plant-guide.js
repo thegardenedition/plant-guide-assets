@@ -380,8 +380,8 @@ function cleanSciName(sc){
    불러온다. GitHub(thegardenedition/plant-guide-assets)에 업로드해 jsDelivr
    CDN으로 서빙하며, 로드에 실패해도 사이트 나머지 기능은 기존 방식(실시간
    API + 정규식 추출)대로 정상 동작한다. */
-var STATIC_NAME_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_name_master.json';
-var STATIC_SPECIES_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_species_detail.json';
+var STATIC_NAME_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/plant_name_master.json';
+var STATIC_SPECIES_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/plant_species_detail.json';
 var STATIC_NAME={},STATIC_SPECIES={};
 function loadStaticTable(url,dest){
   if(!url)return Promise.resolve();
