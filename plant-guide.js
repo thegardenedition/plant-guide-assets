@@ -1611,9 +1611,32 @@ function optimizeQuery(raw){
   return {orig:orig,corr:s,is_err:(isErr||orig.trim()!==s),q_title:s,tokens:tokens};
 }
 
+/* 검색창 오른쪽의 "×" 지우기 버튼 - 검색어가 있을 때만 보인다. 프로그램적으로
+   값을 채울 때(pSuggest 등)도 함께 호출해 항상 실제 입력값과 표시가 일치하게
+   한다. */
+function pUpdateClearBtn(){
+  var el=document.getElementById('psi'),btn=document.getElementById('pclearbtn');
+  if(!el||!btn)return;
+  btn.style.display=el.value.trim()?'flex':'none';
+}
+window.pOnSearchInput=function(){
+  pUpdateClearBtn();
+  var el=document.getElementById('psi');
+  if(el&&!el.value.trim())pClearedSearch();
+};
+/* "×" 버튼 또는 검색어를 손으로 지웠을 때 공통으로 타는 경로 - 새로 검색하고
+   싶을 때는 이 버튼 한 번으로 검색어만 깔끔히 비우고, 선택해둔 필터는 그대로
+   남겨서 바로 "정원 정보로 찾기" 결과를 보여준다. */
+window.pClearSearchBox=function(){
+  var el=document.getElementById('psi');
+  if(el)el.value='';
+  pUpdateClearBtn();
+  pClearedSearch();
+};
 window.pSuggest=function(term){
   var el=document.getElementById('psi');
   if(el)el.value=term;
+  pUpdateClearBtn();
   pQ=term;
   runSearch();
 };
@@ -1639,17 +1662,27 @@ window.pSearch=function(){
     suggEl.style.display='none';
   }
   pQ=opt.q_title;
+  pUpdateClearBtn();
   runSearch();
 };
 window.pMore=function(){
   var b=document.getElementById('pmorebtn');if(b)b.textContent='불러오는 중...';
   renderPage();
 };
-/* 검색창을 손으로 비웠을 때, 선택된 필터가 있으면 곧바로 "정원 정보로 찾기"
-   모드로 전환한다(검색어 없이 필터만으로 찾는 것과 동일한 흐름). */
+/* 검색창을 손으로(또는 "×" 버튼으로) 비웠을 때의 동작 - "초기화 방식"을
+   다시 정리했다: 선택된 필터가 남아 있으면 그 필터만으로 찾은 결과("정원
+   정보로 찾기")를 바로 보여주고, 필터도 전혀 없으면 이전 검색 결과를 화면에
+   그대로 남겨두지 않고 맨 처음 안내 화면으로 되돌아간다(예전엔 검색어만
+   지우고 필터도 없으면 아무 반응이 없어, 지운 게 맞는지 헷갈렸다). */
 window.pClearedSearch=function(){
   pQ='';
-  if(anyFilterActive())runFacetSearch();
+  if(anyFilterActive()){
+    runFacetSearch();
+  } else {
+    hideLoading();hideAll();
+    document.getElementById('pinit').style.display='block';
+    document.getElementById('pcnt').style.display='none';
+  }
 };
 
 /* 식물도감(정식 도감 항목)과 식물표본(표본관 채집기록) 두 목록을 함께 조회해 합치면,
@@ -1942,9 +1975,16 @@ function appendItems(existing,rawList,origin){
    메시지를 보여준다(그 외엔 그냥 '검색결과 없음'으로 처리). */
 function isGovOrigin(origin){return origin==='gov'||!!STRUCT_ORIGINS[origin];}
 
+/* "필터를 먼저 고른 뒤 그 안에서 검색어로 찾고 싶다"는 요청에 따라, 검색어
+   검색을 실행해도 이미 선택된 필터(자생식물 등)를 더 이상 조용히 초기화하지
+   않는다 - 예전엔 여기서 pFilter를 매번 비워버려서, ①필터를 먼저 고르고
+   ②이어서 검색어로 찾으면 필터가 티 안 나게 사라지고 전체 결과가 나오는
+   게 가장 헷갈리는 지점이었다. 이제 검색 결과가 그려질 때(renderPage 안의
+   renderFilterPanel/applyFilters)마다 현재 필터를 그대로 다시 적용해,
+   "검색어+필터"가 항상 AND로 함께 좁혀지고 필터 칩의 활성 표시도 그대로
+   유지된다. 필터만 지우고 싶으면 필터 패널의 "초기화" 버튼을 쓰면 된다. */
 function runSearch(){
   showLoading();
-  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
   pAll=[];
   pShown=0;
   var myQuery=pQ;
