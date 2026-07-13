@@ -377,12 +377,11 @@ function cleanSciName(sc){
 /* ---- 정적 정밀 데이터셋(국가표준식물목록 CSV 가공본) ----
    국립수목원 학명 마스터(3.6만종, 목본/초본/과명 등 분류)와 상세설명(5,400여종,
    잎/꽃/열매/줄기별로 분리된 서술)을 학명 기준으로 미리 가공해둔 JSON 두 개를
-   불러온다. 있으면 활용하고, URL이 비어있거나 로드에 실패해도(예: 아직 호스팅
-   전) 사이트 나머지 기능은 기존 방식(실시간 API + 정규식 추출)대로 정상 동작한다.
-   ▶TODO: 아래 두 URL을 Webflow Assets에 plant_name_master.json / plant_species_detail.json
-   업로드 후 발급되는 CDN 주소로 교체하세요. */
-var STATIC_NAME_URL='';
-var STATIC_SPECIES_URL='';
+   불러온다. GitHub(thegardenedition/plant-guide-assets)에 업로드해 jsDelivr
+   CDN으로 서빙하며, 로드에 실패해도 사이트 나머지 기능은 기존 방식(실시간
+   API + 정규식 추출)대로 정상 동작한다. */
+var STATIC_NAME_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_name_master.json';
+var STATIC_SPECIES_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_species_detail.json';
 var STATIC_NAME={},STATIC_SPECIES={};
 function loadStaticTable(url,dest){
   if(!url)return Promise.resolve();
@@ -1288,20 +1287,8 @@ function renderCardAttrs(cardEl,attrs){
     wrap.innerHTML=html;
     body.appendChild(wrap);
   }
-  renderRoleBadge(cardEl,attrs);
 }
-/* ---- 카드 역할별 배지 ----
-   상세창은 탭으로 나눴지만(Task #3), 카드 그리드는 클릭하지 않고도 한눈에
-   훑어보는 화면이라 "보는 사람이 누구냐"에 따라 카드 위에 바로 보이면 좋은
-   정보가 다르다("가드너 화면엔 관리난이도, 조경 화면엔 자생여부 같은 식").
-   이미 로드해 둔 attrs(deriveCuratedProfile 결과, 네트워크 요청 없이 재사용)를
-   기준으로 배지를 고르고, 관리난이도만은 농사로 gardenList의 이름 매칭으로
-   보강한다(전체 목록이 nongsaroDataReady로 이미 메모리에 있어 카드마다 추가
-   요청이 들지 않는다 - 다만 상세창의 fetchGardenMatch처럼 학명까지 재확인하는
-   엄격한 매칭은 아니라서, 배지는 참고용 힌트로만 쓰고 확정 정보는 상세창의
-   학술정보 탭에 둔다). */
-var pRole='gardener';
-var ROLE_OPTS=[['gardener','가드너'],['landscape','조경전문가'],['academic','식물전문가']];
+/* 농사로 gardenList에서 이름으로 관리난이도 등을 찾을 때 쓰는 헬퍼(비교표에서 사용). */
 function nongsaroGardenByName(korNm){
   if(!korNm||!NONGSARO_GARDEN_CANDIDATES)return null;
   for(var i=0;i<NONGSARO_GARDEN_CANDIDATES.length;i++){
@@ -1309,59 +1296,6 @@ function nongsaroGardenByName(korNm){
   }
   return null;
 }
-function roleBadgeHtml(role,attrs,korNm){
-  if(!attrs)return '';
-  var items=[];
-  if(role==='gardener'){
-    var g=nongsaroGardenByName(korNm);
-    if(g&&(g.managelevelCodeNm||'').trim())items.push((g.managelevelCodeNm.trim())+' 관리');
-    if(attrs.sunlight)items.push(attrs.sunlight);
-    if(attrs.moisture)items.push('물 '+attrs.moisture);
-  } else if(role==='landscape'){
-    if(attrs.resType)items.push(attrs.resType);
-    if(attrs.hardiness)items.push(attrs.hardiness);
-  } else if(role==='academic'){
-    if(attrs.endemicFlag)items.push('특산식물');
-    if(attrs.rareFlag)items.push('희귀식물');
-    if(attrs.endgFlag)items.push('멸종위기종');
-    if(!items.length&&attrs.resType)items.push(attrs.resType);
-  }
-  if(!items.length)return '';
-  return items.slice(0,2).map(function(t){return '<span class="pc-rolebadge'+(t==='멸종위기종'?' caution':(role!=='gardener'?' native':''))+'">'+esc(t)+'</span>';}).join('');
-}
-function renderRoleBadge(cardEl,attrs){
-  var body=cardEl.querySelector('.pc-body');
-  if(!body)return;
-  var old=cardEl.querySelector('.pc-rolebadges');if(old)old.remove();
-  if(!attrs)return;
-  var nmEl=cardEl.querySelector('.pc-name');
-  var html=roleBadgeHtml(pRole,attrs,nmEl?nmEl.textContent:'');
-  if(!html)return;
-  var wrap=document.createElement('div');
-  wrap.className='pc-rolebadges pc-badges';
-  wrap.innerHTML=html;
-  body.appendChild(wrap);
-}
-function renderRoleToggle(){
-  var el=document.getElementById('proletoggle');
-  if(!el)return;
-  el.innerHTML=ROLE_OPTS.map(function(o){return '<span class="fchip'+(pRole===o[0]?' active':'')+'" data-role="'+o[0]+'">'+esc(o[1])+'</span>';}).join('');
-  Array.prototype.forEach.call(el.querySelectorAll('.fchip'),function(chip){
-    chip.onclick=function(){pSetRole(chip.getAttribute('data-role'));};
-  });
-}
-/* 역할을 바꿀 때는 attrs를 다시 불러오지 않는다 - 이미 pAttrCache에 있는
-   값을 그대로 재사용해 배지만 다시 그리므로, 카드가 몇 백 개여도 즉시
-   반응한다(추가 네트워크 요청 없음). */
-window.pSetRole=function(role){
-  pRole=role;
-  renderRoleToggle();
-  document.querySelectorAll('#pgrid .pc').forEach(function(card){
-    var no=card.getAttribute('data-no'),uid=card.getAttribute('data-uid');
-    var attrs=pAttrCache[no||('u'+uid)];
-    renderRoleBadge(card,attrs);
-  });
-};
 /* ---- 정원 정보 필터 (상시 노출 패널, 다중 패싯, 복수 선택) ----
    기존 드롭다운(버튼을 눌러야 열리는 패널)은 필터가 있다는 사실 자체를
    가리는 문제가 있었다 - "정원식물/자생식물/보라색꽃"처럼 사용자가 바로
@@ -2664,5 +2598,4 @@ window.pDetail=function(it){
    응답을 기다릴 필요가 없다. */
 renderFilterPanel();
 updateFilterBadge();
-renderRoleToggle();
 })();
