@@ -19,18 +19,19 @@ var PAGE_SIZE=20;
    페이지 로드 시 한 번에 통째로 받아 학명 기준으로 인덱싱해둔다("정원 관련
    식물도 우선순위" 요구와도 맞물려, 이 인덱스에 있으면 정원용 식물로 우대된다).
    나머지 네 서비스(꽃장식과 정원 꾸미기/실내정원 만들기/실내정원 동영상강좌/
-   좋아하는 꽃)는 특정 학명에 매이지 않는 콘텐츠라 검색 결과에는 못 붙이고,
-   페이지 하단의 별도 섹션(#pgardencontent, PGC_* 함수들)에 둔다.
+   좋아하는 꽃)는 특정 학명에 매이지 않는 콘텐츠라 검색 결과 카드에는 못
+   붙이고, 상세창을 열 때 그 식물의 국명/색상과 실제로 관련된 항목만 걸러
+   상세창 "정원 가이드" 탭에 이어붙인다(nongsaroGeneralHtml, pgc* 함수들 -
+   페이지 하단의 별도 섹션이 아니라 각 식물 상세정보 안에 포함됨).
    ▶중요: api.nongsaro.go.kr는 브라우저에서의 직접 호출(CORS)을 지원하지 않아,
    Webflow 코드임베드(순수 클라이언트 JS)에서 바로 fetch()로 부를 수 없다(실제
    테스트로 확인됨 - GBIF/data.go.kr는 되는데 이 도메인만 "Failed to fetch").
    그래서 별도로 제공한 nongsaro-proxy-worker.js(Cloudflare Workers용, 무료)를
    중계 서버로 배포한 뒤 그 주소를 아래 NONGSARO_PROXY에 넣어야 이 기능이
-   동작한다. 비워두면(기본값) 이 섹션은 조용히 건너뛰고 나머지 기능은 그대로
-   동작한다.
-   ▶TODO: Cloudflare Worker 배포 후 발급되는 주소로 교체하세요
-   (예: 'https://nongsaro-proxy.본인계정.workers.dev') */
-var NONGSARO_PROXY='';
+   동작한다. 비워두면 이 기능은 조용히 건너뛰고 나머지 기능은 그대로 동작한다.
+   ▶실제 배포된 프록시 주소(nongsaro-proxy-worker.js를 Cloudflare Workers에
+   배포해 발급받음): */
+var NONGSARO_PROXY='https://nongsaro-proxy.chgreena.workers.dev';
 function fetchNongsaroItems(path,params){
   if(!NONGSARO_PROXY)return Promise.resolve([]);
   var qs=Object.keys(params||{}).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
@@ -141,74 +142,65 @@ var nongsaroDataReady=Promise.all([loadNongsaroHerb(),loadNongsaroWeed(),loadNon
   .catch(function(){/* 농사로 쪽이 실패해도(키 만료 등) 나머지 기능은 정상 동작해야 한다 */});
 
 /* 농사로 오픈API 중 남은 4종(꽃장식과 정원 꾸미기/실내정원 만들기/실내정원
-   동영상강좌/좋아하는 꽃)은 위 3종과 달리 특정 학명에 매이지 않는 콘텐츠라서
-   ("좋아하는 꽃"은 색상 7종 분류, 나머지는 DIY/영상 목록) 검색 결과 카드나
-   상세창에 붙일 자리가 없다. 그래서 페이지 하단의 별도 접이식 섹션
-   (#pgardencontent)에 두고, 실제로 펼쳤을 때만 필요한 목록을 불러온다(불필요한
-   네트워크 요청 방지). 엔드포인트는 nongsaro.go.kr Open API 목록 페이지에서
-   실제 AJAX 샘플의 네트워크 요청을 직접 관찰해 확인했다(가이드 문서가 없는
-   서비스라 추측 대신 실측). */
-var PGC_TABS=[['decor','꽃장식과 정원 꾸미기'],['make','실내정원 만들기'],['video','실내정원 동영상강좌'],['pref','좋아하는 꽃']];
-var pgcOpened=false,pgcTabsRendered=false,pgcActive='decor',pgcCache={};
-window.pToggleGardenContent=function(){
-  pgcOpened=!pgcOpened;
-  document.getElementById('pgcBody').style.display=pgcOpened?'block':'none';
-  document.getElementById('pgcToggleIcon').textContent=pgcOpened?'−':'+';
-  if(pgcOpened&&!pgcTabsRendered){renderPgcTabs();pgcLoad(pgcActive);}
-};
-function renderPgcTabs(){
-  pgcTabsRendered=true;
-  var el=document.getElementById('pgcTabs');
-  el.innerHTML=PGC_TABS.map(function(t){return '<span class="fchip'+(t[0]===pgcActive?' active':'')+'" data-pgc="'+t[0]+'">'+esc(t[1])+'</span>';}).join('');
-  Array.prototype.forEach.call(el.querySelectorAll('[data-pgc]'),function(chip){
-    chip.onclick=function(){
-      pgcActive=chip.getAttribute('data-pgc');
-      renderPgcTabs();
-      pgcLoad(pgcActive);
-    };
-  });
+   동영상강좌/좋아하는 꽃)은 위 3종과 달리 특정 학명에 매이지 않는 콘텐츠다
+   ("좋아하는 꽃"은 색상 7종 분류, 나머지는 제목 위주의 DIY/영상 목록이라 학명
+   필드가 아예 없다 - 실측으로 필드 목록을 직접 확인함). 예전에는 이 때문에
+   페이지 하단의 별도 섹션(#pgardencontent)에 통째로 나열했었는데, "하단에
+   별도로 노출하지 말고 식물 상세정보에 포함시켜 달라"는 요청에 따라 방식을
+   바꿨다: 페이지 로드 후 첫 상세창이 열릴 때 4종을 한 번만 통째로 받아
+   캐시해두고(nongsaroGeneralReady), 그 상세창의 학명·국명에 실제로 관련된
+   항목만 걸러내 정원 가이드 탭 안에 이어붙인다 - 관련 없는 항목은 아예
+   보여주지 않는다("정확한 데이터만 신뢰" 원칙과 동일).
+   - 꽃장식/실내정원 만들기/동영상강좌: 제목(cntntsSj)에 해당 식물의 국명이
+     그대로 포함된 경우만 채택(부분 문자열 일치 - 과도하게 다른 식물을 끌어오는
+     것을 막기 위해 느슨한 유사도 매칭은 쓰지 않는다).
+   - 좋아하는 꽃: 학명/국명 필드가 없는 대신 색상 계열(colorInfo)로만 분류되어
+     있어, 이 앱이 이미 상세정보에서 뽑아내는 꽃 색상(attrs.colors)과 같은
+     계열이면 채택한다. */
+var PREF_COLOR_MAP={'빨간색계열':'빨강','적색계열':'빨강','분홍색계열':'분홍','노란색계열':'노랑','주황색계열':'주황','흰색계열':'흰색','보라색계열':'보라','파란색계열':'파랑','녹색계열':'초록','검정색계열':'검정','검은색계열':'검정'};
+var nongsaroGeneralReady=null;
+function loadNongsaroGeneral(){
+  if(nongsaroGeneralReady)return nongsaroGeneralReady;
+  if(!NONGSARO_PROXY){nongsaroGeneralReady=Promise.resolve({decor:[],make:[],video:[],pref:[]});return nongsaroGeneralReady;}
+  nongsaroGeneralReady=Promise.all([
+    fetchNongsaroItems('flwrDecor/flwrDecorList',{numOfRows:100,pageNo:1}),
+    fetchNongsaroItems('cateGardenMake/cateGardenMakeLst',{numOfRows:60,pageNo:1}),
+    fetchNongsaroItems('indoorpsncpaMvpLctre/indoorpsncpaMvpLctreLst',{numOfRows:60,pageNo:1}),
+    fetchNongsaroItems('preferenceFlower/preferenceFlowerList',{numOfRows:30,pageNo:1})
+  ]).then(function(res){
+    return {decor:res[0]||[],make:res[1]||[],video:res[2]||[],pref:res[3]||[]};
+  }).catch(function(){return {decor:[],make:[],video:[],pref:[]};});
+  return nongsaroGeneralReady;
 }
-function pgcSetMsg(msg){document.getElementById('pgcList').innerHTML='<p style="color:#ABABAB;text-align:center;padding:30px 0;line-height:1.7">'+esc(msg)+'</p>';}
-function pgcLoad(key){
-  if(pgcCache[key]){pgcRender(key,pgcCache[key]);return;}
-  pgcSetMsg('불러오는 중...');
-  if(!NONGSARO_PROXY){pgcSetMsg('이 섹션은 농사로 중계 서버(NONGSARO_PROXY)가 연결되어야 표시됩니다. 배포 시 함께 설정해 주세요.');return;}
-  var p;
-  if(key==='decor')p=fetchNongsaroItems('flwrDecor/flwrDecorList',{numOfRows:100,pageNo:1});
-  else if(key==='make')p=fetchNongsaroItems('cateGardenMake/cateGardenMakeLst',{numOfRows:50,pageNo:1});
-  else if(key==='video')p=fetchNongsaroItems('indoorpsncpaMvpLctre/indoorpsncpaMvpLctreLst',{numOfRows:50,pageNo:1});
-  else p=fetchNongsaroItems('preferenceFlower/preferenceFlowerList',{numOfRows:10,pageNo:1});
-  p.then(function(items){pgcCache[key]=items;pgcRender(key,items);}).catch(function(){pgcSetMsg('불러오지 못했습니다.');});
+function pgcCard(it,kind){
+  var img=(it.imgUrl||it.imageFileUrl)?('<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px"><img src="'+esc(it.imgUrl||it.imageFileUrl)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"></div>'):'';
+  var label=kind==='pref'?[it.effectInfo,it.spceInfo].filter(Boolean).join(' · '):(it.cntntsSj||'');
+  return '<div>'+img+'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
 }
-function pgcRender(key,items){
-  if(!items||!items.length){pgcSetMsg('표시할 자료가 없습니다.');return;}
-  var html='';
-  if(key==='decor'){
-    html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px">'+items.map(function(it){
-      return '<div style="border:1px solid #E6E6E6;padding:16px 18px"><p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 8px">'+esc(it.seCodeNm||'')+'</p><p style="font-size:14px;color:#121212;margin:0;line-height:1.5">'+esc(it.cntntsSj||'')+'</p></div>';
-    }).join('')+'</div>';
-  } else if(key==='make'){
-    html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px">'+items.map(function(it){
-      var img=it.imgUrl?('<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:10px"><img src="'+esc(it.imgUrl)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"></div>'):'';
-      var tags=[it.postngplaceCodeNm,it.decorkndCodeNm,it.eclgyCodeNm,it.pltmthCodeNm].filter(Boolean).join(' · ');
-      return '<div>'+img+'<p style="font-size:14px;color:#121212;margin:0 0 4px">'+esc(it.cntntsSj||'')+'</p><p style="font-size:11px;color:#ABABAB;margin:0">'+esc(tags)+'</p></div>';
-    }).join('')+'</div>';
-  } else if(key==='video'){
-    html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:24px">'+items.map(function(it){
-      var v=it.atchmnflUrl?('<video src="'+esc(it.atchmnflUrl)+'" poster="'+esc(it.imageFileUrl||'')+'" controls preload="none" style="width:100%;aspect-ratio:16/9;background:#000"></video>'):'';
-      return '<div>'+v+'<p style="font-size:13px;color:#121212;margin:8px 0 0">'+esc(it.cntntsSj||'')+'</p></div>';
-    }).join('')+'</div>';
-  } else {
-    html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:24px">'+items.map(function(it){
-      var img=it.imgUrl?('<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:10px"><img src="'+esc(it.imgUrl)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"></div>'):'';
-      return '<div>'+img+'<p style="font-size:13px;font-weight:600;color:#121212;margin:0 0 6px">'+esc(it.colorInfo||'')+'</p>'
-        +(it.spceInfo?'<p style="font-size:12px;color:#787878;margin:0 0 4px">공간 · '+esc(it.spceInfo)+'</p>':'')
-        +(it.eraInfo?'<p style="font-size:12px;color:#787878;margin:0 0 4px">계절 · '+esc(it.eraInfo)+'</p>':'')
-        +(it.effectInfo?'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(it.effectInfo)+'</p>':'')
-        +'</div>';
-    }).join('')+'</div>';
-  }
-  document.getElementById('pgcList').innerHTML=html;
+function pgcGroup(title,items,kind){
+  if(!items.length)return'';
+  return '<p style="font-size:12px;font-weight:600;color:#787878;margin:0 0 10px">'+esc(title)+'</p>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px">'
+    +items.map(function(it){return pgcCard(it,kind);}).join('')+'</div>';
+}
+/* 상세창(정원 가이드 탭)에 이어붙일 조각을 만든다 - nm(국명)과 colors(꽃 색상
+   배열)에 실제로 매칭되는 항목이 하나도 없으면 빈 문자열을 돌려주고, 그러면
+   호출부에서 이 섹션 자체가 화면에 나타나지 않는다. */
+function nongsaroGeneralHtml(nm,colors){
+  return loadNongsaroGeneral().then(function(all){
+    var nmClean=(nm||'').trim();
+    var decorM=nmClean?all.decor.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
+    var makeM=nmClean?all.make.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
+    var videoM=nmClean?all.video.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
+    var colorSet={};(colors||[]).forEach(function(c){colorSet[c]=1;});
+    var prefM=all.pref.filter(function(it){var mapped=PREF_COLOR_MAP[it.colorInfo]||'';return mapped&&colorSet[mapped];});
+    var body=pgcGroup('꽃장식과 정원 꾸미기',decorM.slice(0,3),'decor')
+      +pgcGroup('실내정원 만들기',makeM.slice(0,3),'make')
+      +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video')
+      +pgcGroup('좋아하는 꽃',prefM.slice(0,2),'pref');
+    if(!body)return'';
+    return '<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">가드닝 콘텐츠 · 농사로(농촌진흥청)</p>'+body+'</div>';
+  }).catch(function(){return'';});
 }
 /* 국명 후보들을 학명으로 검증한 뒤에만 채택 - 학명이 다르면(동명이인 국명)
    버린다. GBIF 통합 때 세운 "학명이 다르면 삭제" 원칙을 여기도 동일 적용. */
@@ -1926,7 +1918,7 @@ function isGovOrigin(origin){return origin==='gov'||!!STRUCT_ORIGINS[origin];}
 
 function runSearch(){
   showLoading();
-  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[]};
+  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
   pAll=[];
   pShown=0;
   var myQuery=pQ;
@@ -2389,11 +2381,12 @@ function pdFillSecondaryTabs(profile,match,sc,nm,nsData,extraAcademicHtml){
   var aBase=pdRarityBadgesHtml(match)+rowsTable(pdAcademicCommonRows(sc,match));
   var bookData=bookProfileData(sc);
   var storyData=forestStoryHtml(nm);
-  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData]).then(function(res){
-    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'';
+  var generalData=nongsaroGeneralHtml(nm,profile&&profile.colors);
+  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData,generalData]).then(function(res){
+    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'',general=res[4]||'';
     var landscapeAll=lHtml+(ns.landscapeHtml||'')+(bk.landscapeHtml||'');
     if(landscapeAll)landscapeAll='<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">조경 스펙</p>'+landscapeAll+'</div>';
-    var g=gHtml+(ns.gardenHtml||'')+(bk.gardenHtml||'')+landscapeAll;
+    var g=gHtml+(ns.gardenHtml||'')+(bk.gardenHtml||'')+landscapeAll+general;
     var s=(bk.storyHtml||'')+fs;
     var academicAll=aBase+extra+(ns.academicHtml||'');
     if(academicAll)academicAll='<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">학술정보</p>'+academicAll+'</div>';
