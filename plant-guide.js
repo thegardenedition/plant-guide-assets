@@ -179,7 +179,7 @@ function pgcCard(it,kind){
 }
 function pgcGroup(title,items,kind){
   if(!items.length)return'';
-  return '<p style="font-size:12px;font-weight:600;color:#787878;margin:0 0 10px">'+esc(title)+'</p>'
+  return (title?'<p style="font-size:12px;font-weight:600;color:#787878;margin:0 0 10px">'+esc(title)+'</p>':'')
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px">'
     +items.map(function(it){return pgcCard(it,kind);}).join('')+'</div>';
 }
@@ -197,7 +197,7 @@ function nongsaroGeneralHtml(nm,colors){
     var body=pgcGroup('꽃장식과 정원 꾸미기',decorM.slice(0,3),'decor')
       +pgcGroup('실내정원 만들기',makeM.slice(0,3),'make')
       +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video')
-      +pgcGroup('좋아하는 꽃',prefM.slice(0,2),'pref');
+      +pgcGroup('',prefM.slice(0,2),'pref');
     if(!body)return'';
     return '<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">가드닝 콘텐츠 · 농사로(농촌진흥청)</p>'+body+'</div>';
   }).catch(function(){return'';});
@@ -506,9 +506,10 @@ function bookForest300Html(r){
   if(r.desc)html+='<p style="color:#121212;font-size:13px;line-height:1.8;margin:-8px 0 20px;white-space:pre-line">'+esc(r.desc)+'</p>';
   return html;
 }
-/* 세 도서 데이터를 학명 기준으로 한 번에 조회해 역할별 탭(가드너/조경/학술)에
-   나눠 붙인다 - pdFillSecondaryTabs 안에서 sc만 받아 호출하므로 기존 호출부
-   7곳을 전혀 손대지 않고도 모든 상세창에 자동으로 반영된다. */
+/* 세 도서 데이터를 학명 기준으로 한 번에 조회해 개요 탭의 슬롯들(정원가이드/
+   조경/학술/이야기)에 나눠 붙인다 - pdFillOverviewExtras 안에서 sc만 받아
+   호출하므로 기존 호출부를 전혀 손대지 않고도 모든 상세창에 자동으로
+   반영된다. */
 function bookProfileData(sc){
   var empty={gardenHtml:'',landscapeHtml:'',academicHtml:'',storyHtml:''};
   return bookDataReady.then(function(){
@@ -1184,19 +1185,17 @@ function envBarHtml(label,options,active){
     +options.map(function(o){var on=(o===active);return '<span style="flex:1;text-align:center;padding:7px 0;font-size:11px;letter-spacing:.3px;border:1px solid '+(on?'#121212':'#E6E6E6')+';background:'+(on?'#121212':'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
     +'</div></div>';
 }
-function curatedGardenHtml(p){
+function envTripleHtml(p){
   var monthCells='';
   for(var m=1;m<=12;m++){
     var active=p.bloomMonths.indexOf(m)!==-1;
     monthCells+='<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:10px;border-radius:50%;'+(active?('background:'+(p.colorHex[0]||'#8E8B82')+';color:#fff;font-weight:600'):'background:#F2F1EE;color:#B7B3AA')+'">'+m+'</span>';
   }
   return ''
-    +(p.tagline?'<p style="font-size:15px;color:#121212;line-height:1.6;margin:0 0 26px;font-style:italic">"'+esc(p.tagline)+'"</p>':'')
     +envBarHtml('광조건',['양지','반음지','음지'],p.sunlight)
     +envBarHtml('수분',['건조','보통','다습'],p.moisture)
     +'<p style="font-size:10px;letter-spacing:1.5px;color:#ABABAB;margin:22px 0 8px">개화 시기 (월)</p>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:26px">'+monthCells+'</div>'
-    +(p.plantingTip?'<p style="font-size:13px;color:#121212;line-height:1.7;margin:0"><span style="font-weight:600">식재 팁 </span>· '+esc(p.plantingTip)+'</p>':'');
+    +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:26px">'+monthCells+'</div>';
 }
 function curatedLandscapeHtml(p){
   var badges=[].concat(p.useCats||[],p.tags||[]);
@@ -1205,6 +1204,33 @@ function curatedLandscapeHtml(p){
     +(tagsHtml?'<div style="margin-bottom:18px">'+tagsHtml+'</div>':'')
     +envBarHtml('내한성',['전국 노지','제한적 노지','실내 구성'],p.hardiness)
     +(p.story?'<p style="font-size:13px;color:#787878;line-height:1.7;margin:22px 0 0">'+esc(p.story)+'</p>':'');
+}
+/* "정원 가이드 탭을 개요에 포함, 학명/과명/영명/광조건/수분/개화시기 순으로"
+   요청에 따라 개요 탭을 이름이 고정된 슬롯(div id)들의 나열로 만든다 -
+   출처별 분기(도감/표본/특산.../정적 데이터셋)마다 데이터가 서로 다른
+   타이밍에 비동기로 도착해도, 슬롯 id가 고정돼 있어 각 조각을 해당 슬롯에만
+   써넣으면 화면 순서는 항상 동일하게 유지된다(먼저 도착한 조각이 뒤 슬롯에
+   끼어들 걱정이 없다). */
+function overviewSkeleton(){
+  return ['pdcore','pdenv','pdtagline','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdgeneral']
+    .map(function(id){return '<div id="'+id+'"></div>';}).join('');
+}
+function setEl(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html||'';}
+/* 학명은 검색 결과에 항상 있어 즉시 채울 수 있지만, 과명·영명은 출처(도감/
+   표본/정적 데이터셋)에 따라 조금 늦게 도착한다 - 도착하는 대로 다시 호출해도
+   같은 슬롯을 덮어쓸 뿐이라 안전하다. */
+function setPdCore(sc,family,engNm){
+  var rows=[];
+  pushRow(rows,'학명',sc);
+  pushRow(rows,'과명',family);
+  pushRow(rows,'영명',engNm);
+  setEl('pdcore',rowsTable(rows));
+}
+function applyCuratedProfile(p){
+  setEl('pdenv',p?envTripleHtml(p):'');
+  setEl('pdtagline',(p&&p.tagline)?'<p style="font-size:15px;color:#121212;line-height:1.6;margin:0 0 26px;font-style:italic">"'+esc(p.tagline)+'"</p>':'');
+  setEl('pdplanting',(p&&p.plantingTip)?'<p style="font-size:13px;color:#121212;line-height:1.7;margin:0 0 26px"><span style="font-weight:600">식재 팁 </span>· '+esc(p.plantingTip)+'</p>':'');
+  setEl('pdlandscape',p?curatedLandscapeHtml(p):'');
 }
 var pAttrCache={};
 /* plantPilbkInfo(종 상세) 원본 응답을 한 번만 받아 공유하는 캐시.
@@ -2275,7 +2301,6 @@ function pushRow(rows,label,v){var t=(v||'').toString().trim();if(t)rows.push([l
 function rawDetailRows(origin,raw){
   var rows=[];
   if(origin==='naturalized'){
-    pushRow(rows,'영명',val(raw,'plantEngNm'));
     pushRow(rows,'원산지',val(raw,'orplcNm'));
     pushRow(rows,'분포지역',val(raw,'distrAraDscrt'));
     pushRow(rows,'생활형',val(raw,'plantLfcclTpcdNm'));
@@ -2283,7 +2308,6 @@ function rawDetailRows(origin,raw){
     pushRow(rows,'확산정도',val(raw,'plantDistrGrcd'));
     pushRow(rows,'열매유형',val(raw,'frtTpcdNm'));
   } else if(origin==='spclt'||origin==='rare'){
-    pushRow(rows,'분류(과)',val(raw,'familyKorNm')||val(raw,'apgFamilyKorNm')||val(raw,'agpFamilyKorNm'));
     pushRow(rows,'적색목록 등급',val(raw,'rareTpcdNm'));
   } else if(origin==='folk'){
     pushRow(rows,'식별 특징',val(raw,'flcstPlantIdntfDscrt'));
@@ -2296,6 +2320,14 @@ function rawDetailRows(origin,raw){
   }
   return rows;
 }
+/* 학명·과명·영명은 이제 개요 맨 위 공통 슬롯(#pdcore)에서 출처와 무관하게
+   같은 형식으로 보여주므로, raw(특산/적색/외래) 데이터에서 이 세 필드만
+   따로 뽑아둔다 - rawDetailRows 본문 표에는 더 이상 섞이지 않는다. */
+function rawCoreFields(origin,raw){
+  if(origin==='naturalized')return{family:'',engNm:val(raw,'plantEngNm')};
+  if(origin==='spclt'||origin==='rare')return{family:val(raw,'familyKorNm')||val(raw,'apgFamilyKorNm')||val(raw,'agpFamilyKorNm'),engNm:''};
+  return{family:'',engNm:''};
+}
 var ORIGIN_NOTICE={
   spclt:'국립수목원 특산식물 목록에 포함된 종입니다. 한국에서만 자라거나 분포가 매우 제한적인 식물입니다.',
   rare:'국립수목원 적색식물 목록에 포함된 종입니다. 자생지 감소 등으로 보전이 필요한 것으로 평가된 식물입니다.',
@@ -2306,13 +2338,13 @@ var ORIGIN_NOTICE={
 var ORIGIN_BADGE_TXT={spclt:'특산식물',rare:'적색식물',naturalized:'외래식물',folk:'민속식물',seed:'종자정보'};
 
 /* ---- 역할별 탭 구조 ----
-   가드너/조경전문가/식물전문가가 원하는 정보가 서로 달라서("검색부터 화면
-   구성까지" 역할별 재편 요청), 상세창을 4개 탭으로 나눈다: 사진과 기본 서술은
-   누구나 보는 개요(overview), 돌보는 사람을 위한 관리 정보는 정원 가이드
-   (garden), 설계·시공하는 사람을 위한 스펙은 조경 스펙(landscape), 학명·
-   분류·희귀종 지정·표본 기록처럼 근거자료 성격이 강한 정보는 학술정보
-   (academic)에 둔다. */
-var PD_TABS=[['overview','개요'],['story','이야기'],['garden','정원 가이드']];
+   "정원 가이드도 개요에 포함" 요청에 따라 원래 4개(개요/정원 가이드/조경 스펙/
+   학술정보)였던 탭을 계속 줄여왔고, 이제 정원 가이드까지 개요에 합쳐 남는
+   탭은 개요(overview)와 이야기(story) 두 개뿐이다. 개요는 학명·과명·영명
+   →광조건·수분·개화시기→그 아래 나머지(설명/조경 스펙/농사로·발간자료/
+   학술정보/가드닝 콘텐츠) 순으로, 이름이 고정된 슬롯(overviewSkeleton)에
+   나눠 채운다. */
+var PD_TABS=[['overview','개요'],['story','이야기']];
 function pdPane(key){return document.getElementById('pdpane-'+key);}
 function pdSet(key,html){var p=pdPane(key);if(p)p.innerHTML=html;}
 /* "학술 정보도 개요에 포함" 요청에 따라 학술정보 탭을 없애고 개요 탭 끝에
@@ -2337,18 +2369,15 @@ window.pSwitchTab=function(key){
     el.classList.toggle('active',el.getAttribute('data-pdtab')===key);
   });
 };
-/* 학명/과명/자원구분(자생종·재배품종·외국종)과 희귀·특산·멸종위기 지정
-   여부는 국립수목원이 직접 평가해둔 값이라(deriveCuratedProfile 주석 참고),
-   어느 origin의 상세창이든 학명이 정적 데이터셋과 일치하면 학술정보 탭에
-   공통으로 보여줄 수 있다. */
-function pdAcademicCommonRows(sc,match){
+/* 자원구분(자생종·재배품종·외국종)과 희귀·특산·멸종위기 지정 여부는 국립
+   수목원이 직접 평가해둔 값이라(deriveCuratedProfile 주석 참고), 어느
+   origin의 상세창이든 학명이 정적 데이터셋과 일치하면 학술정보 자리에
+   공통으로 보여줄 수 있다. 학명/과명은 이제 개요 맨 위 공통 슬롯(#pdcore)에
+   이미 표시되므로 여기서는 중복하지 않는다. */
+function pdRarityRows(match){
   var rows=[];
-  pushRow(rows,'학명',sc);
   var nmRec=match&&match.name;
-  if(nmRec){
-    pushRow(rows,'과명',nmRec.family);
-    pushRow(rows,'자원구분',nmRec.resType);
-  }
+  if(nmRec)pushRow(rows,'자원구분',nmRec.resType);
   return rows;
 }
 function pdRarityBadgesHtml(match){
@@ -2361,40 +2390,39 @@ function pdRarityBadgesHtml(match){
   if(!items.length)return '';
   return '<div class="pc-badges" style="margin:0 0 18px">'+items.map(function(p){return '<span class="pc-rolebadge '+p[1]+'">'+esc(p[0])+'</span>';}).join('')+'</div>';
 }
-/* 정원 가이드/조경 스펙/학술정보 세 탭을 한 번에 채우는 공용 로직 - profile이
-   없으면(도감·정적 데이터셋 어디에도 없는 종) 큐레이션 블록 없이 농사로 자료만,
-   그마저 없으면 "정보가 없습니다"를 보여준다. extraAcademicHtml은 표본 기록처럼
-   탭별로만 존재하는 추가 조각을 위한 선택적 프로미스/문자열이다. */
-/* "단순한 정보 열람이 아니라 식물의 의미·이야기를 별도 탭으로 보여달라"는
-   요청에 따라 이야기(story) 탭을 신설했다 - 국명·학명이 왜 그렇게 붙었는지
-   (이름의 유래, 발간도서 3권)와 산림청이 정리한 숲이야기(생애·서식지 서술)를
-   딱딱한 표 대신 읽는 글로 모아 보여준다. 학술정보 탭에는 분류·자생 스펙만
-   남긴다.
-   ▶"조경 스펙을 정원 가이드에 포함시켜" 요청에 따라 별도 탭이었던 조경 스펙을
-   없애고, 그 내용을 정원 가이드 탭 안에 이어서 보여준다(돌보는 사람이 필요한
-   관리 정보 뒤에, 설계·시공 스펙을 참고 자료로 덧붙이는 순서).
-   ▶"학술 정보도 개요에 포함" 요청에 따라 학술정보 탭도 없애고, 개요 탭 끝에
-   이어붙인다 - 결과적으로 탭은 개요/이야기/정원 가이드 세 개만 남는다. */
-function pdFillSecondaryTabs(profile,match,sc,nm,nsData,extraAcademicHtml){
-  var gHtml=profile?curatedGardenHtml(profile):'';
-  var lHtml=profile?curatedLandscapeHtml(profile):'';
-  var aBase=pdRarityBadgesHtml(match)+rowsTable(pdAcademicCommonRows(sc,match));
+/* 개요 슬롯 중 비동기로 늦게 도착하는 조각(농사로 관리정보/조경 스펙, 발간
+   도서 정원가이드/조경북, 희귀·자원구분 학술정보, 가드닝 콘텐츠)과 이야기
+   탭을 한 번에 채우는 공용 로직 - profile이 없으면(도감·정적 데이터셋 어디에도
+   없는 종) 큐레이션 블록 없이 농사로·발간자료만, 그마저 없으면 각 슬롯이 빈
+   채로 남는다(불필요한 "정보 없음" 문구를 슬롯마다 반복하지 않음).
+   extraAcademicHtml은 표본 채집 기록처럼 특정 분기에만 존재하는 근거자료
+   조각을 위한 선택적 프로미스/문자열이다.
+   ▶"정원 가이드는 학명/과명/영명/광조건/수분/개화시기 순으로 개요에 포함,
+   그 아래는 논리적으로" 요청에 따라 정원 가이드 탭도 없애고 개요 탭 안의
+   고정 슬롯들로 흡수한다 - 결과적으로 탭은 개요/이야기 두 개만 남는다.
+   ▶"조경 스펙", "좋아하는 꽃" 표제 텍스트는 삭제 요청에 따라 더 이상 붙이지
+   않는다(내용은 각자의 슬롯/농사로 자체 표제 아래 그대로 유지). */
+function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
   var bookData=bookProfileData(sc);
   var storyData=forestStoryHtml(nm);
   var generalData=nongsaroGeneralHtml(nm,profile&&profile.colors);
   Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData,generalData]).then(function(res){
     var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'',general=res[4]||'';
-    var landscapeAll=lHtml+(ns.landscapeHtml||'')+(bk.landscapeHtml||'');
-    if(landscapeAll)landscapeAll='<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">조경 스펙</p>'+landscapeAll+'</div>';
-    var g=gHtml+(ns.gardenHtml||'')+(bk.gardenHtml||'')+landscapeAll+general;
+    setEl('pdnsgarden',ns.gardenHtml||'');
+    setEl('pdnslandscape',ns.landscapeHtml||'');
+    setEl('pdbookgarden',bk.gardenHtml||'');
+    setEl('pdbooklandscape',bk.landscapeHtml||'');
+    var rarityRowsArr=pdRarityRows(match);
+    var rarityTable=rarityRowsArr.length?rowsTable(rarityRowsArr):'';
+    var badges=pdRarityBadgesHtml(match);
+    var academicInner=badges+rarityTable+extra+(ns.academicHtml||'');
+    var hasAcademic=!!(badges||rarityTable||extra||ns.academicHtml);
+    setEl('pdacademic',hasAcademic?('<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">학술정보</p>'+academicInner+'</div>'):'');
+    setEl('pdgeneral',general);
     var s=(bk.storyHtml||'')+fs;
-    var academicAll=aBase+extra+(ns.academicHtml||'');
-    if(academicAll)academicAll='<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:24px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 16px">학술정보</p>'+academicAll+'</div>';
-    pdSet('garden',g||'<p style="color:#ABABAB;text-align:center;padding:20px 0">정원 관리 정보가 없습니다.</p>');
-    pdAppend('overview',academicAll);
     pdSet('story',s||'<p style="color:#ABABAB;text-align:center;padding:20px 0;line-height:1.7">이름의 유래나 이야기로 정리된 자료가 없습니다.</p>');
   }).catch(function(){
-    pdSetEmpty('garden');pdSetEmpty('story');
+    pdSetEmpty('story');
   });
 }
 
@@ -2407,7 +2435,9 @@ window.pDetail=function(it){
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   renderPdTabBar();
   pSwitchTab('overview');
-  PD_TABS.forEach(function(t){pdSetLoading(t[0]);});
+  pdSet('overview',overviewSkeleton());
+  setPdCore(sc,'','');
+  pdSetLoading('story');
   var creditEl=document.getElementById('pdcredit');
   creditEl.style.display='none';
   document.getElementById('pov').style.display='flex';
@@ -2428,10 +2458,10 @@ window.pDetail=function(it){
     if(pDetailToken!==photoRenderToken)return;
     renderImageSlider(pdimg,creditEl,photos);
   });
-  /* 정원 가이드/조경 스펙/학술정보/이야기 네 탭이 공유하는 농사로 조회는
-     origin과 무관하게 학명 기준으로 한 번만 호출해 나눠 쓴다. 숲이야기·발간도서
-     조회(bookProfileData)는 nm/sc만 있으면 되므로 pdFillSecondaryTabs 안에서
-     직접 호출한다. */
+  /* 개요 탭 안의 정원가이드/조경 스펙/학술정보 슬롯과 이야기 탭이 공유하는
+     농사로 조회는 origin과 무관하게 학명 기준으로 한 번만 호출해 나눠 쓴다.
+     숲이야기·발간도서 조회(bookProfileData)는 nm/sc만 있으면 되므로
+     pdFillOverviewExtras 안에서 직접 호출한다. */
   var nsData=nongsaroPanelData(nm,sc);
 
   if(no){
@@ -2441,9 +2471,17 @@ window.pDetail=function(it){
     Promise.all([fetchPilbkItem(no),staticDataReady]).then(function(res){
       var item=res[0];
       var match=getStaticMatch(sc||(item&&val(item,'plantSpecsScnm')));
-      if(!item){pdSetEmpty('overview','상세 정보가 없습니다.');pdFillSecondaryTabs(null,match,sc,nm,nsData);return;}
+      var family=(match&&match.name&&match.name.family)||'';
+      if(!item){
+        setPdCore(sc,family,'');
+        setEl('pdbody','<p style="color:#ABABAB;text-align:center;padding:20px 0">상세 정보가 없습니다.</p>');
+        pdFillOverviewExtras(null,match,sc,nm,nsData);
+        return;
+      }
+      var engNm=val(item,'engNm');
+      family=family||val(item,'familyKorNm')||val(item,'apgFamilyKorNm')||'';
+      setPdCore(sc,family,engNm);
       var rows=[];
-      pushRow(rows,'영명',val(item,'engNm'));
       pushRow(rows,'형태',val(item,'shpe'));
       pushRow(rows,'분포',val(item,'dstrb'));
       pushRow(rows,'해외분포',val(item,'osDstrb'));
@@ -2451,13 +2489,14 @@ window.pDetail=function(it){
       pushRow(rows,'이용방법',val(item,'useMthdDesc'));
       pushRow(rows,'원산지',val(item,'orplcNm'));
       pushRow(rows,'비고',val(item,'note'));
-      pdSet('overview',rowsTable(rows));
+      setEl('pdbody',rowsTable(rows));
       var profile=pAttrCache[no]||deriveCuratedProfile(item,match);
       pAttrCache[no]=profile;
-      pdFillSecondaryTabs(profile,match,sc,nm,nsData);
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData);
     }).catch(function(e){
-      pdSetError('overview',e.message);
-      pdFillSecondaryTabs(null,getStaticMatch(sc),sc,nm,nsData);
+      setEl('pdbody','<p style="color:#DC2B2B;text-align:center;padding:20px 0">'+esc(e.message)+'</p>');
+      pdFillOverviewExtras(null,getStaticMatch(sc),sc,nm,nsData);
     });
   } else if(specsId){
     var url2=buildUrl('/plantSmplUnitList',{serviceKey:KEY,pageNo:1,numOfRows:5,reqPlantSpecsId:specsId});
@@ -2466,14 +2505,14 @@ window.pDetail=function(it){
       var header=res.header||{};
       var body=res.body||{};
       if(header.resultCode==='03'||!parseInt(body.totalCount||0,10)){
-        pdSetEmpty('overview','표본 정보가 없습니다.');
+        setEl('pdbody','<p style="color:#ABABAB;text-align:center;padding:20px 0">표본 정보가 없습니다.</p>');
         return '';
       }
       if(header.resultCode!=='00'){throw new Error(header.resultMsg||'표본 정보를 불러올 수 없습니다.');}
       var tot=body.totalCount||'0';
       var items=normalizeItems(body.items);
-      var notice='<p style="color:#787878;font-size:13px;margin:0 0 20px;line-height:1.7">국립수목원 식물도감에는 아직 등록되지 않은 종으로, 표본관에 소장된 채집 기록 '+esc(tot)+'건 중 일부를 학술정보 탭에서 확인할 수 있습니다.</p>';
-      pdSet('overview',notice);
+      var notice='<p style="color:#787878;font-size:13px;margin:0 0 20px;line-height:1.7">국립수목원 식물도감에는 아직 등록되지 않은 종으로, 표본관에 소장된 채집 기록 '+esc(tot)+'건 중 일부를 아래 학술정보에서 확인할 수 있습니다.</p>';
+      setEl('pdbody',notice);
       if(!items.length)return '';
       var html='<div style="border-top:1px solid #E6E6E6;padding-top:24px;margin-top:8px"><p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0 0 12px">표본 채집 기록 · 국립수목원 표본관</p><table style="width:100%;border-collapse:collapse">';
       html+='<tr style="border-bottom:1px solid #E6E6E6"><td style="padding:10px 0;color:#ABABAB;font-size:11px;letter-spacing:1px;font-weight:600">소장기관</td><td style="padding:10px 0;color:#ABABAB;font-size:11px;letter-spacing:1px;font-weight:600">채집지</td><td style="padding:10px 0;color:#ABABAB;font-size:11px;letter-spacing:1px;font-weight:600">채집일</td></tr>';
@@ -2486,7 +2525,7 @@ window.pDetail=function(it){
       html+='</table></div>';
       return html;
     }).catch(function(e){
-      pdSetError('overview',e.message);
+      setEl('pdbody','<p style="color:#DC2B2B;text-align:center;padding:20px 0">'+esc(e.message)+'</p>');
       return '';
     });
     staticDataReady.then(function(){
@@ -2494,22 +2533,29 @@ window.pDetail=function(it){
       var key=attrsCacheKeyFor(it);
       var profile=match?(pAttrCache[key]||deriveCuratedProfile({},match)):null;
       if(profile)pAttrCache[key]=profile;
-      pdFillSecondaryTabs(profile,match,sc,nm,nsData,specimenHtml);
+      setPdCore(sc,(match&&match.name&&match.name.family)||'','');
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData,specimenHtml);
     });
   } else if(raw){
     /* 특산식물/적색식물/외래식물/민속식물/종자정보 - 별도 상세조회 API가 없어
        검색 목록에 이미 실려 온 필드를 그대로 보여준다(추가 네트워크 요청 없음).
        다만 학명이 정적 데이터셋(국가표준식물목록)과 일치하면, 도감 항목과 동일한
        정원 큐레이션 프로필도 함께 보여줄 수 있다. */
+    var coreFields=rawCoreFields(origin,raw);
+    setPdCore(sc,coreFields.family,coreFields.engNm);
     var rows=rawDetailRows(origin,raw);
     var notice=ORIGIN_NOTICE[origin]?'<p style="color:#787878;font-size:13px;margin:0 0 20px;line-height:1.7">'+esc(ORIGIN_NOTICE[origin])+'</p>':'';
-    pdSet('overview',notice+rowsTable(rows));
+    setEl('pdbody',notice+rowsTable(rows));
     staticDataReady.then(function(){
       var match=getStaticMatch(sc);
       var key=attrsCacheKeyFor(it);
       var profile=match?(pAttrCache[key]||deriveCuratedProfile({},match)):null;
       if(profile)pAttrCache[key]=profile;
-      pdFillSecondaryTabs(profile,match,sc,nm,nsData);
+      var family=coreFields.family||(match&&match.name&&match.name.family)||'';
+      setPdCore(sc,family,coreFields.engNm);
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData);
     });
   } else if(origin==='static'){
     /* "정원 정보로 찾기"(검색어 없이 필터만으로 찾은) 결과 - 도감 상세(no)
@@ -2538,18 +2584,22 @@ window.pDetail=function(it){
         pushRow(rows,'원산지',sp.orig);
       }
       var notice='<p style="color:#787878;font-size:13px;margin:0 0 20px;line-height:1.7">검색어 없이 \'정원 정보로 찾기\' 조건만으로 국가표준식물목록에서 찾은 종입니다.</p>';
-      pdSet('overview',notice+rowsTable(rows));
+      setPdCore(sc,(match&&match.name&&match.name.family)||'','');
+      setEl('pdbody',notice+rowsTable(rows));
       var key=attrsCacheKeyFor(it);
       var profile=match?(pAttrCache[key]||deriveCuratedProfile({},match)):null;
       if(profile)pAttrCache[key]=profile;
-      pdFillSecondaryTabs(profile,match,sc,nm,nsData);
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData);
     });
   } else {
-    pdSet('overview','<p style="color:#787878;font-size:13px;text-align:center;padding:20px 0;line-height:1.7">국립수목원 도감·표본 자료에는 없는 종으로, 생물다양성 커뮤니티 데이터(iNaturalist)에서 국명·학명 일치를 확인해 보충한 항목입니다. 형태·분포 등 상세 설명은 제공되지 않습니다.</p>');
+    setEl('pdbody','<p style="color:#787878;font-size:13px;text-align:center;padding:20px 0;line-height:1.7">국립수목원 도감·표본 자료에는 없는 종으로, 생물다양성 커뮤니티 데이터(iNaturalist)에서 국명·학명 일치를 확인해 보충한 항목입니다. 형태·분포 등 상세 설명은 제공되지 않습니다.</p>');
     staticDataReady.then(function(){
       var match=getStaticMatch(sc);
       var profile=match?deriveCuratedProfile({},match):null;
-      pdFillSecondaryTabs(profile,match,sc,nm,nsData);
+      setPdCore(sc,(match&&match.name&&match.name.family)||'','');
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData);
     });
   }
 };
