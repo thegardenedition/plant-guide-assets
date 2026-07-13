@@ -1,0 +1,206 @@
+<!-- 로딩 최소화: 실제로 fetch를 하기 전에 미리 DNS/TLS 연결을 맺어둔다.
+     정부 API(apis.data.go.kr)는 요청당 1~5초의 서버측 지연이 있는데, 그중
+     연결 수립(핸드셰이크) 부분만이라도 페이지 로드와 동시에 미리 끝내두면
+     실제 검색 버튼을 누른 시점의 체감 지연을 줄일 수 있다. -->
+<link rel="preconnect" href="https://apis.data.go.kr">
+<link rel="preconnect" href="https://api.inaturalist.org">
+<link rel="preconnect" href="https://static.inaturalist.org">
+<link rel="preconnect" href="https://ko.wikipedia.org">
+<link rel="preconnect" href="https://upload.wikimedia.org">
+<link rel="preconnect" href="https://www.forest.go.kr">
+<link rel="preconnect" href="https://api.gbif.org">
+<link rel="preconnect" href="https://api.nongsaro.go.kr">
+<link rel="preconnect" href="https://api.odcloud.kr">
+<link rel="preconnect" href="https://www.nature.go.kr">
+<link rel="dns-prefetch" href="https://apis.data.go.kr">
+<link rel="dns-prefetch" href="https://api.inaturalist.org">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<div id="pnPage" style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FFFFFF;color:#121212">
+
+<div style="max-width:1200px;margin:0 auto;padding:80px 32px 64px;display:flex;align-items:flex-start;gap:64px;flex-wrap:wrap">
+  <div style="flex:1;min-width:320px">
+    <p style="color:#ABABAB;font-size:11px;letter-spacing:5px;text-transform:uppercase;font-weight:600;margin:0 0 20px">PLANT GUIDE</p>
+    <h1 style="font-size:44px;font-weight:600;line-height:1.25;margin:0 0 24px;letter-spacing:-1px">국명 또는 학명으로<br>식물을 검색해보세요</h1>
+    <div style="width:32px;height:1px;background:#E6E6E6;margin:0 0 24px"></div>
+    <p style="color:#787878;font-size:16px;line-height:1.75;margin:0 0 24px">국립수목원 국가생물종지식정보시스템의 식물자원 데이터를 실시간으로 조회합니다.</p>
+    <div style="margin:0 0 32px;display:grid;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:18px;height:18px;border-radius:50%;background:#121212;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#10003;</span>
+        <span style="font-size:14px;color:#121212;font-weight:500">국립수목원 공식 데이터 연동</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:18px;height:18px;border-radius:50%;background:#121212;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#10003;</span>
+        <span style="font-size:14px;color:#121212;font-weight:500">과명·속명 등 분류 정보 제공</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:18px;height:18px;border-radius:50%;background:#121212;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#10003;</span>
+        <span style="font-size:14px;color:#121212;font-weight:500">형태·분포·이용법 등 상세정보 확인</span>
+      </div>
+    </div>
+    <div style="display:flex;border:1.5px solid #121212;max-width:480px">
+      <input id="psi" type="text" placeholder="예: 소나무, 장미, Pinus densiflora" style="flex:1;padding:14px 20px;border:none;font-size:15px;outline:none;color:#121212;font-family:inherit;background:transparent" onkeypress="if(event.key==='Enter')pSearch()" oninput="if(!this.value.trim())pClearedSearch()">
+      <button onclick="pSearch()" style="padding:14px 28px;background:#121212;border:none;cursor:pointer;font-size:11px;font-weight:600;color:#fff;letter-spacing:2px;font-family:inherit">검색</button>
+    </div>
+    <div id="pnote" style="display:none;max-width:480px;margin-top:10px;font-size:12px;color:#ABABAB"></div>
+    <div id="psugg" style="display:none;max-width:480px;margin-top:10px;flex-wrap:wrap;gap:8px"></div>
+  </div>
+  <div style="flex:1;min-width:320px">
+    <div id="pfilterbar" style="border:1px solid #E6E6E6;background:#FAFAFA;padding:28px 28px 24px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0">정원 정보로 찾기</p>
+        <div style="display:flex;align-items:center;gap:16px">
+          <p id="pfilterprogress" style="font-size:11px;color:#ABABAB;margin:0"></p>
+          <button id="pfilterreset" onclick="pResetFilters()" style="display:none;background:none;border:none;font-size:11px;color:#787878;text-decoration:underline;cursor:pointer;font-family:inherit;padding:0">초기화 (<span id="pfilterbadge">0</span>)</button>
+        </div>
+      </div>
+      <div style="margin-bottom:18px">
+        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">식물 유형</p>
+        <div id="pfusecat" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+      <div style="margin-bottom:18px">
+        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">출처 분류</p>
+        <div id="pforigin" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+      <div style="margin-bottom:18px">
+        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">꽃 색상</p>
+        <div id="pfcolor" style="display:flex;flex-wrap:wrap;gap:14px"></div>
+      </div>
+      <div style="display:flex;gap:32px;flex-wrap:wrap">
+        <div>
+          <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">생활형</p>
+          <div id="pfcycle" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div>
+          <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">광조건</p>
+          <div id="pflight" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="background:#FAFAFA;border-top:1px solid #E6E6E6;padding:48px 32px 96px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div id="prolebar" style="display:flex;align-items:center;gap:10px;margin-bottom:28px;flex-wrap:wrap">
+      <p style="font-size:10px;letter-spacing:1.5px;color:#ABABAB;margin:0">보는 사람에 맞춰 카드 정보 표시</p>
+      <div id="proletoggle" style="display:flex;gap:6px"></div>
+    </div>
+    <div id="pinit" style="text-align:center;padding:64px 0">
+      <p style="color:#ABABAB;font-size:15px;line-height:1.75">위 검색창에 식물의 국명 또는 학명을 입력해보세요.</p>
+    </div>
+    <div id="pld" style="display:none;text-align:center;padding:80px 0">
+      <div id="pspin" style="width:24px;height:24px;border:1.5px solid #E6E6E6;border-top-color:#121212;border-radius:50%;margin:0 auto 16px"></div>
+      <p style="color:#ABABAB;font-size:11px;letter-spacing:3px">검색 중...</p>
+    </div>
+    <div id="perr" style="display:none;text-align:center;padding:64px 32px;border:1px solid #E6E6E6;background:#fff">
+      <p style="font-weight:600;font-size:11px;letter-spacing:2px;margin:0 0 10px">오류</p>
+      <p id="perrmsg" style="color:#DC2B2B;font-size:14px;margin:0"></p>
+    </div>
+    <div id="pemp" style="display:none;text-align:center;padding:64px 0"><p style="color:#ABABAB;font-size:15px">검색 결과가 없습니다</p></div>
+    <div id="pcnt" style="display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
+      <p style="color:#787878;font-size:11px;letter-spacing:1px;margin:0" id="pcnttxt"></p>
+      <button onclick="pExportResults()" style="background:none;border:1px solid #DCDCDC;color:#121212;padding:6px 14px;font-size:11px;letter-spacing:.5px;cursor:pointer;font-family:inherit">CSV로 내보내기</button>
+    </div>
+    <div id="pgrid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:28px;background:transparent;border:none"></div>
+    <div id="pmorewrap" style="display:none;text-align:center;margin-top:40px">
+      <button onclick="pMore()" id="pmorebtn" style="padding:12px 36px;background:#fff;border:1.5px solid #121212;font-size:11px;font-weight:600;letter-spacing:2px;cursor:pointer;font-family:inherit">더 보기</button>
+    </div>
+    <p style="text-align:center;color:#ABABAB;font-size:11px;margin-top:56px">자료 제공: 산림청 국립수목원 국가생물종지식정보시스템 (공공데이터포털)</p>
+
+    <!-- 농사로(농촌진흥청) 오픈API 중 학명 단위로 붙일 수 없는(개별 식물 검색과
+         무관한) 4개 서비스 - 꽃장식과 정원 꾸미기 / 실내정원 만들기 / 실내정원
+         동영상강좌 / 좋아하는 꽃. 검색 결과 카드/상세창에는 넣을 자리가 없어서
+         (특정 종에 속하지 않는 콘텐츠라서) 별도의 접이식 섹션으로 둔다. -->
+    <div id="pgardencontent" style="margin-top:64px;border-top:1px solid #E6E6E6;padding-top:40px">
+      <div id="pgcHeader" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="pToggleGardenContent()">
+        <div>
+          <p style="font-size:11px;letter-spacing:2px;color:#ABABAB;margin:0 0 6px">농사로 · 농촌진흥청</p>
+          <h3 style="margin:0;font-size:20px;font-weight:600;color:#121212">가드닝 콘텐츠</h3>
+        </div>
+        <span id="pgcToggleIcon" style="font-size:22px;color:#ABABAB;line-height:1">+</span>
+      </div>
+      <div id="pgcBody" style="display:none;margin-top:28px">
+        <div id="pgcTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px"></div>
+        <div id="pgcList" style="min-height:80px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(18,18,18,.75);z-index:99999;align-items:center;justify-content:center;padding:24px;box-sizing:border-box" onclick="if(event.target===this)pCD()">
+  <div id="pdpanel" style="background:#fff;width:100%;max-width:880px;max-height:88vh;overflow-y:auto;position:relative;margin:0 auto">
+    <div id="pdhead" style="background:#121212;color:#fff;padding:32px 36px;position:sticky;top:0;cursor:grab">
+      <div id="pdgrip" title="드래그해서 창을 옮길 수 있습니다" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px;cursor:grab"></div>
+      <button onclick="pCD()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;cursor:pointer;font-family:inherit">&#10005;</button>
+      <p id="pdbadge" style="opacity:.5;font-size:11px;letter-spacing:1.5px;font-weight:600;margin:0 0 8px">PLANT</p>
+      <h2 id="pdname" style="margin:0 0 6px;font-size:24px;font-weight:600"></h2>
+      <p id="pdsci" style="opacity:.5;font-size:13px;font-style:italic;margin:0"></p>
+    </div>
+    <div id="pdimg" style="position:relative;width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:3rem;color:#D6D6D6"></div>
+    <p id="pdcredit" style="display:none;text-align:right;margin:0;padding:6px 36px 0;font-size:10px;color:#ABABAB"></p>
+    <div id="pdtabbar" style="display:flex;border-bottom:1px solid #E6E6E6;padding:0 36px;overflow-x:auto"></div>
+    <div id="pdpane-overview" class="pdpane" style="padding:28px 36px 40px"></div>
+    <div id="pdpane-story" class="pdpane" style="display:none;padding:28px 36px 40px"></div>
+    <div id="pdpane-garden" class="pdpane" style="display:none;padding:28px 36px 40px"></div>
+  </div>
+</div>
+
+<div id="pcmpbar" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#121212;color:#fff;z-index:99998;padding:14px 24px;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 20px rgba(0,0,0,.2);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <p style="margin:0;font-size:11px;letter-spacing:1px;color:#ABABAB;white-space:nowrap">비교함 (<span id="pcmpcount">0</span>/4)</p>
+  <div id="pcmpthumbs" style="display:flex;gap:8px;flex:1;overflow-x:auto"></div>
+  <button onclick="pClearCompare()" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">비우기</button>
+  <button onclick="pOpenCompare()" id="pcmpgo" style="background:#fff;border:none;color:#121212;padding:8px 20px;font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;font-family:inherit;white-space:nowrap" disabled>비교하기</button>
+</div>
+
+<div id="pcmpov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(18,18,18,.75);z-index:100000;align-items:center;justify-content:center;padding:24px;box-sizing:border-box" onclick="if(event.target===this)pCloseCompare()">
+  <div style="background:#fff;width:100%;max-width:1040px;max-height:88vh;overflow:auto;position:relative;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+    <div style="background:#121212;color:#fff;padding:24px 32px;position:sticky;top:0;display:flex;align-items:center;justify-content:space-between">
+      <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:.5px">식물 비교</p>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="pExportCompare()" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:8px 14px;font-size:11px;letter-spacing:.5px;cursor:pointer;font-family:inherit;white-space:nowrap">CSV 내보내기</button>
+        <button onclick="pCloseCompare()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;cursor:pointer;font-family:inherit;flex-shrink:0">&#10005;</button>
+      </div>
+    </div>
+    <div id="pcmpbody" style="padding:24px 32px 40px;overflow-x:auto"></div>
+  </div>
+</div>
+
+<style>
+#pgrid .pc{background:#fff;cursor:pointer;transition:box-shadow .15s,transform .15s;border:1px solid #E6E6E6;position:relative}
+#pgrid .pc:hover{box-shadow:0 12px 28px rgba(18,18,18,.12);transform:translateY(-2px)}
+#pgrid .pc.pc-cmp-active{outline:2px solid #121212;outline-offset:-1px}
+.pc-cmpbtn{position:absolute;top:10px;left:10px;z-index:2;font-size:10px;letter-spacing:.5px;padding:5px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.8);background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-family:inherit}
+.pc-cmpbtn:hover{background:rgba(18,18,18,.8)}
+.pc-cmpbtn.active{background:#121212;border-color:#121212}
+#pgrid .pc-img{width:100%;aspect-ratio:1/1;background:#F2F2F2;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.4rem;color:#D6D6D6}
+#pgrid .pc-img img{width:100%;height:100%;object-fit:cover;display:block}
+#pgrid .pc-body{padding:20px}
+#pgrid .pc-name{font-size:15px;font-weight:600;margin:0 0 4px;color:#121212}
+#pgrid .pc-sci{font-size:13px;color:#ABABAB;font-style:italic;margin:0 0 8px}
+#pgrid .pc-fam{font-size:11px;color:#787878;border:1px solid #DCDCDC;display:inline-block;padding:2px 8px;letter-spacing:.5px}
+#pgrid .pc-tag{font-size:11px;color:#ABABAB;display:inline-block;padding:2px 8px;letter-spacing:.5px;margin-left:6px}
+#psugg .pchip{font-size:12px;color:#121212;border:1px solid #DCDCDC;padding:5px 12px;border-radius:14px;cursor:pointer;background:#fff}
+#psugg .pchip:hover{background:#F6F6F6;border-color:#121212}
+.pdpane .attr-chip{font-size:11px;color:#121212;border:1px solid #DCDCDC;padding:4px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px}
+.pdpane .attr-dot{width:9px;height:9px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+#pgrid .pc-attrs{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+#pgrid .pc-attrs .attr-chip{font-size:10px;color:#787878;border:1px solid #E6E6E6;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px}
+.pdtab{padding:14px 16px;font-size:12px;font-weight:600;letter-spacing:.5px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.pdtab:hover{color:#121212}
+.pdtab.active{color:#121212;border-bottom-color:#121212}
+.pc-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pc-rolebadge{font-size:10px;color:#787878;border:1px solid #E6E6E6;padding:2px 7px;border-radius:10px;display:inline-block}
+.pc-rolebadge.native{color:#3F6B4A;border-color:#B9D6C2;background:#F2F8F4}
+.pc-rolebadge.caution{color:#B1584F;border-color:#E6C4C0;background:#FBF1F0}
+.fchip{font-size:12px;color:#121212;border:1px solid #DCDCDC;padding:6px 14px;border-radius:14px;cursor:pointer;background:#fff;user-select:none}
+.fchip:hover{border-color:#121212}
+.fchip.active{background:#121212;color:#fff;border-color:#121212}
+.cchip{display:inline-flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;background:none;border:none;font-family:inherit;padding:0}
+.cchip .cdot{width:24px;height:24px;border-radius:50%;border:1px solid rgba(0,0,0,.12);box-shadow:0 0 0 2px #FAFAFA;transition:box-shadow .15s}
+.cchip:hover .cdot{box-shadow:0 0 0 2px #FAFAFA,0 0 0 3px #ABABAB}
+.cchip.active .cdot{box-shadow:0 0 0 2px #FAFAFA,0 0 0 3px #121212}
+.cchip .clabel{font-size:9px;color:#ABABAB;letter-spacing:.3px}
+.cchip.active .clabel{color:#121212;font-weight:600}
+</style>
+
+<script src="https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@mai
