@@ -416,24 +416,30 @@ function getStaticMatch(sciNm){
    쓰고 있는 "정적 데이터셋은 외부 JSON으로 호스팅 후 URL만 채워 넣는다"는
    원칙을 그대로 따른다 - URL이 비어있으면 이 섹션만 조용히 빠지고 나머지
    기능에는 영향이 없다.
-   ▶TODO: 아래 세 URL을 Webflow Assets에 book_form_texture_color.json /
-   book_garden_encyclopedia.json / book_forest_garden_300.json 업로드 후
-   발급되는 CDN 주소로 교체하세요(작업 결과물 폴더에 3개 파일을 함께 드렸습니다).
+   GitHub(thegardenedition/plant-guide-assets)에 업로드해 raw.githubusercontent.com로
+   서빙한다(정적 데이터셋과 동일한 방식 - fetch()로 받는 JSON이라 raw 도메인의
+   MIME 타입 제약을 받지 않는다).
    - 형태·질감·색으로 찾는 우리꽃 정원식물(3권, 총 450종) → 학술정보 탭
-     (자생환경·국명유래·학명유래 등 분류학적 서술 중심)
+     (자생환경·국명유래·학명유래 등 분류학적 서술 중심), 국명/학명 유래가
+     있는 종은 "스토리" 필터(pFilter.story)에도 매치된다(bookHasStory 참고).
    - 우리꽃으로 만드는 정원식물도감(텃밭·약초·실내·빗물·옥상·학교정원, 108종)
      → 정원 가이드 탭(자생지·식재·관리·증식 등 실제 재배 정보 중심)
    - 숲정원을 위한 식물 300종(248종) → 조경 스펙 탭(토성·광조건·내한성 표와
      재배품종 서술 중심) */
-var BOOK_FTC_URL='';
-var BOOK_GARDEN_URL='';
-var BOOK_FOREST300_URL='';
+var BOOK_FTC_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_form_texture_color.json';
+var BOOK_GARDEN_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_garden_encyclopedia.json';
+var BOOK_FOREST300_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_forest_garden_300.json';
 var BOOK_FTC={},BOOK_GARDEN={},BOOK_FOREST300={};
 var bookDataReady=Promise.all([
   loadStaticTable(BOOK_FTC_URL,BOOK_FTC),
   loadStaticTable(BOOK_GARDEN_URL,BOOK_GARDEN),
   loadStaticTable(BOOK_FOREST300_URL,BOOK_FOREST300)
 ]);
+/* 정원정보 칩/필터(deriveCuratedProfile)는 국가표준식물목록 정적 데이터뿐 아니라
+   도서 데이터(특히 스토리 유무 판정용 BOOK_FTC)도 함께 봐야 하므로, 두 로딩을
+   합친 공용 준비 신호를 둔다 - staticDataReady만 기다리던 기존 호출부들은
+   BOOK_FTC가 아직 비어있는 상태에서 hasStory를 항상 false로 오판할 수 있었다. */
+var curationDataReady=Promise.all([staticDataReady,bookDataReady]);
 var BOOK_AXIS_LABEL={form:'형태',texture:'질감',color:'색'};
 function bookFtcHtml(r){
   var rows=[];
@@ -460,6 +466,17 @@ function bookFtcStoryHtml(r){
   if(r.originSci)html+='<p style="color:#121212;font-size:14px;line-height:1.85;margin:0">'+'<b style="font-weight:600">학명</b> — '+esc(r.originSci)+'</p>';
   html+='</div>';
   return html;
+}
+/* '스토리' 필터(정원 정보로 찾기 패널)가 쓰는 판정 함수 - 이름의 유래(국명·
+   학명 유래) 서술이 있는 종만 "스토리 있음"으로 인정한다. 산림청 숲이야기는
+   종별로 매번 네트워크 조회가 필요해(forestStoryHtml) 3.6만종 전체를 대상으로
+   즉시 필터링할 수 없으므로, 필터 판정에는 클라이언트에 이미 통째로 로드되어
+   있는 도서 데이터(BOOK_FTC)만 쓴다. */
+function bookHasStory(sc){
+  var key=cleanSciName(sc);
+  if(!key)return false;
+  var r=BOOK_FTC[key];
+  return !!(r&&(r.originKor||r.originSci));
 }
 function bookGardenHtml(r){
   var rows=[];
@@ -1131,7 +1148,7 @@ function staticSpeciesText(sp){
   var dstrbParts=[sp.habitat,sp.orig].filter(Boolean).map(joinField);
   return {shpe:shpeParts.join(' '),grw:grwParts.join(' '),dstrb:dstrbParts.join(' ')};
 }
-function deriveCuratedProfile(item,staticMatch){
+function deriveCuratedProfile(item,staticMatch,sc){
   var sp=staticMatch&&staticMatch.species,nm=staticMatch&&staticMatch.name;
   var st=staticSpeciesText(sp);
   var shpe=(st.shpe?st.shpe+' ':'')+val(item,'shpe');
@@ -1160,6 +1177,7 @@ function deriveCuratedProfile(item,staticMatch){
   attrs.tagline=buildTagline(item,attrs,shpe,fam);
   attrs.plantingTip=buildPlantingTip(attrs,extractHeight(shpe));
   attrs.story=buildStory(item,dstrb);
+  attrs.hasStory=bookHasStory(sc||(sp&&sp.sc)||(nm&&nm.sc)||val(item,'plantSpecsScnm'));
   return attrs;
 }
 /* 예전엔 광조건/내한성/수분/개화월/식재팁/태그/스토리를 한 블록(curatedProfileHtml)
@@ -1222,11 +1240,12 @@ function fetchPilbkItem(no){
 }
 function fetchPlantAttrs(no,sciNm){
   if(pAttrCache[no])return Promise.resolve(pAttrCache[no]);
-  return staticDataReady.then(function(){
+  return curationDataReady.then(function(){
     return fetchPilbkItem(no).then(function(item){
       if(!item)return null;
-      var match=getStaticMatch(sciNm||val(item,'plantSpecsScnm'));
-      var attrs=deriveCuratedProfile(item,match);
+      var sc=sciNm||val(item,'plantSpecsScnm');
+      var match=getStaticMatch(sc);
+      var attrs=deriveCuratedProfile(item,match,sc);
       pAttrCache[no]=attrs;
       return attrs;
     });
@@ -1239,10 +1258,10 @@ function attrsCacheKeyFor(it){return it.no?it.no:('u'+it._uid);}
 function staticOnlyAttrs(it){
   var key=attrsCacheKeyFor(it);
   if(pAttrCache[key])return Promise.resolve(pAttrCache[key]);
-  return staticDataReady.then(function(){
+  return curationDataReady.then(function(){
     var match=getStaticMatch(it.sc);
     if(!match)return null;
-    var attrs=deriveCuratedProfile({},match);
+    var attrs=deriveCuratedProfile({},match,it.sc);
     pAttrCache[key]=attrs;
     return attrs;
   }).catch(function(){return null;});
@@ -1303,7 +1322,7 @@ function nongsaroGardenByName(korNm){
    패싯을 用途(식물 유형)·출처 분류·꽃 색상(시각적 스와치)·생활형·광조건
    다섯 갈래로 나누었다. 모든 패싯은 각각 복수 선택(OR)이며, 패싯 간에는
    AND로 좁혀진다. */
-var pFilter={usecat:[],origin:[],color:[],cycle:[],light:[]};
+var pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
 /* 클릭 반응 속도 최적화: 예전엔 칩 하나를 눌러도 5개 패싯(약 33개 칩) 전체를
    innerHTML로 다시 그렸다 - 브라우저가 매번 그 많은 DOM을 새로 만들고 클릭
    핸들러 문자열을 다시 파싱해야 해서 불필요하게 느렸다. 이제 클릭된 칩
@@ -1321,23 +1340,31 @@ window.pToggleFilterVal=function(kind,v,el){
   if(pQ)applyFilters();else runFacetSearch();
 };
 window.pResetFilters=function(){
-  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[]};
+  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
   renderFilterPanel();
   updateFilterBadge();
   if(pQ)applyFilters();else runFacetSearch();
 };
 var USECAT_OPTS=['꽃나무/관목','상록침엽수','상록활엽수','낙엽교목','정원용초본(꽃/야생화)','꽃구근','과수/유실수','특용/약용수','잔디','씨앗','관엽/공기정화식물','생울타리','덩굴식물','수생식물','남부수종','희귀식물'];
 var ORIGIN_OPTS=['자생식물','특산식물','적색식물','외래식물','민속식물'];
+/* 국명/학명의 유래가 정리되어 있는(=이야기 탭에 보여줄 서술이 있는) 종만
+   골라 보고 싶다는 요청에 따른 필터. 옵션이 하나뿐이라 다른 패싯처럼
+   목록에서 값을 고르는 게 아니라 켜고 끄는 토글이지만, pFilter/chip/
+   pToggleFilterVal 구조를 그대로 재사용할 수 있어 별도 코드 경로 없이
+   'story' 라는 kind 하나만 추가했다. */
+var STORY_OPTS=['스토리 있음'];
 function renderFilterPanel(){
   var usecatEl=document.getElementById('pfusecat'),originEl=document.getElementById('pforigin'),
-      colorEl=document.getElementById('pfcolor'),cycleEl=document.getElementById('pfcycle'),lightEl=document.getElementById('pflight');
-  if(!usecatEl||!originEl||!colorEl||!cycleEl||!lightEl)return;
+      colorEl=document.getElementById('pfcolor'),cycleEl=document.getElementById('pfcycle'),lightEl=document.getElementById('pflight'),
+      storyEl=document.getElementById('pfstory');
+  if(!usecatEl||!originEl||!colorEl||!cycleEl||!lightEl||!storyEl)return;
   var cycleOpts=['한해살이','두해살이','여러해살이','목본'],lightOpts=['양지','반음지','음지'];
   function chip(kind,o){return '<span class="fchip'+(pFilter[kind].indexOf(o)!==-1?' active':'')+'" onclick="pToggleFilterVal(\''+kind+'\',\''+o+'\',this)">'+esc(o)+'</span>';}
   usecatEl.innerHTML=USECAT_OPTS.map(function(o){return chip('usecat',o);}).join('');
   originEl.innerHTML=ORIGIN_OPTS.map(function(o){return chip('origin',o);}).join('');
   cycleEl.innerHTML=cycleOpts.map(function(o){return chip('cycle',o);}).join('');
   lightEl.innerHTML=lightOpts.map(function(o){return chip('light',o);}).join('');
+  storyEl.innerHTML=STORY_OPTS.map(function(o){return chip('story',o);}).join('');
   colorEl.innerHTML=COLOR_MAP.map(function(c){return c.label;}).map(function(o){
     var active=pFilter.color.indexOf(o)!==-1;
     return '<button type="button" class="cchip'+(active?' active':'')+'" onclick="pToggleFilterVal(\'color\',\''+o+'\',this)" title="'+o+'">'
@@ -1347,7 +1374,7 @@ function renderFilterPanel(){
 function updateFilterBadge(){
   var badge=document.getElementById('pfilterbadge'),reset=document.getElementById('pfilterreset');
   if(!badge||!reset)return;
-  var n=pFilter.usecat.length+pFilter.origin.length+pFilter.color.length+pFilter.cycle.length+pFilter.light.length;
+  var n=pFilter.usecat.length+pFilter.origin.length+pFilter.color.length+pFilter.cycle.length+pFilter.light.length+pFilter.story.length;
   badge.textContent=n;
   reset.style.display=n?'inline-block':'none';
 }
@@ -1404,6 +1431,7 @@ function applyFilters(){
     if(pFilter.color.length)show=show&&(attrs?pFilter.color.some(function(v){return attrs.colors&&attrs.colors.indexOf(v)!==-1;}):true);
     if(pFilter.light.length)show=show&&(attrs?pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}):true);
     if(pFilter.cycle.length)show=show&&(attrs?pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}):true);
+    if(pFilter.story.length)show=show&&!!(attrs&&attrs.hasStory);
     card.style.display=show?'':'none';
   });
   updateFilterProgress();
@@ -1425,16 +1453,17 @@ function buildStaticIndex(){
   STATIC_INDEX=Object.keys(keys).map(function(k){
     var sp=STATIC_SPECIES[k],nm=STATIC_NAME[k];
     var korNm=(sp&&sp.kn)||(nm&&nm.kn)||k;
+    var sc=(sp&&sp.sc)||(nm&&nm.sc)||k;
     /* item을 그냥 {}로 넘기면 deriveUseCategory 안의 val(item,'plantGnrlNm')이
        항상 빈 문자열이 되어, "들잔디/금잔디"처럼 국명 자체에 '잔디'가 들어간
        종이 잔디 카테고리로 하나도 분류되지 않는 문제가 있었다(실측: 잔디 칩을
        눌러도 결과 0건). 국명을 plantGnrlNm 자리에 채워 넘겨 이름 기반 분류가
        정상 동작하게 한다. */
-    var attrs=deriveCuratedProfile({plantGnrlNm:korNm},{species:sp||null,name:nm||null});
+    var attrs=deriveCuratedProfile({plantGnrlNm:korNm},{species:sp||null,name:nm||null},sc);
     return {
       key:k,
       nm:korNm,
-      sc:(sp&&sp.sc)||(nm&&nm.sc)||k,
+      sc:sc,
       fam:(nm&&nm.family)||'',
       resType:(nm&&nm.resType)||'',
       attrs:attrs
@@ -1457,10 +1486,11 @@ function staticEntryMatchesFilters(entry){
   if(pFilter.color.length&&!pFilter.color.some(function(v){return attrs.colors&&attrs.colors.indexOf(v)!==-1;}))return false;
   if(pFilter.cycle.length&&!pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}))return false;
   if(pFilter.light.length&&!pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}))return false;
+  if(pFilter.story.length&&!attrs.hasStory)return false;
   return true;
 }
 function anyFilterActive(){
-  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.cycle.length||pFilter.light.length;
+  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.cycle.length||pFilter.light.length||pFilter.story.length;
 }
 var facetSearchToken=0;
 function runFacetSearch(){
@@ -1473,7 +1503,7 @@ function runFacetSearch(){
   }
   var myToken=++facetSearchToken;
   showLoading();
-  staticDataReady.then(function(){
+  curationDataReady.then(function(){
     if(myToken!==facetSearchToken)return; /* 그 사이 필터가 또 바뀌었으면 이 결과는 버림 */
     buildStaticIndex();
     var matches=STATIC_INDEX.filter(staticEntryMatchesFilters)
