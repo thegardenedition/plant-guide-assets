@@ -1244,7 +1244,7 @@ function curatedLandscapeHtml(p){
   var badges=[].concat(p.useCats||[],p.tags||[]);
   var tagsHtml=badges.map(uiTag).join('');
   return ''
-    +(tagsHtml?'<div style="margin-bottom:20px">'+tagsHtml+'</div>':'')
+    +(tagsHtml?'<div style="margin:20px 0">'+tagsHtml+'</div>':'')
     +envBarHtml('내한성',['전국 노지','제한적 노지','실내 구성'],p.hardiness)
     +(p.story?'<p style="font-size:14px;color:#787878;line-height:1.8;margin:20px 0 0">'+esc(p.story)+'</p>':'');
 }
