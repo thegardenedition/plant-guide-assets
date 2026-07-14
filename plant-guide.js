@@ -823,10 +823,20 @@ function fetchAllPhotos(korNm,sciNm){
 function fetchNongsaroCardPhoto(korNm,sciNm){
   return fetchNongsaroPhotoList(korNm,sciNm).then(function(photos){return photos[0]||null;});
 }
-function loadCardImage(korNm,sciNm,imgWrap,onDone){
+/* "최대한 빠르게 노출" 요청 대응 - 예전에는 국립수목원 응답(naturePromise)이
+   끝나야만(있으면 즉시, 없으면 null 확인 후) 나머지 소스(fallbackPromise)
+   결과를 쓸 수 있었다. 두 프라미스의 실제 fetch 자체는 이미 동시에 시작되고
+   있었지만, 화면 표시는 국립수목원 쪽이 "먼저 답해야" 진행되는 구조라, 국립
+   수목원 인덱스(최초 1회, 5000행)가 늦게 도착하면 이미 훨씬 빨리 끝난 다른
+   소스 결과까지 함께 묶여 늦게 노출됐다. 이제 둘 중 먼저 도착하는 결과를
+   바로 화면에 쓰고("체감 속도"), 국립수목원 사진이 나중에 도착했는데 실제
+   사진이 있으면(가장 신뢰도 높은 소스이므로) 조용히 교체해 최종 정확도는
+   그대로 유지한다 - 국립수목원 인덱스가 이미 로드되어 있는 두 번째 검색부터는
+   naturePromise 자체가 사실상 즉시 응답이라 교체가 거의 일어나지 않는다. */
+function loadCardImage(korNm,sciNm,imgWrap,onDone,eager){
   var key=korNm+'|'+sciNm;
   if(pImgCache[key]!==undefined){
-    applyThumb(imgWrap,pImgCache[key]);
+    applyThumb(imgWrap,pImgCache[key],eager);
     if(onDone)onDone(pImgCache[key]&&pImgCache[key].credit);
     return Promise.resolve();
   }
@@ -841,21 +851,28 @@ function loadCardImage(korNm,sciNm,imgWrap,onDone){
     if(r)return r;
     return fetchBarkPhoto(korNm);
   });
-  return naturePromise.then(function(r){
-    return r||fallbackPromise;
-  }).then(function(r){
+  var shown=false;
+  function show(r){
     pImgCache[key]=r;
-    applyThumb(imgWrap,r);
+    applyThumb(imgWrap,r,eager);
     if(onDone)onDone(r&&r.credit);
+  }
+  fallbackPromise.then(function(r){
+    if(!shown){shown=true;show(r);}
   });
+  var natureDone=naturePromise.then(function(r){
+    if(r){shown=true;show(r);} /* 국립수목원 사진은 늦게 와도 항상 우선 채택(정확도 유지) */
+  });
+  return Promise.all([natureDone,fallbackPromise]).then(function(){});
 }
-function applyThumb(imgWrap,result){
+function applyThumb(imgWrap,result,eager){
   if(!imgWrap||!imgWrap.isConnected)return;
   if(result&&result.url){
     var img=document.createElement('img');
     img.src=result.url;
     img.alt='';
-    img.loading='lazy';
+    if(eager){img.loading='eager';img.setAttribute('fetchpriority','high');}
+    else{img.loading='lazy';}
     img.onerror=function(){imgWrap.innerHTML=PLACEHOLDER_ICON;};
     imgWrap.innerHTML='';
     imgWrap.appendChild(img);
@@ -1595,8 +1612,12 @@ function runFacetSearch(){
 
 /* ---- 동시 요청 수 제한 ----
    카드 20개가 한꺼번에 사진+정원정보 요청을 쏘면 브라우저 동시 연결 한도에
-   걸려 오히려 전체적으로 느려지고 응답이 뒤섞여 보인다. 한 번에 5개까지만
-   진행하도록 제한해, 화면이 순차적으로 빠르게 채워지도록 한다. */
+   걸려 오히려 전체적으로 느려지고 응답이 뒤섞여 보인다. 한 번에 8개까지만
+   진행하도록 제한해, 화면이 순차적으로 빠르게 채워지도록 한다(소스가 국립
+   수목원·농사로·위키·iNaturalist·GBIF 등 서로 다른 도메인에 나뉘어 있어
+   5개보다 늘려도 특정 도메인에 병목이 몰리지 않는다 - "최대한 빠르게 노출"
+   요청에 따라 기존 5에서 상향). 화면에 바로 보이는 첫 배치(위 카드 8개)는
+   이 대기열조차 건너뛰고 즉시 요청한다(renderPage 참고). */
 function makeLimiter(max){
   var active=0,queue=[];
   function next(){
@@ -1612,7 +1633,7 @@ function makeLimiter(max){
     });
   };
 }
-var limitCard=makeLimiter(5);
+var limitCard=makeLimiter(8);
 
 /* ---- 검색어 최적화 (Search Query Optimizer, JS 규칙 기반) ----
    외부 LLM 호출 없이 오타 교정/자연어 정리/유의어 확장의 취지만 차용해 구현.
@@ -2336,8 +2357,10 @@ function renderPage(){
   g.style.display='grid';
   showFilterBarIfNeeded();
   renderFilterPanel();
+  var isFirstBatch=(pShown===0); /* 최초 화면(스크롤 없이 바로 보이는 카드들)은 이미지 우선순위를 높여 "최대한 빠르게" 노출한다 */
   var next=pAll.slice(pShown,pShown+PAGE_SIZE);
-  next.forEach(function(it){
+  next.forEach(function(it,idx){
+    var eager=isFirstBatch&&idx<8;
     var d=document.createElement('div');
     d.className='pc';
     if(it.no)d.setAttribute('data-no',it.no);
@@ -2349,10 +2372,11 @@ function renderPage(){
     cmpBtn.onclick=function(e){e.stopPropagation();pToggleCompare(it,d);};
     g.appendChild(d);
     pCardEls[it._uid]={el:d};
-    limitCard(function(){return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
+    var imgTask=function(){return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
       it._hasPhoto=!!credit;
       reflowGrid();
-    });});
+    },eager);};
+    if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
     loadAndRenderAttrs(d,it);
   });
   pShown+=next.length;
