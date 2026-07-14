@@ -607,11 +607,40 @@ function fetchINatPhoto(sciNm){
     return {url:p.medium_url||p.url,credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
   }).catch(function(){return null;});
 }
-function fetchWikiThumb(lang,title){
+/* "갓(식물)"으로 검색했더니 전통 갓(모자) 사진이 나온 사고의 원인 - 한국어
+   위키백과에 국명과 완전히 같은 제목의 동음이의 문서(갓/모자, 배/과일·배·
+   신체부위 등)가 존재하면, title=국명으로만 REST 요약 API를 호출했을 때
+   식물과 무관한 문서의 대표 이미지를 그대로 가져오게 된다. 문서 제목이
+   같다고 같은 대상이라는 보장이 없으므로, 반환된 문서가 실제로 우리가 찾는
+   학명의 그 종을 가리키는 문서인지 위키데이터(Wikidata)의 학명 속성(P225,
+   taxon name)으로 교차 검증한다 - 위키백과 요약 API 응답에 포함된
+   wikibase_item(Q-id)로 위키데이터 항목을 조회해 P225 값이 우리 학명과
+   글자 그대로 일치할 때만 채택하고, 검증에 실패하거나 학명 속성 자체가
+   없는(=식물 분류군 문서가 아닌) 경우는 조용히 버린다("정확한 데이터만
+   신뢰" 원칙과 동일). */
+function wikidataTaxonMatches(qid,clean){
+  if(!qid||!clean)return Promise.resolve(false);
+  var url='https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(qid)+'.json';
+  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    var ent=j&&j.entities&&j.entities[qid];
+    var p225=ent&&ent.claims&&ent.claims.P225;
+    if(!p225||!p225.length)return false;
+    return p225.some(function(c){
+      var v=c.mainsnak&&c.mainsnak.datavalue&&c.mainsnak.datavalue.value;
+      return v&&cleanSciName(v).toLowerCase()===clean.toLowerCase();
+    });
+  }).catch(function(){return false;});
+}
+function fetchWikiThumb(lang,title,sciNm){
   if(!title)return Promise.resolve(null);
+  var clean=cleanSciName(sciNm);
+  if(!clean)return Promise.resolve(null); /* 학명이 없으면 동음이의 검증이 불가능 - 신뢰하지 않는다 */
   var url='https://'+lang+'.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(title);
   return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
-    return (j&&j.thumbnail&&j.thumbnail.source)?{url:j.thumbnail.source,credit:'Wikipedia'}:null;
+    if(!j||!j.thumbnail||!j.thumbnail.source)return null;
+    return wikidataTaxonMatches(j.wikibase_item,clean).then(function(ok){
+      return ok?{url:j.thumbnail.source,credit:'Wikipedia'}:null;
+    });
   }).catch(function(){return null;});
 }
 /* GBIF(Global Biodiversity Information Facility, 지구생물다양성정보기구)
@@ -775,7 +804,7 @@ function fetchAllPhotos(korNm,sciNm){
     fetchNongsaroPhotoList(korNm,sciNm)
   ]).then(function(res){return dedupePhotos([].concat(res[0]||[],res[1]||[]));});
   var slow=Promise.all([
-    fetchWikiThumb('ko',korNm),
+    fetchWikiThumb('ko',korNm,sciNm),
     fetchINatPhotos(sciNm),
     fetchGbifPhotos(sciNm),
     fetchBarkPhotos(korNm)
@@ -804,7 +833,7 @@ function loadCardImage(korNm,sciNm,imgWrap,onDone){
   var naturePromise=fetchNatureImagePhoto(sciNm);
   var fallbackPromise=Promise.all([
     fetchNongsaroCardPhoto(korNm,sciNm),
-    fetchWikiThumb('ko',korNm),
+    fetchWikiThumb('ko',korNm,sciNm),
     fetchINatPhoto(sciNm),
     fetchGbifPhoto(sciNm)
   ]).then(function(res){
@@ -1230,7 +1259,7 @@ function overviewSkeleton(){
      둔다 - 사실 정보(형태/분포 등)와 실용 정보(조경·농사로)를 먼저 읽고,
      이름의 유래·숲이야기 같은 서술형 콘텐츠는 마지막에 자연스럽게 이어지는
      순서다. */
-  return ['pdcore','pdenv','pdtagline','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdgeneral','pdstory']
+  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdgeneral','pdstory']
     .map(function(id){return '<div id="'+id+'"></div>';}).join('');
 }
 function setEl(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html||'';}
@@ -1244,9 +1273,11 @@ function setPdCore(sc,family,engNm){
   pushRow(rows,'영명',engNm);
   setEl('pdcore',rowsTable(rows));
 }
+/* "정원에 은은한 존재감을 더하는 식재" 같은 자동 생성 한 줄 태그라인은
+   군더더기라는 지적에 따라 삭제 요청 - pdtagline 슬롯 자체를
+   overviewSkeleton에서 없앴으므로 여기서도 채우지 않는다(식재 팁은 유지). */
 function applyCuratedProfile(p){
   setEl('pdenv',p?envTripleHtml(p):'');
-  setEl('pdtagline',(p&&p.tagline)?'<p style="font-size:16px;color:#121212;line-height:1.7;margin:0 0 20px;font-style:italic">"'+esc(p.tagline)+'"</p>':'');
   setEl('pdplanting',(p&&p.plantingTip)?'<p style="font-size:14px;color:#121212;line-height:1.8;margin:0 0 20px"><span style="font-weight:600">식재 팁</span> · '+esc(p.plantingTip)+'</p>':'');
   setEl('pdlandscape',p?curatedLandscapeHtml(p):'');
 }
@@ -2464,8 +2495,17 @@ window.pDetail=function(it){
   var no=it.no,nm=it.nm,sc=it.sc,specsId=it.specsId,origin=it.origin,raw=it.raw;
   var panel=document.getElementById('pdpanel');
   panel.style.position='';panel.style.left='';panel.style.top='';panel.style.margin='';
-  document.getElementById('pdname').textContent=nm;
-  document.getElementById('pdsci').textContent=sc;
+  /* "상단에 국명과 학명을 넣어야지, 국명을 크게" 요청 대응 - 국가표준식물목록에
+     아직 국명이 등록되지 않은 종(주로 iNaturalist/정적 데이터셋 보충 항목)은
+     it.nm이 비어 있거나 '이름 없음'이라, 그대로 쓰면 큰 제목(h2)이 텅 비고
+     작고 흐린 학명만 남아 헤더가 깨져 보였다. 국명이 없으면 학명을 대신
+     큰 제목 자리에 올리고, 그 경우 아래 학명 줄은 같은 문자열이 중복되므로
+     숨긴다. */
+  var hasKorNm=!!(nm&&nm.trim()&&nm.trim()!=='이름 없음');
+  var sciEl=document.getElementById('pdsci');
+  document.getElementById('pdname').textContent=hasKorNm?nm:(sc||'이름 미확인');
+  if(hasKorNm&&sc){sciEl.textContent=sc;sciEl.style.display='';}
+  else{sciEl.textContent='';sciEl.style.display='none';}
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   pdSet(overviewSkeleton());
   setPdCore(sc,'','');
