@@ -321,7 +321,7 @@ function pSpin(on){
   else el.style.transform='';
 }
 
-function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap'].forEach(function(id){document.getElementById(id).style.display='none';});}
+function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});}
 function showLoading(){hideAll();document.getElementById('pld').style.display='block';pSpin(true);}
 function hideLoading(){pSpin(false);document.getElementById('pld').style.display='none';}
 function showError(msg){hideLoading();hideAll();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
@@ -1372,6 +1372,38 @@ function loadAndRenderAttrs(d,it){
     reflowGrid(); /* "정원 관련 식물 우선순위" - 용도/색상 등 정원 정보가 실제로 채워지면 순위 상승 */
   });
 }
+/* "1순위 실내 정원 식물, 2순위 국립수목원+농촌진흥청 모두 있는 식물" 판정.
+   실내정원 매칭(fetchGardenMatch)은 학명 검증을 위해 추가 조회가 필요할 수
+   있어 비동기이지만, 후보 국명 217종에 없으면 즉시 null로 끝나 대다수 카드는
+   추가 네트워크 요청이 붙지 않는다. 민간약초·잡초 매칭은 이미 메모리에 있는
+   테이블(NONGSARO_HERB/WEED)이라 nongsaroDataReady 이후로는 즉시 판정된다.
+   결과는 attrs 캐시와 같은 키로 캐시해 재계산을 막는다. */
+var pGardenTierCache={};
+function loadGardenTier(it){
+  var key=attrsCacheKeyFor(it);
+  var cached=pGardenTierCache[key];
+  if(cached){
+    it._indoorGarden=cached.indoor;
+    it._bothAgencies=cached.both;
+    reflowGrid();
+    return;
+  }
+  nongsaroDataReady.then(function(){
+    var clean=cleanSciName(it.sc||'').toLowerCase();
+    var hasRda=!!(clean&&(NONGSARO_HERB[clean]||NONGSARO_WEED[clean]));
+    it._bothAgencies=!!it.no&&hasRda;
+    reflowGrid();
+    return fetchGardenMatch(it.nm,it.sc);
+  }).then(function(m){
+    it._indoorGarden=!!m;
+    pGardenTierCache[key]={indoor:it._indoorGarden,both:it._bothAgencies};
+    reflowGrid();
+  }).catch(function(){
+    it._indoorGarden=false;
+    if(it._bothAgencies===undefined)it._bothAgencies=false;
+    reflowGrid();
+  });
+}
 function attrChipsHtml(attrs,small){
   var chips=[];
   if(attrs.sunlight)chips.push('<span class="attr-chip">'+esc(attrs.sunlight)+'</span>');
@@ -1406,7 +1438,7 @@ function nongsaroGardenByName(korNm){
    패싯을 用途(식물 유형)·출처 분류·꽃 색상(시각적 스와치)·생활형·광조건
    다섯 갈래로 나누었다. 모든 패싯은 각각 복수 선택(OR)이며, 패싯 간에는
    AND로 좁혀진다. */
-var pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
+var pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[],initial:null};
 /* 클릭 반응 속도 최적화: 예전엔 칩 하나를 눌러도 5개 패싯(약 33개 칩) 전체를
    innerHTML로 다시 그렸다 - 브라우저가 매번 그 많은 DOM을 새로 만들고 클릭
    핸들러 문자열을 다시 파싱해야 해서 불필요하게 느렸다. 이제 클릭된 칩
@@ -1424,7 +1456,7 @@ window.pToggleFilterVal=function(kind,v,el){
   if(pQ)applyFilters();else runFacetSearch();
 };
 window.pResetFilters=function(){
-  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[]};
+  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[],initial:null};
   renderFilterPanel();
   updateFilterBadge();
   if(pQ)applyFilters();else runFacetSearch();
@@ -1504,6 +1536,36 @@ function updateFilterProgress(){
    예전에는 검색 결과에 도감(no) 항목이 하나라도 있을 때만 보였는데, 결과가
    바뀔 때마다 패널이 나타났다 사라졌다 하는 것 자체가 어색하다는 피드백. */
 function showFilterBarIfNeeded(){ /* 상시 노출 - 더 이상 조건부로 숨기지 않음. 호출부 호환을 위해 함수만 유지 */ }
+/* 한글 초성(자모) 색인 - "ㄱㄴㄷㄹㅁ... 순 색인을 클릭해서 찾기 편하게" 요청.
+   19개 한글 초성(쌍자음 포함)을 사전/전화번호부에서 흔히 쓰는 14개 대표
+   자음(ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ)으로 묶는다 - 쌍자음(ㄲㄸㅃㅆㅉ)으로
+   시작하는 국명도 대응하는 예사소리 버튼(ㄱㄷㅂㅅㅈ)에서 함께 찾을 수 있다.
+   기준은 국명(요청대로) - 국명이 없거나 한글로 시작하지 않으면(예: 국명 없이
+   학명만 있는 커뮤니티 데이터) 어떤 자음을 선택해도 걸러지지 않는다. */
+var INITIAL_CHARS=['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+var INITIAL_GROUP={0:0,1:0,2:1,3:2,4:2,5:3,6:4,7:5,8:5,9:6,10:6,11:7,12:8,13:8,14:9,15:10,16:11,17:12,18:13};
+function koInitial(nm){
+  var t=(nm||'').trim();
+  if(!t)return null;
+  var code=t.charCodeAt(0);
+  if(code<0xAC00||code>0xD7A3)return null;
+  return INITIAL_CHARS[INITIAL_GROUP[Math.floor((code-0xAC00)/588)]];
+}
+function renderIndexBar(){
+  var el=document.getElementById('pindex');
+  if(!el)return;
+  if(!pShown){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='flex';
+  el.innerHTML='<span class="fchip'+(!pFilter.initial?' active':'')+'" onclick="pSetInitial(null)">전체</span>'
+    +INITIAL_CHARS.map(function(ch){
+      return '<span class="fchip'+(pFilter.initial===ch?' active':'')+'" onclick="pSetInitial(\''+ch+'\')">'+ch+'</span>';
+    }).join('');
+}
+window.pSetInitial=function(ch){
+  pFilter.initial=(pFilter.initial===ch)?null:ch;
+  renderIndexBar();
+  if(pQ)applyFilters();else runFacetSearch();
+};
 function applyFilters(){
   var cards=document.querySelectorAll('#pgrid .pc');
   cards.forEach(function(card){
@@ -1516,9 +1578,14 @@ function applyFilters(){
     if(pFilter.light.length)show=show&&(attrs?pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}):true);
     if(pFilter.cycle.length)show=show&&(attrs?pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}):true);
     if(pFilter.story.length)show=show&&!!(attrs&&attrs.hasStory);
+    if(pFilter.initial){
+      var nmEl=card.querySelector('.pc-name');
+      show=show&&(koInitial(nmEl?nmEl.textContent:'')===pFilter.initial);
+    }
     card.style.display=show?'':'none';
   });
   updateFilterProgress();
+  renderIndexBar();
 }
 
 /* ---- 정원 정보로 찾기(검색어 없이 필터만으로 종을 찾는 기능) ----
@@ -1571,10 +1638,11 @@ function staticEntryMatchesFilters(entry){
   if(pFilter.cycle.length&&!pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}))return false;
   if(pFilter.light.length&&!pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}))return false;
   if(pFilter.story.length&&!attrs.hasStory)return false;
+  if(pFilter.initial&&koInitial(entry.nm)!==pFilter.initial)return false;
   return true;
 }
 function anyFilterActive(){
-  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.cycle.length||pFilter.light.length||pFilter.story.length;
+  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.cycle.length||pFilter.light.length||pFilter.story.length||!!pFilter.initial;
 }
 var facetSearchToken=0;
 function runFacetSearch(){
@@ -1958,25 +2026,37 @@ function queryMatchScore(it,q){
   }
   return 0;
 }
-/* 화면 표시 순서 전용 점수: "사진+내용이 풍부한 순, 정원 관련 식물 우선순위"
-   요청에 따라 (1)사진 유무를 가장 크게 반영하고 (2)rankOf의 콘텐츠 충실도를
-   보조 기준으로, (3)정원 정보(용도/색상/생활형 태그)가 실제로 채워졌는지를
-   작은 가산점으로 반영한다. 사진/속성은 카드가 그려진 뒤 비동기로 도착하므로
-   아직 모르는 상태(undefined)는 "중간값"으로 취급해 결과가 도착하기 전에
-   맨 아래로 밀려나는 것을 막는다.
-   검색어가 있는 경우에는(pQ) 검색어 일치도가 무조건 콘텐츠 충실도보다
-   우선한다(×10 가중치 - 콘텐츠 점수의 최댓값 3.5보다 한 단계 차이만 나도
-   항상 앞서도록) - 정확히 입력한 이름이 사진 많은 다른 종에 밀려 안 보이는
-   일을 막기 위함. 마지막으로 실제 종묘장에서 유통되는 종(DAILIM_PLANT_SET)이면
-   아주 작은 가산점(0.3)을 더해 "실제로 구할 수 있는 식물"이 동률일 때 살짝
-   앞서게 한다 - garden(0.5)보다는 작게, 다른 신뢰도 기준을 넘어서지 않도록. */
+/* "검색 결과값 우선순위" 요청에 따른 4단계 노출 순위 -
+   1순위: 실내 정원 식물(농사로 실내정원용 식물 목록에 국명+학명까지 검증된
+   종, it._indoorGarden), 2순위: 국립수목원(정식 도감, it.no)과 농촌진흥청
+   (민간약초·잡초 자원정보, it._bothAgencies) 데이터가 모두 있는 식물,
+   3순위: 사진과 정원 정보(용도/색상 등)가 둘 다 채워진 식물, 4순위: 나머지.
+   이 네 등급은 loadGardenTier()가 비동기로 채우는 _indoorGarden/_bothAgencies
+   와, 기존에 있던 사진(_hasPhoto)·정원정보(_attrsRich) 플래그로 판정한다.
+   아직 비동기 결과가 도착하지 않은 상태(undefined)는 확정된 낮은 등급보다는
+   위, 확정된 높은 등급보다는 아래에 두는 중간값을 줘서(+0.5) 결과가 도착하기
+   전에 맨 아래로 떨어지지 않게 한다. */
+function priorityTier(it){
+  var unresolved=(it._indoorGarden===undefined||it._bothAgencies===undefined||it._hasPhoto===undefined||it._attrsRich===undefined);
+  var tier;
+  if(it._indoorGarden===true)tier=4;
+  else if(it._bothAgencies===true)tier=3;
+  else if(it._hasPhoto===true&&it._attrsRich===true)tier=2;
+  else tier=1;
+  return unresolved?tier+0.5:tier;
+}
+/* 화면 표시 순서 전용 점수. 검색어가 있는 경우에는(pQ) 검색어 일치도가
+   무조건 다른 모든 기준보다 우선한다(×100 가중치 - 위 4단계 우선순위 폭
+   (최대 40)보다 한 단계 차이만 나도 항상 앞서도록) - 정확히 입력한 이름이
+   다른 종에 밀려 안 보이는 일을 막기 위함. priorityTier(×10)가 그다음으로
+   크게 반영되고, 남은 rankOf(콘텐츠 충실도)와 실제 종묘장 유통 여부
+   (DAILIM_PLANT_SET)는 동률일 때만 갈리는 작은 세부 기준으로 남긴다. */
 function displayScore(it){
-  var rankNorm=(rankOf(it)-1)/3; /* 1~4 -> 0~1 */
-  var photo=it._hasPhoto===true?2:(it._hasPhoto===false?0:1);
-  var garden=it._attrsRich===true?0.5:0;
+  var match=pQ?queryMatchScore(it,pQ)*100:0;
+  var tier=priorityTier(it)*10;
+  var rankNorm=(rankOf(it)-1)/3; /* 1~4 -> 0~1, 세부 동률 정렬용 */
   var market=isDailimPlant(it.nm)?0.3:0;
-  var match=pQ?queryMatchScore(it,pQ)*10:0;
-  return match+photo+rankNorm+garden+market;
+  return match+tier+rankNorm+market;
 }
 function isAttrsRich(attrs){return !!(attrs&&((attrs.tags&&attrs.tags.length)||(attrs.useCats&&attrs.useCats.length)));}
 /* 이미 그려진 카드(사진 로딩 등)를 새로 만들지 않고, DOM에 붙어있는 노드를
@@ -2146,6 +2226,7 @@ function refreshCard(it){
     });});
   }
   loadAndRenderAttrs(d,it);
+  loadGardenTier(it);
   reflowGrid();
 }
 
@@ -2378,6 +2459,7 @@ function renderPage(){
     },eager);};
     if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
     loadAndRenderAttrs(d,it);
+    loadGardenTier(it);
   });
   pShown+=next.length;
   document.getElementById('pcnt').style.display='flex';
