@@ -13,8 +13,8 @@ var pDetailToken=0;
    요청에 따라 페이지 단위를 사실상 무제한으로 둔다 - renderPage 한 번에
    그 시점까지 모인 결과 전체를 카드로 그린다(단계별로 도착하는 소스마다
    다시 호출되므로 여전히 점진적으로 채워진다). 카드 수가 수백 건이어도
-   느려지지 않도록, 실제 데이터 로딩은 화면 근처 카드만 지연 로딩한다
-   (getCardObserver 참고). */
+   브라우저가 느려지지 않도록, 실제 데이터 로딩은 limitCard 동시요청 제한
+   대기열(renderPage 참고)을 그대로 거친다. */
 var PAGE_SIZE=Infinity;
 
 /* ---- 상세창 공통 디자인 토큰 ----
@@ -2549,29 +2549,17 @@ window.pExportCompare=function(){
   downloadCsv('식물비교_'+dateStamp()+'.csv',buildCompareCsvRows(pLastCompareResolved));
 };
 
-/* "더 보기" 없이 전체 결과를 한 번에 카드로 그리면서도 "가장 빠르게"
-   요청을 지키는 핵심 장치 - 카드 수백 개가 한꺼번에 사진·정원정보 API를
-   쏘면 오히려 전체가 느려지고 정부 API 요청 한도에도 쉽게 걸린다. 화면
-   맨 위 첫 배치(8장)만 기존처럼 즉시 로딩하고, 나머지는 IntersectionObserver로
-   "화면 근처(800px 이내)에 스크롤되어 들어오는 순간"에만 실제 데이터를
-   요청한다 - 안 보이는 카드는 자리(썸네일 틀)만 잡아둔 채 네트워크 요청을
-   전혀 만들지 않는다. IntersectionObserver를 지원하지 않는 아주 오래된
-   환경에서는 안전하게 기존처럼 즉시 로딩으로 폴백한다. */
-var pCardObserver=null;
-function getCardObserver(){
-  if(pCardObserver!==null)return pCardObserver;
-  if(typeof IntersectionObserver==='undefined'){pCardObserver=false;return pCardObserver;}
-  pCardObserver=new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if(!entry.isIntersecting)return;
-      var fn=entry.target.__pLoad;
-      entry.target.__pLoad=null;
-      pCardObserver.unobserve(entry.target);
-      if(fn)fn();
-    });
-  },{rootMargin:'800px 0px'});
-  return pCardObserver;
-}
+/* "더 보기" 없이 전체 결과를 한 번에 카드로 그리면서도 "가장 빠르게" 요청을
+   지키는 장치 - 카드 수백 개가 한꺼번에 사진·정원정보 API를 쏘면 오히려
+   전체가 느려지므로, 화면 맨 위 첫 배치(8장)만 대기열을 건너뛰어 즉시
+   로딩하고 나머지는 limitCard 동시요청 제한 대기열(8개씩)에 넣어 순차적으로
+   채운다. (한때 "화면에 보이는 카드만" IntersectionObserver로 지연 로딩하는
+   방식을 썼으나, 브라우저가 탭을 백그라운드로 인식하는 상황 등에서
+   IntersectionObserver 콜백 자체가 아예 발화하지 않아 8번째 카드 이후로는
+   영영 로딩되지 않는 실사용 버그가 발견되어 되돌렸다 - "스크롤해야만 겨우
+   보이는" 절약보다 "항상 확실히 다 채워지는" 안정성을 우선한다. limitCard가
+   이미 동시 8개로 막아주므로 결과가 아무리 많아도 브라우저 동시 연결 한도나
+   정부 API 과부하 문제는 그대로 방지된다.) */
 function renderPage(){
   hideLoading();
   hideAll();
@@ -2582,7 +2570,6 @@ function renderPage(){
   renderFilterPanel();
   var isFirstBatch=(pShown===0); /* 최초 화면(스크롤 없이 바로 보이는 카드들)은 이미지 우선순위를 높여 "최대한 빠르게" 노출한다 */
   var next=pAll.slice(pShown,pShown+PAGE_SIZE);
-  var cardObs=getCardObserver();
   next.forEach(function(it,idx){
     var eager=isFirstBatch&&idx<8;
     var d=document.createElement('div');
@@ -2601,17 +2588,9 @@ function renderPage(){
       it._hasPhoto=!!credit;
       reflowGrid();
     },eager);};
-    function loadCardData(){
-      if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
-      loadAndRenderAttrs(d,it);
-      loadGardenTier(it);
-    }
-    if(eager||!cardObs){
-      loadCardData();
-    } else {
-      d.__pLoad=loadCardData;
-      cardObs.observe(d);
-    }
+    if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
+    loadAndRenderAttrs(d,it);
+    loadGardenTier(it);
   });
   pShown+=next.length;
   document.getElementById('pcnt').style.display='flex';
