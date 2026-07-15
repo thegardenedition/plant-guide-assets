@@ -1809,7 +1809,24 @@ function makeLimiter(max){
     if(active>=max||!queue.length)return;
     active++;
     var job=queue.shift();
-    job.fn().then(job.resolve,job.reject).then(function(){active--;next();});
+    var settled=false;
+    function advance(){ /* 같은 카드 슬롯이 두 번 next()를 부르지 않도록 방어 */
+      if(settled)return;
+      settled=true;
+      active--;
+      next();
+    }
+    job.fn().then(job.resolve,job.reject).then(advance,advance);
+    /* "8개 이후로는 아무것도 없다" 버그의 실제 원인 - 정부 API·프록시(농사로
+       Cloudflare Worker) 등 외부 소스 중 하나가 드물게 응답 없이 멈춰버리면
+       (에러도 성공도 아닌 영원한 pending), 그 작업이 차지한 동시요청 슬롯이
+       영영 반환되지 않아 대기열 전체가 멈춘다 - 첫 배치(대개 화면에 사진이
+       있는 카드들)만 채워지고 그 뒤로는 실제로 사진이 있는 종이어도 전부
+       멈춰버렸던 이유. 8초 안에 끝나지 않는 작업은 포기하고 슬롯을 돌려줘
+       나머지 카드들이 계속 채워지도록 한다(포기된 작업 자체가 나중에 실제로
+       끝나면 그 카드에는 여전히 정상적으로 사진이 반영된다 - 대기열 진행만
+       막지 않을 뿐). */
+    setTimeout(advance,8000);
   }
   return function(fn){
     return new Promise(function(resolve,reject){
