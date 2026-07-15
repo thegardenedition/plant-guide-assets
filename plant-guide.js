@@ -9,7 +9,13 @@ var pQ='',pST=null,pAll=[],pShown=0;
    덮어쓸 수 있다. pDetail이 호출될 때마다 값을 올리고, 각 렌더링 콜백은 자기
    토큰이 최신일 때만 실제로 화면을 갱신한다. */
 var pDetailToken=0;
-var PAGE_SIZE=20;
+/* "더 보기 버튼이 꼭 필요한 게 아니라면 전체 검색값이 한 번에 노출되도록"
+   요청에 따라 페이지 단위를 사실상 무제한으로 둔다 - renderPage 한 번에
+   그 시점까지 모인 결과 전체를 카드로 그린다(단계별로 도착하는 소스마다
+   다시 호출되므로 여전히 점진적으로 채워진다). 카드 수가 수백 건이어도
+   느려지지 않도록, 실제 데이터 로딩은 화면 근처 카드만 지연 로딩한다
+   (getCardObserver 참고). */
+var PAGE_SIZE=Infinity;
 
 /* ---- 상세창 공통 디자인 토큰 ----
    "줄간격·행간·이모지·아이콘·박스 디자인이 제각각이라 보기 불편하다"는
@@ -505,11 +511,33 @@ function bookAxisTag(sc,axis){
   var rec=BOOK_AXIS_INDEX[cleanSciName(sc||'')];
   return rec?(rec[axis]||null):null;
 }
+/* "우측 색인 중 클릭해도 값이 없는 건 빼야지" 대응 - 형태/질감/색 옵션
+   목록(BOOK_FORM_OPTS 등)은 책의 목차를 그대로 옮긴 것이라, 실제 PDF
+   표 추출 과정에서 특정 종의 분류값이 비어 있거나(예: 무릇 종의 category가
+   빈 문자열로 확인된 사례) 목차상의 범주 하나가 실제로는 단 한 종도 채워지지
+   않았을 수 있다. BOOK_AXIS_INDEX(책 3권 전체 색인)를 한 번 훑어 실제로
+   1건 이상 존재하는 값만 옵션으로 남긴다 - 검색결과 유무가 아니라 데이터
+   자체의 존재 여부이므로, 검색어와 무관하게 항상 같은 기준으로 걸러진다. */
+function computeBookAxisAvailability(){
+  var avail={form:{},texture:{},color:{}};
+  Object.keys(BOOK_AXIS_INDEX).forEach(function(key){
+    var rec=BOOK_AXIS_INDEX[key];
+    if(rec.form)avail.form[rec.form]=true;
+    if(rec.texture)avail.texture[rec.texture]=true;
+    if(rec.color)avail.color[rec.color]=true;
+  });
+  return avail;
+}
 var bookDataReady=Promise.all([
   loadStaticTable(BOOK_FTC_URL,BOOK_FTC),
   loadStaticTable(BOOK_GARDEN_URL,BOOK_GARDEN),
   loadStaticTable(BOOK_FOREST300_URL,BOOK_FOREST300),
-  loadBookAxisIndex()
+  loadBookAxisIndex().then(function(){
+    /* 색인 데이터가 이제 막 도착했으므로, 그 사이 필터 패널이 이미 그려져
+       있었다면(=BOOK_AXIS_INDEX가 비어 결과 0건인 옵션을 전혀 못 걸러낸
+       상태로 렌더링됐다면) 한 번 더 그려서 실제 존재하는 옵션만 남긴다. */
+    if(document.getElementById('pfform'))renderFilterPanel();
+  })
 ]);
 /* 정원정보 칩/필터(deriveCuratedProfile)는 국가표준식물목록 정적 데이터뿐 아니라
    도서 데이터(특히 스토리 유무 판정용 BOOK_FTC)도 함께 봐야 하므로, 두 로딩을
@@ -1545,13 +1573,21 @@ function renderFilterPanel(){
   cycleEl.innerHTML=cycleOpts.map(function(o){return chip('cycle',o);}).join('');
   lightEl.innerHTML=lightOpts.map(function(o){return chip('light',o);}).join('');
   storyEl.innerHTML=STORY_OPTS.map(function(o){return chip('story',o);}).join('');
-  formEl.innerHTML=BOOK_FORM_OPTS.map(function(o){return chip('form',o);}).join('');
-  textureEl.innerHTML=BOOK_TEXTURE_OPTS.map(function(o){return chip('texture',o);}).join('');
+  /* BOOK_AXIS_INDEX가 아직 비어 있으면(로딩 전) 결과 0건 여부를 판단할 수
+     없으므로 전체 목록을 그대로 보여주고, 로드가 끝나면(bookDataReady 콜백이
+     renderFilterPanel을 다시 호출) 실제 존재하는 값만 남긴다. */
+  var bookAxisLoaded=Object.keys(BOOK_AXIS_INDEX).length>0;
+  var bookAvail=bookAxisLoaded?computeBookAxisAvailability():null;
+  var formOpts=bookAvail?BOOK_FORM_OPTS.filter(function(o){return bookAvail.form[o];}):BOOK_FORM_OPTS;
+  var textureOpts=bookAvail?BOOK_TEXTURE_OPTS.filter(function(o){return bookAvail.texture[o];}):BOOK_TEXTURE_OPTS;
+  var colorOpts=bookAvail?BOOK_COLOR_OPTS.filter(function(o){return bookAvail.color[o];}):BOOK_COLOR_OPTS;
+  formEl.innerHTML=formOpts.map(function(o){return chip('form',o);}).join('');
+  textureEl.innerHTML=textureOpts.map(function(o){return chip('texture',o);}).join('');
   /* 색 색인은 첨부된 '색으로 찾는 우리꽃 정원식물'의 7개 분류(빨간색·분홍색·
      주황색·노란색·초록색·보라색·흰색)를 그대로 쓴다. 기존 텍스트 추정 색상
      (COLOR_MAP)은 카드 배지·이야기 문구 등 다른 곳에서는 계속 쓰이지만, 이
      색인 필터에는 더 이상 쓰지 않는다(정확도 우선). */
-  colorEl.innerHTML=BOOK_COLOR_OPTS.map(function(o){
+  colorEl.innerHTML=colorOpts.map(function(o){
     var active=pFilter.color.indexOf(o)!==-1;
     return '<button type="button" class="cchip'+(active?' active':'')+'" onclick="pToggleFilterVal(\'color\',\''+o+'\',this)" title="'+o+'">'
       +'<span class="cdot" style="background:'+(BOOK_COLOR_HEX[o]||'#B7B3AA')+'"></span><span class="clabel">'+esc(o)+'</span></button>';
@@ -2513,6 +2549,29 @@ window.pExportCompare=function(){
   downloadCsv('식물비교_'+dateStamp()+'.csv',buildCompareCsvRows(pLastCompareResolved));
 };
 
+/* "더 보기" 없이 전체 결과를 한 번에 카드로 그리면서도 "가장 빠르게"
+   요청을 지키는 핵심 장치 - 카드 수백 개가 한꺼번에 사진·정원정보 API를
+   쏘면 오히려 전체가 느려지고 정부 API 요청 한도에도 쉽게 걸린다. 화면
+   맨 위 첫 배치(8장)만 기존처럼 즉시 로딩하고, 나머지는 IntersectionObserver로
+   "화면 근처(800px 이내)에 스크롤되어 들어오는 순간"에만 실제 데이터를
+   요청한다 - 안 보이는 카드는 자리(썸네일 틀)만 잡아둔 채 네트워크 요청을
+   전혀 만들지 않는다. IntersectionObserver를 지원하지 않는 아주 오래된
+   환경에서는 안전하게 기존처럼 즉시 로딩으로 폴백한다. */
+var pCardObserver=null;
+function getCardObserver(){
+  if(pCardObserver!==null)return pCardObserver;
+  if(typeof IntersectionObserver==='undefined'){pCardObserver=false;return pCardObserver;}
+  pCardObserver=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(!entry.isIntersecting)return;
+      var fn=entry.target.__pLoad;
+      entry.target.__pLoad=null;
+      pCardObserver.unobserve(entry.target);
+      if(fn)fn();
+    });
+  },{rootMargin:'800px 0px'});
+  return pCardObserver;
+}
 function renderPage(){
   hideLoading();
   hideAll();
@@ -2523,6 +2582,7 @@ function renderPage(){
   renderFilterPanel();
   var isFirstBatch=(pShown===0); /* 최초 화면(스크롤 없이 바로 보이는 카드들)은 이미지 우선순위를 높여 "최대한 빠르게" 노출한다 */
   var next=pAll.slice(pShown,pShown+PAGE_SIZE);
+  var cardObs=getCardObserver();
   next.forEach(function(it,idx){
     var eager=isFirstBatch&&idx<8;
     var d=document.createElement('div');
@@ -2541,9 +2601,17 @@ function renderPage(){
       it._hasPhoto=!!credit;
       reflowGrid();
     },eager);};
-    if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
-    loadAndRenderAttrs(d,it);
-    loadGardenTier(it);
+    function loadCardData(){
+      if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
+      loadAndRenderAttrs(d,it);
+      loadGardenTier(it);
+    }
+    if(eager||!cardObs){
+      loadCardData();
+    } else {
+      d.__pLoad=loadCardData;
+      cardObs.observe(d);
+    }
   });
   pShown+=next.length;
   document.getElementById('pcnt').style.display='flex';
