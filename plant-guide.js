@@ -443,10 +443,40 @@ var BOOK_FTC_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide
 var BOOK_GARDEN_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_garden_encyclopedia.json';
 var BOOK_FOREST300_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_forest_garden_300.json';
 var BOOK_FTC={},BOOK_GARDEN={},BOOK_FOREST300={};
+/* BOOK_FTC는 학명 하나당 한 행만 남기므로(loadStaticTable이 같은 키를 덮어씀),
+   세 책(형태/질감/색) 중 두 책 이상에 같은 종이 나오면 먼저 읽힌 축 정보가
+   사라진다(표시용으로는 문제없었지만 "형태·질감·색 색인" 필터는 세 축을 각각
+   정확히 구분해야 하므로 별도로 축별 전체 정보를 보존하는 색인을 둔다). */
+var BOOK_AXIS_INDEX={};
+function loadBookAxisIndex(){
+  return fetch(BOOK_FTC_URL).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    if(!j||!j.fields||!j.rows)return;
+    var f=j.fields,scIdx=f.indexOf('sc'),catIdx=f.indexOf('category'),axisIdx=f.indexOf('axis');
+    j.rows.forEach(function(row){
+      var key=cleanSciName(row[scIdx]||''),axis=row[axisIdx],cat=row[catIdx];
+      if(!key||!axis||!cat)return;
+      if(!BOOK_AXIS_INDEX[key])BOOK_AXIS_INDEX[key]={};
+      BOOK_AXIS_INDEX[key][axis]=cat;
+    });
+  }).catch(function(){/* 실패해도 색인 필터만 조용히 빠지고 나머지 기능엔 영향 없음 */});
+}
+/* 색인(형태/질감/색) 필터의 옵션 값 - 첨부된 3권(형태로/질감으로/색으로 찾는
+   우리꽃 정원식물)이 실제로 쓰는 분류 용어를 그대로 가져온 것으로, 앱이 임의로
+   지어낸 범주가 아니다. 질감은 요청대로 '고운/중간/거친' 대신 완전한 표현인
+   '고운 질감/중간 질감/거친 질감'을 그대로 노출한다. */
+var BOOK_FORM_OPTS=['수직형','구형','반구형','기본형','분산형','곡선형'];
+var BOOK_TEXTURE_OPTS=['고운 질감','중간 질감','거친 질감'];
+var BOOK_COLOR_OPTS=['빨간색','분홍색','주황색','노란색','초록색','보라색','흰색'];
+var BOOK_COLOR_HEX={'빨간색':'#B1584F','분홍색':'#D2A6A0','주황색':'#C68F5E','노란색':'#D2BD7E','초록색':'#7C8B6F','보라색':'#8E7C93','흰색':'#EFEAE0'};
+function bookAxisTag(sc,axis){
+  var rec=BOOK_AXIS_INDEX[cleanSciName(sc||'')];
+  return rec?(rec[axis]||null):null;
+}
 var bookDataReady=Promise.all([
   loadStaticTable(BOOK_FTC_URL,BOOK_FTC),
   loadStaticTable(BOOK_GARDEN_URL,BOOK_GARDEN),
-  loadStaticTable(BOOK_FOREST300_URL,BOOK_FOREST300)
+  loadStaticTable(BOOK_FOREST300_URL,BOOK_FOREST300),
+  loadBookAxisIndex()
 ]);
 /* 정원정보 칩/필터(deriveCuratedProfile)는 국가표준식물목록 정적 데이터뿐 아니라
    도서 데이터(특히 스토리 유무 판정용 BOOK_FTC)도 함께 봐야 하므로, 두 로딩을
@@ -1438,7 +1468,7 @@ function nongsaroGardenByName(korNm){
    패싯을 用途(식물 유형)·출처 분류·꽃 색상(시각적 스와치)·생활형·광조건
    다섯 갈래로 나누었다. 모든 패싯은 각각 복수 선택(OR)이며, 패싯 간에는
    AND로 좁혀진다. */
-var pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[],initial:null};
+var pFilter={usecat:[],origin:[],color:[],form:[],texture:[],cycle:[],light:[],story:[],initial:null};
 /* 클릭 반응 속도 최적화: 예전엔 칩 하나를 눌러도 5개 패싯(약 33개 칩) 전체를
    innerHTML로 다시 그렸다 - 브라우저가 매번 그 많은 DOM을 새로 만들고 클릭
    핸들러 문자열을 다시 파싱해야 해서 불필요하게 느렸다. 이제 클릭된 칩
@@ -1456,7 +1486,7 @@ window.pToggleFilterVal=function(kind,v,el){
   if(pQ)applyFilters();else runFacetSearch();
 };
 window.pResetFilters=function(){
-  pFilter={usecat:[],origin:[],color:[],cycle:[],light:[],story:[],initial:null};
+  pFilter={usecat:[],origin:[],color:[],form:[],texture:[],cycle:[],light:[],story:[],initial:null};
   renderFilterPanel();
   updateFilterBadge();
   if(pQ)applyFilters();else runFacetSearch();
@@ -1471,9 +1501,10 @@ var ORIGIN_OPTS=['자생식물','특산식물','적색식물','외래식물','�
 var STORY_OPTS=['스토리 있음'];
 function renderFilterPanel(){
   var usecatEl=document.getElementById('pfusecat'),originEl=document.getElementById('pforigin'),
-      colorEl=document.getElementById('pfcolor'),cycleEl=document.getElementById('pfcycle'),lightEl=document.getElementById('pflight'),
+      colorEl=document.getElementById('pfcolor'),formEl=document.getElementById('pfform'),textureEl=document.getElementById('pftexture'),
+      cycleEl=document.getElementById('pfcycle'),lightEl=document.getElementById('pflight'),
       storyEl=document.getElementById('pfstory');
-  if(!usecatEl||!originEl||!colorEl||!cycleEl||!lightEl||!storyEl)return;
+  if(!usecatEl||!originEl||!colorEl||!formEl||!textureEl||!cycleEl||!lightEl||!storyEl)return;
   var cycleOpts=['한해살이','두해살이','여러해살이','목본'],lightOpts=['양지','반음지','음지'];
   function chip(kind,o){return '<span class="fchip'+(pFilter[kind].indexOf(o)!==-1?' active':'')+'" onclick="pToggleFilterVal(\''+kind+'\',\''+o+'\',this)">'+esc(o)+'</span>';}
   usecatEl.innerHTML=USECAT_OPTS.map(function(o){return chip('usecat',o);}).join('');
@@ -1481,16 +1512,22 @@ function renderFilterPanel(){
   cycleEl.innerHTML=cycleOpts.map(function(o){return chip('cycle',o);}).join('');
   lightEl.innerHTML=lightOpts.map(function(o){return chip('light',o);}).join('');
   storyEl.innerHTML=STORY_OPTS.map(function(o){return chip('story',o);}).join('');
-  colorEl.innerHTML=COLOR_MAP.map(function(c){return c.label;}).map(function(o){
+  formEl.innerHTML=BOOK_FORM_OPTS.map(function(o){return chip('form',o);}).join('');
+  textureEl.innerHTML=BOOK_TEXTURE_OPTS.map(function(o){return chip('texture',o);}).join('');
+  /* 색 색인은 첨부된 '색으로 찾는 우리꽃 정원식물'의 7개 분류(빨간색·분홍색·
+     주황색·노란색·초록색·보라색·흰색)를 그대로 쓴다. 기존 텍스트 추정 색상
+     (COLOR_MAP)은 카드 배지·이야기 문구 등 다른 곳에서는 계속 쓰이지만, 이
+     색인 필터에는 더 이상 쓰지 않는다(정확도 우선). */
+  colorEl.innerHTML=BOOK_COLOR_OPTS.map(function(o){
     var active=pFilter.color.indexOf(o)!==-1;
     return '<button type="button" class="cchip'+(active?' active':'')+'" onclick="pToggleFilterVal(\'color\',\''+o+'\',this)" title="'+o+'">'
-      +'<span class="cdot" style="background:'+colorSwatch(o)+'"></span><span class="clabel">'+esc(o)+'</span></button>';
+      +'<span class="cdot" style="background:'+(BOOK_COLOR_HEX[o]||'#B7B3AA')+'"></span><span class="clabel">'+esc(o)+'</span></button>';
   }).join('');
 }
 function updateFilterBadge(){
   var badge=document.getElementById('pfilterbadge'),reset=document.getElementById('pfilterreset');
   if(!badge||!reset)return;
-  var n=pFilter.usecat.length+pFilter.origin.length+pFilter.color.length+pFilter.cycle.length+pFilter.light.length+pFilter.story.length;
+  var n=pFilter.usecat.length+pFilter.origin.length+pFilter.color.length+pFilter.form.length+pFilter.texture.length+pFilter.cycle.length+pFilter.light.length+pFilter.story.length;
   badge.textContent=n;
   reset.style.display=n?'inline-block':'none';
 }
@@ -1574,7 +1611,12 @@ function applyFilters(){
     var show=true;
     if(pFilter.usecat.length)show=show&&pFilter.usecat.some(function(v){return cardHasUseCat(card,attrs,v);});
     if(pFilter.origin.length)show=show&&pFilter.origin.some(function(v){return originCategoryMatch(card,attrs,v);});
-    if(pFilter.color.length)show=show&&(attrs?pFilter.color.some(function(v){return attrs.colors&&attrs.colors.indexOf(v)!==-1;}):true);
+    /* 색·형태·질감 색인은 첨부된 3권(형태로/질감으로/색으로 찾는 우리꽃
+       정원식물)의 실제 분류만 정확히 매칭한다(bookAxisTag) - 텍스트 추정치인
+       attrs.colors는 더 이상 이 색인에 쓰지 않는다. */
+    if(pFilter.color.length){var sc0=card.getAttribute('data-sc');show=show&&pFilter.color.indexOf(bookAxisTag(sc0,'color'))!==-1;}
+    if(pFilter.form.length){var sc1=card.getAttribute('data-sc');show=show&&pFilter.form.indexOf(bookAxisTag(sc1,'form'))!==-1;}
+    if(pFilter.texture.length){var sc2=card.getAttribute('data-sc');show=show&&pFilter.texture.indexOf(bookAxisTag(sc2,'texture'))!==-1;}
     if(pFilter.light.length)show=show&&(attrs?pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}):true);
     if(pFilter.cycle.length)show=show&&(attrs?pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}):true);
     if(pFilter.story.length)show=show&&!!(attrs&&attrs.hasStory);
@@ -1634,7 +1676,13 @@ function staticEntryMatchesFilters(entry){
     if(v==='외래식물')return entry.resType==='외국종';
     return false; /* 민속식물 등은 정적 데이터셋에 대응 개념이 없어 매치되지 않음 */
   }))return false;
-  if(pFilter.color.length&&!pFilter.color.some(function(v){return attrs.colors&&attrs.colors.indexOf(v)!==-1;}))return false;
+  /* 색·형태·질감은 "정확한 매칭" 요청에 따라 텍스트 추정치(attrs.colors)가
+     아니라 첨부된 3권(형태로/질감으로/색으로 찾는 우리꽃 정원식물)의 실제
+     분류를 그대로 쓴다(bookAxisTag, BOOK_AXIS_INDEX 참고) - 이 3권에 실린
+     150종씩만 대상이 되므로 다른 필터보다 결과가 훨씬 좁혀질 수 있다. */
+  if(pFilter.color.length&&pFilter.color.indexOf(bookAxisTag(entry.sc,'color'))===-1)return false;
+  if(pFilter.form.length&&pFilter.form.indexOf(bookAxisTag(entry.sc,'form'))===-1)return false;
+  if(pFilter.texture.length&&pFilter.texture.indexOf(bookAxisTag(entry.sc,'texture'))===-1)return false;
   if(pFilter.cycle.length&&!pFilter.cycle.some(function(v){return (attrs.cycle||'').indexOf(v)!==-1;}))return false;
   if(pFilter.light.length&&!pFilter.light.some(function(v){return (attrs.light||'').indexOf(v)!==-1;}))return false;
   if(pFilter.story.length&&!attrs.hasStory)return false;
@@ -1642,7 +1690,7 @@ function staticEntryMatchesFilters(entry){
   return true;
 }
 function anyFilterActive(){
-  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.cycle.length||pFilter.light.length||pFilter.story.length||!!pFilter.initial;
+  return pFilter.usecat.length||pFilter.origin.length||pFilter.color.length||pFilter.form.length||pFilter.texture.length||pFilter.cycle.length||pFilter.light.length||pFilter.story.length||!!pFilter.initial;
 }
 var facetSearchToken=0;
 function runFacetSearch(){
@@ -2216,6 +2264,7 @@ function refreshCard(it){
   if(it.no)d.setAttribute('data-no',it.no); else d.removeAttribute('data-no');
   d.setAttribute('data-origin',it.origin||'');
   d.setAttribute('data-uid',it._uid);
+  d.setAttribute('data-sc',it.sc||'');
   var core=d.querySelector('.pc-core');
   if(core)core.innerHTML=coreHtml(it);
   var imgWrap=d.querySelector('.pc-img');
@@ -2447,6 +2496,7 @@ function renderPage(){
     if(it.no)d.setAttribute('data-no',it.no);
     d.setAttribute('data-origin',it.origin||'');
     d.setAttribute('data-uid',it._uid);
+    d.setAttribute('data-sc',it.sc||'');
     d.onclick=function(){pDetail(it);};
     d.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div><button type="button" class="pc-cmpbtn">비교</button><div class="pc-body"><div class="pc-core">'+coreHtml(it)+'</div></div>';
     var cmpBtn=d.querySelector('.pc-cmpbtn');
