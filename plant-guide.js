@@ -314,6 +314,39 @@ function nongsaroPanelData(korNm,sciNm){
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
+/* "학명은 기울임이 있는 것은 그대로 반영해줘" 대응 - 지금까지는 학명이 표시되는
+   모든 자리(#pdsci, 카드의 .pc-sci, 비교표)에 CSS font-style:italic을 문자열
+   전체에 그대로 걸어서, 국제식물명명규약상 이탤릭이 아니어야 하는 부분(작은
+   따옴표로 묶인 품종명, 잡종기호 ×, 명명자 인용 - 괄호 안팎의 사람 이름·
+   출판연도·& 기호 등)까지 몽땅 기울어져 보였다. 실제 규약대로 속명+종소명
+   (그리고 var./subsp./f. 뒤에 오는 종하 계급 학명)만 기울이고 나머지는
+   정자로 남기도록, 문자열을 토큰 단위로 나눠 이탤릭 여부를 판단한다. */
+var SCI_CONNECTORS={'var.':1,'subsp.':1,'ssp.':1,'f.':1,'forma':1,'subvar.':1,'cv.':1};
+function sciNameHtml(sc){
+  if(!sc)return'';
+  var tokens=sc.match(/'[^']*'|\([^)]*\)|\S+/g)||[];
+  var sawGenus=false,sawSpecies=false;
+  return tokens.map(function(tok,i){
+    var italic=false;
+    var lower=tok.toLowerCase();
+    if(/^'.*'$/.test(tok)||/^\(.*\)$/.test(tok)||tok==='×'){
+      italic=false;
+    } else if(!sawGenus&&/^[A-Z][a-z-]+\.?$/.test(tok)){
+      italic=true;sawGenus=true;
+    } else if(sawGenus&&!sawSpecies&&/^×?[a-z-]+$/.test(tok)){
+      italic=true;sawSpecies=true;
+    } else if(SCI_CONNECTORS[lower]){
+      italic=false;
+    } else if(i>0&&SCI_CONNECTORS[tokens[i-1].toLowerCase()]&&/^[a-z-]+$/.test(tok)){
+      italic=true;
+    } else {
+      italic=false;
+    }
+    var e=esc(tok);
+    return italic?('<i>'+e+'</i>'):e;
+  }).join(' ');
+}
+
 function pSpin(on){
   var a=0,el=document.getElementById('pspin');
   if(pST)clearInterval(pST);
@@ -1306,7 +1339,7 @@ function overviewSkeleton(){
      둔다 - 사실 정보(형태/분포 등)와 실용 정보(조경·농사로)를 먼저 읽고,
      이름의 유래·숲이야기 같은 서술형 콘텐츠는 마지막에 자연스럽게 이어지는
      순서다. */
-  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdgeneral','pdstory']
+  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdstory']
     .map(function(id){return '<div id="'+id+'"></div>';}).join('');
 }
 function setEl(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html||'';}
@@ -2251,7 +2284,7 @@ function badgeFor(it){
   return'';
 }
 function coreHtml(it){
-  return '<p class="pc-name">'+esc(it.nm)+'</p><p class="pc-sci">'+esc(it.sc)+'</p>'+(it.fam?'<span class="pc-fam">'+esc(it.fam)+'</span>':'')+badgeFor(it);
+  return '<p class="pc-name">'+esc(it.nm)+'</p><p class="pc-sci">'+sciNameHtml(it.sc)+'</p>'+(it.fam?'<span class="pc-fam">'+esc(it.fam)+'</span>':'')+badgeFor(it);
 }
 /* uid -> 렌더된 카드 DOM 매핑. 같은 종의 더 충실한 항목이 나중에 도착하면(예:
    iNaturalist 단독 항목으로 먼저 그려졌다가 도감 항목으로 승급) 새 카드를
@@ -2373,7 +2406,7 @@ function buildCompareTableHtml(resolved){
       return '<th style="padding:12px;text-align:left;border-bottom:2px solid #121212;vertical-align:bottom">'
         +(r.imgSrc?'<img src="'+r.imgSrc+'" style="width:100%;aspect-ratio:1/1;object-fit:cover;margin-bottom:8px;display:block">':'')
         +'<span style="font-size:14px;font-weight:600;color:#121212;display:block">'+esc(r.it.nm)+'</span>'
-        +'<span style="font-size:11px;color:#ABABAB;font-style:italic">'+esc(r.it.sc)+'</span>'
+        +'<span style="font-size:11px;color:#ABABAB">'+sciNameHtml(r.it.sc)+'</span>'
         +'</th>';
     }).join('')
     +'</tr>';
@@ -2391,6 +2424,7 @@ window.pOpenCompare=function(){
   var items=Object.keys(pCompareSet).map(function(uid){return pCompareSet[uid];});
   if(items.length<2)return;
   document.getElementById('pcmpov').style.display='flex';
+  pLockScroll();
   var body=document.getElementById('pcmpbody');
   body.innerHTML='<p style="color:#ABABAB;text-align:center;padding:40px 0">비교 정보를 불러오는 중...</p>';
   Promise.all(items.map(function(rec){
@@ -2406,7 +2440,7 @@ window.pOpenCompare=function(){
     body.innerHTML=buildCompareTableHtml(resolved);
   });
 };
-window.pCloseCompare=function(){document.getElementById('pcmpov').style.display='none';};
+window.pCloseCompare=function(){document.getElementById('pcmpov').style.display='none';pUnlockScroll();};
 
 /* ---- 내보내기 기능 ----
    가드너·조경전문가·식물전문가 모두 결과를 엑셀 등 다른 도구로 옮겨 쓰고
@@ -2520,7 +2554,29 @@ function renderPage(){
   reflowGrid(); /* 사진/속성이 도착하기 전에도 rankOf(콘텐츠 충실도) 기준으로 우선 정렬 */
 }
 
-window.pCD=function(){document.getElementById('pov').style.display='none';};
+/* "팝업 열고 스크롤하면 뒤 페이지까지 움직인다" 요청 대응 - 팝업이 떠 있는
+   동안 배경(body) 스크롤을 잠그고, 팝업 안(#pdpanel)은 자체 overflow-y:auto로
+   계속 스크롤된다. 닫을 때 원래 스크롤 위치로 정확히 복귀시킨다(단순히
+   overflow만 풀면 모바일 브라우저에서 스크롤 위치가 흔들리는 경우가 있어,
+   위치를 fixed로 고정했다가 해제 시 원위치로 되돌린다). */
+var pScrollLockY=0;
+function pLockScroll(){
+  pScrollLockY=window.scrollY||document.documentElement.scrollTop||0;
+  document.body.style.position='fixed';
+  document.body.style.top='-'+pScrollLockY+'px';
+  document.body.style.left='0';
+  document.body.style.right='0';
+  document.body.style.width='100%';
+}
+function pUnlockScroll(){
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.left='';
+  document.body.style.right='';
+  document.body.style.width='';
+  window.scrollTo(0,pScrollLockY);
+}
+window.pCD=function(){document.getElementById('pov').style.display='none';pUnlockScroll();};
 
 function rowsTable(rows){
   if(!rows.length)return uiEmpty('상세 정보가 없습니다.');
@@ -2627,9 +2683,8 @@ function pdRarityBadgesHtml(match){
 function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
   var bookData=bookProfileData(sc);
   var storyData=forestStoryHtml(nm);
-  var generalData=nongsaroGeneralHtml(nm,profile&&profile.colors);
-  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData,generalData]).then(function(res){
-    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'',general=res[4]||'';
+  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData]).then(function(res){
+    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'';
     setEl('pdnsgarden',ns.gardenHtml||'');
     setEl('pdnslandscape',ns.landscapeHtml||'');
     setEl('pdbookgarden',bk.gardenHtml||'');
@@ -2640,7 +2695,6 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
     var academicInner=badges+rarityTable+extra+(ns.academicHtml||'');
     var hasAcademic=!!(badges||rarityTable||extra||ns.academicHtml);
     setEl('pdacademic',hasAcademic?uiSection('학술정보',academicInner):'');
-    setEl('pdgeneral',general);
     setEl('pdstory',(bk.storyHtml||'')+fs);
   }).catch(function(){
     setEl('pdstory','');
@@ -2660,7 +2714,7 @@ window.pDetail=function(it){
   var hasKorNm=!!(nm&&nm.trim()&&nm.trim()!=='이름 없음');
   var sciEl=document.getElementById('pdsci');
   document.getElementById('pdname').textContent=hasKorNm?nm:(sc||'이름 미확인');
-  if(hasKorNm&&sc){sciEl.textContent=sc;sciEl.style.display='';}
+  if(hasKorNm&&sc){sciEl.innerHTML=sciNameHtml(sc);sciEl.style.display='';}
   else{sciEl.textContent='';sciEl.style.display='none';}
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   pdSet(overviewSkeleton());
@@ -2668,6 +2722,7 @@ window.pDetail=function(it){
   var creditEl=document.getElementById('pdcredit');
   creditEl.style.display='none';
   document.getElementById('pov').style.display='flex';
+  pLockScroll();
   var pdimg=document.getElementById('pdimg');
   pdimg.innerHTML=PLACEHOLDER_ICON;
   /* 상세창은 카드 그리드용 대표 사진 1장이 아니라, 여러 소스를 모두 훑어
