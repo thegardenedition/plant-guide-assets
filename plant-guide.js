@@ -3018,3 +3018,113 @@ window.pDetail=function(it){
 renderFilterPanel();
 updateFilterBadge();
 })();
+/* ============================================================
+   pgMiniCards — 기사 하단 "이 기사에 나온 식물" 미니 카드
+   ------------------------------------------------------------
+   식물도감(runSearch)과 동일한 공공데이터 소스로 각 식물명당 대표 1건을
+   가져와, 도감과 똑같은 .pc 카드 디자인으로 지정 컨테이너에 렌더한다.
+   기사(Blog Posts)의 "관련식물명" 텍스트 필드값(쉼표 구분)을 그대로 넘기면 됨.
+
+   사용:
+     <div id="tge-plant-cards" data-plants="맥문동,산수국,미선나무"></div>
+     → 페이지에서 pgMiniCards() 자동 실행 (아래 auto-init)
+   또는 직접:
+     window.pgMiniCards('맥문동,산수국', document.getElementById('...'));
+   ============================================================ */
+(function(){
+  function firstBest(items){
+    /* appendItems의 랭킹 로직을 재사용해 가장 충실한 1건을 고른다 */
+    var acc=[];
+    (items||[]).forEach(function(list){
+      if(Array.isArray(list)) appendItems(acc,list,list.__origin||'gov');
+    });
+    if(!acc.length) return null;
+    acc.sort(function(a,b){return rankOf(b)-rankOf(a);});
+    return acc[0];
+  }
+
+  function fetchOnePlant(name){
+    /* runSearch와 동일 소스를 병렬 호출하되, 결과를 모아 대표 1건만 반환 */
+    var q=name;
+    try{ var opt=optimizeQuery(name); if(opt&&opt.q_title)q=opt.q_title; }catch(e){}
+    var sources=[
+      fetchSourceItemsWithVariant('/plantPilbkSearch',q),
+      fetchSourceItemsWithVariant('/plantSmplSearch',q),
+      fetchSourceItemsWithVariant('/plantSpcltList',q),
+      fetchSourceItemsWithVariant('/plantRareList',q),
+      fetchSourceItemsWithVariant('/plantNaturalizedList',q),
+      fetchINatMatches(q),
+      searchByFamily(q)
+    ];
+    return Promise.all(sources.map(function(p){
+      return p.then(function(r){return Array.isArray(r)?r:[];}).catch(function(){return [];});
+    })).then(function(lists){
+      var acc=[];
+      lists.forEach(function(list){ if(list && list.length) appendItems(acc,list,(list[0]&&list[0].origin)||'gov'); });
+      if(!acc.length) return null;
+      acc.sort(function(a,b){return rankOf(b)-rankOf(a);});
+      return acc[0];
+    });
+  }
+
+  function miniCard(it, guideBase){
+    var d=document.createElement('a');
+    d.className='pc tge-mini';
+    d.setAttribute('href', guideBase + '?q=' + encodeURIComponent(it.nm));
+    d.style.textDecoration='none';
+    d.style.display='block';
+    d.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div>'
+      +'<div class="pc-body"><div class="pc-core">'+coreHtml(it)+'</div>'
+      +'<p style="margin:10px 0 0;font-size:11px;color:#ABABAB;letter-spacing:.3px">식물도감에서 자세히 보기 →</p></div>';
+    /* 도감과 동일한 이미지 로딩 재사용 */
+    try{ loadCardImage(it.nm, it.sc, d.querySelector('.pc-img'), function(){}, true); }catch(e){}
+    return d;
+  }
+
+  window.pgMiniCards=function(namesStr, container){
+    if(!container) container=document.getElementById('tge-plant-cards');
+    if(!container) return;
+    var names=(namesStr||container.getAttribute('data-plants')||'')
+      .split(/[,\n]/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!names.length){ container.style.display='none'; return; }
+
+    /* 도감 카드 CSS(.pc 등)가 이 페이지엔 없으므로 최소 스타일을 주입 */
+    if(!document.getElementById('tge-mini-style')){
+      var st=document.createElement('style'); st.id='tge-mini-style';
+      st.textContent='#tge-plant-cards .tge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px}'
+        +'#tge-plant-cards .pc{background:#fff;border:1px solid #E6E6E6;position:relative;transition:box-shadow .15s,transform .15s;color:#121212}'
+        +'#tge-plant-cards .pc:hover{box-shadow:0 12px 28px rgba(18,18,18,.12);transform:translateY(-2px)}'
+        +'#tge-plant-cards .pc-img{width:100%;aspect-ratio:1/1;background:#F2F2F2;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.4rem;color:#D6D6D6}'
+        +'#tge-plant-cards .pc-img img{width:100%;height:100%;object-fit:cover;display:block}'
+        +'#tge-plant-cards .pc-body{padding:16px}'
+        +'#tge-plant-cards .pc-name{font-size:15px;font-weight:600;margin:0 0 4px}'
+        +'#tge-plant-cards .pc-sci{font-size:12px;color:#ABABAB;margin:0 0 8px;font-style:italic}'
+        +'#tge-plant-cards .pc-fam{font-size:11px;color:#787878;border:1px solid #DCDCDC;display:inline-block;padding:2px 8px;letter-spacing:.5px}'
+        +'#tge-plant-cards .pc-tag{font-size:11px;color:#ABABAB;display:inline-block;padding:2px 8px;letter-spacing:.5px;margin-left:6px}';
+      document.head.appendChild(st);
+    }
+
+    var grid=document.createElement('div'); grid.className='tge-grid';
+    container.innerHTML=''; container.appendChild(grid);
+    var guideBase=(container.getAttribute('data-guide')||'/plant-guide');
+
+    names.forEach(function(nm){
+      var ph=document.createElement('div'); ph.className='pc';
+      ph.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div><div class="pc-body"><p class="pc-name">'+esc(nm)+'</p><p class="pc-sci" style="color:#ABABAB">불러오는 중…</p></div>';
+      grid.appendChild(ph);
+      fetchOnePlant(nm).then(function(it){
+        if(!it){ ph.querySelector('.pc-sci').textContent='정보를 찾지 못했습니다'; return; }
+        var card=miniCard(it, guideBase);
+        grid.replaceChild(card, ph);
+      }).catch(function(){ ph.querySelector('.pc-sci').textContent='불러오기 실패'; });
+    });
+  };
+
+  /* auto-init: #tge-plant-cards[data-plants]가 있으면 자동 실행 */
+  function autoInit(){
+    var c=document.getElementById('tge-plant-cards');
+    if(c && c.getAttribute('data-plants')) window.pgMiniCards(null, c);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoInit);
+  else autoInit();
+})();
