@@ -3120,10 +3120,30 @@ updateFilterBadge();
     });
   };
 
-  /* auto-init: #tge-plant-cards[data-plants]가 있으면 자동 실행 */
+  /* auto-init: #tge-plant-cards 컨테이너가 있으면 자동 실행.
+     식물명은 (1) data-plants 속성, 또는 (2) #tge-plants-src 요소의 텍스트에서 읽는다.
+     Webflow 임베드는 CMS 필드를 속성에 직접 못 꽂는 경우가 있어, 별도 텍스트
+     요소(#tge-plants-src)에 "관련식물명" CMS 필드를 출력해두면 그 값을 읽어온다. */
+  function readPlants(container){
+    var v = container.getAttribute('data-plants') || '';
+    if(!v.trim()){
+      var src = document.getElementById('tge-plants-src');
+      if(src) v = (src.textContent || '').trim();
+    }
+    return v;
+  }
   function autoInit(){
     var c=document.getElementById('tge-plant-cards');
-    if(c && c.getAttribute('data-plants')) window.pgMiniCards(null, c);
+    if(!c) return;
+    var names = readPlants(c);
+    if(names && names.trim()){
+      var src=document.getElementById('tge-plants-src');
+      if(src) src.style.display='none';
+      window.pgMiniCards(names, c);
+    } else {
+      c.style.display='none';
+      var sec=c.closest('[data-plant-section]');
+    }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoInit);
   else autoInit();
