@@ -3042,10 +3042,14 @@ function firstBest(items){
     return acc[0];
   }
 
+  function normNm(s){ return (s||'').replace(/\s+/g,'').toLowerCase(); }
   function fetchOnePlant(name){
-    /* runSearch와 동일 소스를 병렬 호출하되, 결과를 모아 대표 1건만 반환 */
+    /* runSearch와 동일 소스를 병렬 호출하되, 결과를 모아 대표 1건만 반환.
+       국명이 입력값과 정확히 일치하는 항목을 최우선으로 고른다(예: '맥문동'을
+       넣으면 근연종 '개맥문동'이 아니라 정확히 '맥문동'을 선택). */
     var q=name;
     try{ var opt=optimizeQuery(name); if(opt&&opt.q_title)q=opt.q_title; }catch(e){}
+    var target=normNm(name);
     var sources=[
       fetchSourceItemsWithVariant('/plantPilbkSearch',q),
       fetchSourceItemsWithVariant('/plantSmplSearch',q),
@@ -3061,6 +3065,13 @@ function firstBest(items){
       var acc=[];
       lists.forEach(function(list){ if(list && list.length) appendItems(acc,list,(list[0]&&list[0].origin)||'gov'); });
       if(!acc.length) return null;
+      /* 1순위: 국명 완전일치 중 랭킹 최고 */
+      var exact=acc.filter(function(x){return normNm(x.nm)===target;});
+      if(exact.length){ exact.sort(function(a,b){return rankOf(b)-rankOf(a);}); return exact[0]; }
+      /* 2순위: 입력값으로 시작하는 국명(맥문동류 등) 중 랭킹 최고 */
+      var starts=acc.filter(function(x){return normNm(x.nm).indexOf(target)===0;});
+      if(starts.length){ starts.sort(function(a,b){return rankOf(b)-rankOf(a);}); return starts[0]; }
+      /* 3순위: 그냥 랭킹 최고 */
       acc.sort(function(a,b){return rankOf(b)-rankOf(a);});
       return acc[0];
     });
@@ -3069,7 +3080,7 @@ function firstBest(items){
   function miniCard(it, guideBase){
     var d=document.createElement('a');
     d.className='pc tge-mini';
-    d.setAttribute('href', guideBase + '?q=' + encodeURIComponent(it.nm));
+    d.setAttribute('href', guideBase + '?q=' + encodeURIComponent(it.nm) + '&detail=1');
     d.style.textDecoration='none';
     d.style.display='block';
     d.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div>'
@@ -3146,4 +3157,45 @@ function firstBest(items){
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoInit);
   else autoInit();
+
+  /* ---- 식물도감 페이지 딥링크 핸들러 ----
+     기사 카드에서 /plant-guide?q=식물명(&detail=1) 로 진입 시:
+       - #psi 검색창이 있는 식물도감 페이지에서만 동작
+       - q로 검색 실행(pSuggest)
+       - detail=1이면 검색 결과 중 국명이 q와 정확히 일치하는 항목의 상세 팝업을 자동으로 연다.
+     기존 임베드 부트스트랩과 중복 실행돼도 __pgDeepDone 플래그로 한 번만 처리. */
+  function pgDeepLink(){
+    if(window.__pgDeepDone) return;
+    if(!document.getElementById('psi')) return; /* 식물도감 페이지가 아니면 무시 */
+    var params;
+    try{ params=new URLSearchParams(window.location.search); }catch(e){ return; }
+    var q=params.get('q');
+    if(!q) return;
+    window.__pgDeepDone=true;
+    var wantDetail=(params.get('detail')==='1');
+    try{ if(window.pSuggest) window.pSuggest(q); }catch(e){}
+    if(!wantDetail) return;
+    /* 검색 결과(pAll)가 채워지면 정확 일치 항목의 상세를 연다. 여러 소스가
+       순차 도착하므로, 완전일치가 나타날 때까지 잠깐 폴링한다. */
+    var want=(q||'').replace(/\s+/g,'').toLowerCase();
+    var tries=0;
+    var timer=setInterval(function(){
+      tries++;
+      var hit=null;
+      if(typeof pAll!=='undefined' && pAll && pAll.length){
+        for(var i=0;i<pAll.length;i++){
+          if((pAll[i].nm||'').replace(/\s+/g,'').toLowerCase()===want){ hit=pAll[i]; break; }
+        }
+        if(!hit) hit=pAll[0]; /* 완전일치 없으면 첫 결과 */
+      }
+      if(hit && window.pDetail){
+        clearInterval(timer);
+        try{ window.pDetail(hit); }catch(e){}
+      } else if(tries>40){ /* 약 8초 후 포기 */
+        clearInterval(timer);
+      }
+    },200);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', pgDeepLink);
+  else pgDeepLink();
 })();
