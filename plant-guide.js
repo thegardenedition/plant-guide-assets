@@ -3017,7 +3017,7 @@ window.pDetail=function(it){
    응답을 기다릴 필요가 없다. */
 renderFilterPanel();
 updateFilterBadge();
-})();
+
 /* ============================================================
    pgMiniCards — 기사 하단 "이 기사에 나온 식물" 미니 카드
    ------------------------------------------------------------
@@ -3031,8 +3031,7 @@ updateFilterBadge();
    또는 직접:
      window.pgMiniCards('맥문동,산수국', document.getElementById('...'));
    ============================================================ */
-(function(){
-  function firstBest(items){
+function firstBest(items){
     /* appendItems의 랭킹 로직을 재사용해 가장 충실한 1건을 고른다 */
     var acc=[];
     (items||[]).forEach(function(list){
