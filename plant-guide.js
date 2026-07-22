@@ -1957,6 +1957,109 @@ window.pClearedSearch=function(){
   }
 };
 
+/* ---- 사진으로 식물 찾기 (Pl@ntNet API) ----
+   "사진을 업로드하면 식물을 찾아주는 기능을 붙여달라"는 요청에 따라 추가.
+   iNaturalist의 사진인식(Computer Vision) API는 일반에 공개되지 않고 소수
+   기관에만 이메일로 개별 승인해주는 비공개 API라 쓸 수 없었다(포럼 공지로
+   확인). 대신 저작권·이용조건이 명확한 공개 서비스인 Pl@ntNet API(사용자가
+   my.plantnet.org에서 직접 발급한 키)를 쓴다.
+   my-api.plantnet.org는 브라우저에서 키를 그대로 붙여 직접 호출하면 CORS가
+   막힌다(Pl@ntNet 공식 web-component 문서에 명시됨) - 이미 같은 이유로 만들어
+   둔 nongsaro-proxy-worker.js(Cloudflare Worker)에 /plantid 라우트를 추가해
+   그 워커를 그대로 재사용한다(NONGSARO_PROXY 주소 재사용, 새 프록시 주소를
+   따로 둘 필요 없음).
+   Pl@ntNet이 돌려준 학명 후보는 이 앱이 이미 들고 있는 정적 데이터셋
+   (STATIC_SPECIES/STATIC_NAME, 국가표준식물목록 3.6만종)과 대조해, 도감에
+   있는 종은 바로 검색 결과 카드로 보여주고(기존 renderPage 재사용), 도감에
+   없는 후보는 추천 검색어 칩으로만 제시해(기존 pSuggest 재사용) 사용자가
+   원하면 실시간 API 검색으로 더 찾아볼 수 있게 한다 - 새 렌더링 코드를
+   따로 만들지 않고 기존에 검증된 두 경로만 재사용해 위험을 줄였다. */
+function pMatchLocalByName(sciNameRaw){
+  var key=cleanSciName(sciNameRaw);
+  if(!key)return null;
+  var sp=STATIC_SPECIES[key],nm=STATIC_NAME[key];
+  if(!sp&&!nm)return null;
+  var korNm=(sp&&sp.kn)||(nm&&nm.kn)||key;
+  var fam=(nm&&nm.family)||'';
+  return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',_uid:++pCardUid};
+}
+window.pPhotoTrigger=function(){
+  var el=document.getElementById('pphotoinput');
+  if(el)el.click();
+};
+window.pOnPhotoSelected=function(input){
+  var file=input&&input.files&&input.files[0];
+  if(!file)return;
+  pIdentifyPhoto(file);
+  input.value=''; /* 같은 사진을 다시 골라도 change 이벤트가 다시 일어나도록 비워둔다 */
+};
+function pIdentifyPhoto(file){
+  if(!NONGSARO_PROXY){
+    showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
+    return;
+  }
+  showLoading();
+  var fd=new FormData();
+  fd.append('images',file,file.name||'photo.jpg');
+  fd.append('organs','auto');
+  var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=ko';
+  fetch(url,{method:'POST',body:fd}).then(function(r){
+    return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,body:j};});
+  }).then(function(res){
+    if(!res.ok||!res.body){
+      showError('사진에서 식물을 인식하지 못했습니다. 선명한 잎·꽃 사진으로 다시 시도해보세요.');
+      return;
+    }
+    var results=(res.body&&res.body.results)||[];
+    if(!results.length){
+      showError('사진에서 식물을 찾지 못했습니다. 다른 각도의 사진으로 다시 시도해보세요.');
+      return;
+    }
+    staticDataReady.then(function(){
+      var matched=[],seen={},suggestions=[];
+      results.slice(0,5).forEach(function(r){
+        var sci=r.species&&r.species.scientificNameWithoutAuthor;
+        if(!sci)return;
+        var key=cleanSciName(sci).toLowerCase();
+        if(!key||seen[key])return;
+        seen[key]=true;
+        var pct=Math.round((r.score||0)*100);
+        var hit=pMatchLocalByName(sci);
+        if(hit){
+          matched.push(hit);
+        } else {
+          var commonNm=(r.species.commonNames&&r.species.commonNames[0])||sci;
+          suggestions.push({term:commonNm,sci:sci,pct:pct});
+        }
+      });
+      hideLoading();hideAll();
+      pQ='';pUpdateClearBtn();
+      var noteEl=document.getElementById('pnote'),suggEl=document.getElementById('psugg');
+      if(suggestions.length){
+        suggEl.innerHTML=suggestions.map(function(s){
+          return '<span class="pchip" onclick="pSuggest(\''+s.sci.replace(/'/g,'')+'\')">'+esc(s.term)+' · 유사도 '+s.pct+'%</span>';
+        }).join('');
+        suggEl.style.display='flex';
+      } else {
+        suggEl.style.display='none';
+      }
+      if(matched.length){
+        noteEl.textContent='사진 인식 결과입니다. 촬영 각도·초점에 따라 정확도가 달라질 수 있어요.';
+        noteEl.style.display='block';
+        pAll=matched;pShown=0;
+        renderPage();
+      } else {
+        noteEl.textContent=suggestions.length?'도감에 상세정보가 등록된 종은 찾지 못했습니다. 아래 추천 검색어로 다시 찾아보세요.':'도감에서 일치하는 식물을 찾지 못했습니다.';
+        noteEl.style.display='block';
+        document.getElementById('pemp').style.display='block';
+        document.getElementById('pcnt').style.display='none';
+      }
+    });
+  }).catch(function(){
+    showError('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+  });
+}
+
 /* 식물도감(정식 도감 항목)과 식물표본(표본관 채집기록) 두 목록을 함께 조회해 합치면,
    도감에는 없지만 표본으로만 등록된 종까지 검색 결과에 포함되어 누락이 크게 줄어든다.
    numOfRows는 100에서 50으로 낮춰 정부 API 응답 속도를 조금 더 확보했다(실측상
@@ -3017,185 +3120,4 @@ window.pDetail=function(it){
    응답을 기다릴 필요가 없다. */
 renderFilterPanel();
 updateFilterBadge();
-
-/* ============================================================
-   pgMiniCards — 기사 하단 "이 기사에 나온 식물" 미니 카드
-   ------------------------------------------------------------
-   식물도감(runSearch)과 동일한 공공데이터 소스로 각 식물명당 대표 1건을
-   가져와, 도감과 똑같은 .pc 카드 디자인으로 지정 컨테이너에 렌더한다.
-   기사(Blog Posts)의 "관련식물명" 텍스트 필드값(쉼표 구분)을 그대로 넘기면 됨.
-
-   사용:
-     <div id="tge-plant-cards" data-plants="맥문동,산수국,미선나무"></div>
-     → 페이지에서 pgMiniCards() 자동 실행 (아래 auto-init)
-   또는 직접:
-     window.pgMiniCards('맥문동,산수국', document.getElementById('...'));
-   ============================================================ */
-function firstBest(items){
-    /* appendItems의 랭킹 로직을 재사용해 가장 충실한 1건을 고른다 */
-    var acc=[];
-    (items||[]).forEach(function(list){
-      if(Array.isArray(list)) appendItems(acc,list,list.__origin||'gov');
-    });
-    if(!acc.length) return null;
-    acc.sort(function(a,b){return rankOf(b)-rankOf(a);});
-    return acc[0];
-  }
-
-  function normNm(s){ return (s||'').replace(/\s+/g,'').toLowerCase(); }
-  function fetchOnePlant(name){
-    /* runSearch와 동일 소스를 병렬 호출하되, 결과를 모아 대표 1건만 반환.
-       국명이 입력값과 정확히 일치하는 항목을 최우선으로 고른다(예: '맥문동'을
-       넣으면 근연종 '개맥문동'이 아니라 정확히 '맥문동'을 선택). */
-    var q=name;
-    try{ var opt=optimizeQuery(name); if(opt&&opt.q_title)q=opt.q_title; }catch(e){}
-    var target=normNm(name);
-    var sources=[
-      fetchSourceItemsWithVariant('/plantPilbkSearch',q),
-      fetchSourceItemsWithVariant('/plantSmplSearch',q),
-      fetchSourceItemsWithVariant('/plantSpcltList',q),
-      fetchSourceItemsWithVariant('/plantRareList',q),
-      fetchSourceItemsWithVariant('/plantNaturalizedList',q),
-      fetchINatMatches(q),
-      searchByFamily(q)
-    ];
-    return Promise.all(sources.map(function(p){
-      return p.then(function(r){return Array.isArray(r)?r:[];}).catch(function(){return [];});
-    })).then(function(lists){
-      var acc=[];
-      lists.forEach(function(list){ if(list && list.length) appendItems(acc,list,(list[0]&&list[0].origin)||'gov'); });
-      if(!acc.length) return null;
-      /* 1순위: 국명 완전일치 중 랭킹 최고 */
-      var exact=acc.filter(function(x){return normNm(x.nm)===target;});
-      if(exact.length){ exact.sort(function(a,b){return rankOf(b)-rankOf(a);}); return exact[0]; }
-      /* 2순위: 입력값으로 시작하는 국명(맥문동류 등) 중 랭킹 최고 */
-      var starts=acc.filter(function(x){return normNm(x.nm).indexOf(target)===0;});
-      if(starts.length){ starts.sort(function(a,b){return rankOf(b)-rankOf(a);}); return starts[0]; }
-      /* 3순위: 그냥 랭킹 최고 */
-      acc.sort(function(a,b){return rankOf(b)-rankOf(a);});
-      return acc[0];
-    });
-  }
-
-  function miniCard(it, guideBase){
-    var d=document.createElement('a');
-    d.className='pc tge-mini';
-    d.setAttribute('href', guideBase + '?q=' + encodeURIComponent(it.nm) + '&detail=1');
-    d.style.textDecoration='none';
-    d.style.display='block';
-    d.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div>'
-      +'<div class="pc-body"><div class="pc-core">'+coreHtml(it)+'</div>'
-      +'<p style="margin:10px 0 0;font-size:11px;color:#ABABAB;letter-spacing:.3px">식물도감에서 자세히 보기 →</p></div>';
-    /* 도감과 동일한 이미지 로딩 재사용 */
-    try{ loadCardImage(it.nm, it.sc, d.querySelector('.pc-img'), function(){}, true); }catch(e){}
-    return d;
-  }
-
-  window.pgMiniCards=function(namesStr, container){
-    if(!container) container=document.getElementById('tge-plant-cards');
-    if(!container) return;
-    var names=(namesStr||container.getAttribute('data-plants')||'')
-      .split(/[,\n]/).map(function(s){return s.trim();}).filter(Boolean);
-    if(!names.length){ container.style.display='none'; return; }
-
-    /* 도감 카드 CSS(.pc 등)가 이 페이지엔 없으므로 최소 스타일을 주입 */
-    if(!document.getElementById('tge-mini-style')){
-      var st=document.createElement('style'); st.id='tge-mini-style';
-      st.textContent='#tge-plant-cards .tge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px}'
-        +'#tge-plant-cards .pc{background:#fff;border:1px solid #E6E6E6;position:relative;transition:box-shadow .15s,transform .15s;color:#121212}'
-        +'#tge-plant-cards .pc:hover{box-shadow:0 12px 28px rgba(18,18,18,.12);transform:translateY(-2px)}'
-        +'#tge-plant-cards .pc-img{width:100%;aspect-ratio:1/1;background:#F2F2F2;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2.4rem;color:#D6D6D6}'
-        +'#tge-plant-cards .pc-img img{width:100%;height:100%;object-fit:cover;display:block}'
-        +'#tge-plant-cards .pc-body{padding:16px}'
-        +'#tge-plant-cards .pc-name{font-size:15px;font-weight:600;margin:0 0 4px}'
-        +'#tge-plant-cards .pc-sci{font-size:12px;color:#ABABAB;margin:0 0 8px;font-style:italic}'
-        +'#tge-plant-cards .pc-fam{font-size:11px;color:#787878;border:1px solid #DCDCDC;display:inline-block;padding:2px 8px;letter-spacing:.5px}'
-        +'#tge-plant-cards .pc-tag{font-size:11px;color:#ABABAB;display:inline-block;padding:2px 8px;letter-spacing:.5px;margin-left:6px}';
-      document.head.appendChild(st);
-    }
-
-    var grid=document.createElement('div'); grid.className='tge-grid';
-    container.innerHTML=''; container.appendChild(grid);
-    var guideBase=(container.getAttribute('data-guide')||'/plant-guide');
-
-    names.forEach(function(nm){
-      var ph=document.createElement('div'); ph.className='pc';
-      ph.innerHTML='<div class="pc-img">'+PLACEHOLDER_ICON+'</div><div class="pc-body"><p class="pc-name">'+esc(nm)+'</p><p class="pc-sci" style="color:#ABABAB">불러오는 중…</p></div>';
-      grid.appendChild(ph);
-      fetchOnePlant(nm).then(function(it){
-        if(!it){ ph.querySelector('.pc-sci').textContent='정보를 찾지 못했습니다'; return; }
-        var card=miniCard(it, guideBase);
-        grid.replaceChild(card, ph);
-      }).catch(function(){ ph.querySelector('.pc-sci').textContent='불러오기 실패'; });
-    });
-  };
-
-  /* auto-init: #tge-plant-cards 컨테이너가 있으면 자동 실행.
-     식물명은 (1) data-plants 속성, 또는 (2) #tge-plants-src 요소의 텍스트에서 읽는다.
-     Webflow 임베드는 CMS 필드를 속성에 직접 못 꽂는 경우가 있어, 별도 텍스트
-     요소(#tge-plants-src)에 "관련식물명" CMS 필드를 출력해두면 그 값을 읽어온다. */
-  function readPlants(container){
-    var v = container.getAttribute('data-plants') || '';
-    if(!v.trim()){
-      var src = document.getElementById('tge-plants-src');
-      if(src) v = (src.textContent || '').trim();
-    }
-    return v;
-  }
-  function autoInit(){
-    var c=document.getElementById('tge-plant-cards');
-    if(!c) return;
-    var names = readPlants(c);
-    if(names && names.trim()){
-      var src=document.getElementById('tge-plants-src');
-      if(src) src.style.display='none';
-      window.pgMiniCards(names, c);
-    } else {
-      c.style.display='none';
-      var sec=c.closest('[data-plant-section]');
-    }
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoInit);
-  else autoInit();
-
-  /* ---- 식물도감 페이지 딥링크 핸들러 ----
-     기사 카드에서 /plant-guide?q=식물명(&detail=1) 로 진입 시:
-       - #psi 검색창이 있는 식물도감 페이지에서만 동작
-       - q로 검색 실행(pSuggest)
-       - detail=1이면 검색 결과 중 국명이 q와 정확히 일치하는 항목의 상세 팝업을 자동으로 연다.
-     기존 임베드 부트스트랩과 중복 실행돼도 __pgDeepDone 플래그로 한 번만 처리. */
-  function pgDeepLink(){
-    if(window.__pgDeepDone) return;
-    if(!document.getElementById('psi')) return; /* 식물도감 페이지가 아니면 무시 */
-    var params;
-    try{ params=new URLSearchParams(window.location.search); }catch(e){ return; }
-    var q=params.get('q');
-    if(!q) return;
-    window.__pgDeepDone=true;
-    var wantDetail=(params.get('detail')==='1');
-    try{ if(window.pSuggest) window.pSuggest(q); }catch(e){}
-    if(!wantDetail) return;
-    /* 검색 결과(pAll)가 채워지면 정확 일치 항목의 상세를 연다. 여러 소스가
-       순차 도착하므로, 완전일치가 나타날 때까지 잠깐 폴링한다. */
-    var want=(q||'').replace(/\s+/g,'').toLowerCase();
-    var tries=0;
-    var timer=setInterval(function(){
-      tries++;
-      var hit=null;
-      if(typeof pAll!=='undefined' && pAll && pAll.length){
-        for(var i=0;i<pAll.length;i++){
-          if((pAll[i].nm||'').replace(/\s+/g,'').toLowerCase()===want){ hit=pAll[i]; break; }
-        }
-        if(!hit) hit=pAll[0]; /* 완전일치 없으면 첫 결과 */
-      }
-      if(hit && window.pDetail){
-        clearInterval(timer);
-        try{ window.pDetail(hit); }catch(e){}
-      } else if(tries>40){ /* 약 8초 후 포기 */
-        clearInterval(timer);
-      }
-    },200);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', pgDeepLink);
-  else pgDeepLink();
 })();
