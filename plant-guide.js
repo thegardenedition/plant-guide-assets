@@ -3526,4 +3526,27 @@ updateFilterBadge();
    동작 - 더 되돌릴 앱 내부 상태가 없으므로). */
 history.replaceState({type:'search',q:'',filter:pFilterSnapshot()},'',location.href);
 window.addEventListener('popstate',pOnPopState);
+
+/* 홈페이지 사진검색 배너에서 카메라로 바로 찍은 사진을 세션스토리지에
+   담아 이 페이지로 넘어온 경우("배너 클릭 -> 카메라 -> 자동 이동"),
+   페이지가 열리자마자 그 사진으로 바로 식별을 시작한다 - 사용자 입장에서는
+   배너를 누른 것 자체가 곧 "사진으로 찾기"가 되도록 하기 위함. */
+(function autoPhotoFromHome(){
+  try{
+    if(!/[?&]autoPhoto=1(&|$)/.test(location.search))return;
+    var raw=sessionStorage.getItem('pgPendingPhoto');
+    var cleanUrl=location.pathname+location.search.replace(/[?&]autoPhoto=1/,'').replace(/^&/,'?')+location.hash;
+    history.replaceState(history.state,'',cleanUrl);
+    if(!raw)return;
+    sessionStorage.removeItem('pgPendingPhoto');
+    var items=JSON.parse(raw);
+    Promise.all(items.map(function(it){
+      return fetch(it.dataUrl).then(function(r){return r.blob();}).then(function(blob){
+        return new File([blob],it.name||'photo.jpg',{type:it.type||'image/jpeg'});
+      });
+    })).then(function(files){
+      if(files.length)pIdentifyPhoto(files);
+    });
+  }catch(e){}
+})();
 })();
