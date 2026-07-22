@@ -3,6 +3,17 @@
 var PB='https://apis.data.go.kr/1400119/PlantResource';
 var KEY='57a313760f23320ea0e2f7b63e2a1ce80450c86a7470a67067e03a8037ff513e'; /* 공공데이터포털 일반 인증키(Decoding) */
 var pQ='',pST=null,pAll=[],pShown=0;
+/* "색인(초성)을 좌우로 왔다갔다 하면 결과값이 사라진다" 버그 대응 - 초성
+   색인은 usecat 필터보다 훨씬 큰 결과(한 자음이 전체 3.6만종의 1/14 가량,
+   수천 건)를 만들어내는데, renderPage()가 카드마다 사진/정원정보/정원등급
+   요청을 큐에 쌓아두고 그 완료 콜백마다 다시 화면 전체를 정렬/필터링한다.
+   자음을 빠르게 여러 번 바꾸면 이전에 누른 자음들의 카드·요청이 아직 다
+   끝나지 않은 채로 새 렌더가 계속 쌓여, 결국 브라우저가 수십 초간 멈추고
+   그 사이엔 아무 결과도 안 보여 "사라졌다"로 느껴진다. 렌더할 때마다 세대
+   번호를 올리고, 각 카드에 그 번호를 붙여둔 뒤, 완료 콜백이 도착했을 때
+   이미 최신 세대가 아니면(=그새 다른 자음/필터를 눌러 낡은 렌더가 됐으면)
+   조용히 아무 일도 하지 않고 빠진다 - 새 렌더가 자원을 즉시 넘겨받는다. */
+var pRenderGen=0;
 /* 상세창 사진을 fast/all 두 단계로 나눠 렌더링하면서 생기는 경쟁 상태 방지용
    토큰 - 상세창을 열자마자 다른 식물을 다시 클릭하면, 먼저 연 상세창의 느린
    단계(all) 응답이 나중에 도착해 지금 보고 있는 다른 식물의 슬라이드를
@@ -1501,6 +1512,7 @@ function staticOnlyAttrs(it){
    있음)은 실시간 API+정적 보강, 그 외 항목은 학명이 정적 데이터셋과 일치할
    때만 정적 데이터 단독으로 채운다(네트워크 요청 없이). */
 function loadAndRenderAttrs(d,it){
+  var myGen=it._gen;
   var key=attrsCacheKeyFor(it);
   if(pAttrCache[key]){
     renderCardAttrs(d,pAttrCache[key]);
@@ -1508,14 +1520,21 @@ function loadAndRenderAttrs(d,it){
     reflowGrid();
     return;
   }
-  var task=it.no?function(){return fetchPlantAttrs(it.no,it.sc);}:function(){return staticOnlyAttrs(it);};
+  var task=function(){
+    /* 그 사이 다른 자음/필터로 렌더가 새로 시작됐으면(pRenderGen 증가) 이
+       카드는 이미 화면에서 사라졌을 낡은 요청이다 - 대기열 차례가 와도
+       실제 API 호출 없이 바로 빠진다("왔다갔다"로 큐가 밀리는 문제 완화). */
+    if(myGen!=null&&myGen!==pRenderGen)return Promise.resolve(null);
+    return it.no?fetchPlantAttrs(it.no,it.sc):staticOnlyAttrs(it);
+  };
   limitCard(task).then(function(attrs){
+    if(myGen!=null&&myGen!==pRenderGen)return; /* 낡은 렌더의 응답은 화면에 반영하지 않는다 */
     if(attrs&&d.isConnected){
       var old=d.querySelector('.pc-attrs');if(old)old.remove();
       renderCardAttrs(d,attrs);
     }
     it._attrsRich=isAttrsRich(attrs);
-    applyFilters();
+    applyFiltersThrottled();
     reflowGrid(); /* "정원 관련 식물 우선순위" - 용도/색상 등 정원 정보가 실제로 채워지면 순위 상승 */
   });
 }
@@ -1527,6 +1546,7 @@ function loadAndRenderAttrs(d,it){
    결과는 attrs 캐시와 같은 키로 캐시해 재계산을 막는다. */
 var pGardenTierCache={};
 function loadGardenTier(it){
+  var myGen=it._gen;
   var key=attrsCacheKeyFor(it);
   var cached=pGardenTierCache[key];
   if(cached){
@@ -1536,16 +1556,19 @@ function loadGardenTier(it){
     return;
   }
   nongsaroDataReady.then(function(){
+    if(myGen!=null&&myGen!==pRenderGen)return null; /* 낡은 렌더면 매칭 조회(fetchGardenMatch) 자체를 건너뛴다 */
     var clean=cleanSciName(it.sc||'').toLowerCase();
     var hasRda=!!(clean&&(NONGSARO_HERB[clean]||NONGSARO_WEED[clean]));
     it._bothAgencies=!!it.no&&hasRda;
     reflowGrid();
     return fetchGardenMatch(it.nm,it.sc);
   }).then(function(m){
+    if(myGen!=null&&myGen!==pRenderGen)return;
     it._indoorGarden=!!m;
     pGardenTierCache[key]={indoor:it._indoorGarden,both:it._bothAgencies};
     reflowGrid();
   }).catch(function(){
+    if(myGen!=null&&myGen!==pRenderGen)return;
     it._indoorGarden=false;
     if(it._bothAgencies===undefined)it._bothAgencies=false;
     reflowGrid();
@@ -1753,6 +1776,31 @@ function applyFilters(){
   });
   updateFilterProgress();
   renderIndexBar();
+}
+/* applyFilters()는 #pgrid의 모든 카드를 매번 다시 훑는 O(카드 수) 작업인데,
+   loadAndRenderAttrs가 카드마다 정원정보가 도착할 때마다 이 함수를 그대로
+   불러서 카드가 N장이면 사실상 O(N²)이 된다 - usecat 같은 필터는 결과가
+   수백 건이라 체감이 안 됐지만, 초성 색인처럼 결과가 수천 건인 경우 카드
+   하나하나의 정원정보 도착 콜백마다 수천 장을 다시 훑어 브라우저가 멈추는
+   핵심 원인 중 하나였다("색인을 왔다갔다 하면 결과값이 사라진다"). 카드가
+   많을 때는(REFLOW_LARGE_THRESHOLD 재사용) reflowGrid와 같은 방식으로
+   일정 시간(500ms)에 한 번만 실제로 훑도록 묶는다 - 필터 칩을 직접 누를 때
+   호출하는 applyFilters()는 이 함수를 거치지 않아 그 자리에서 바로 반영된다. */
+var applyFiltersPending=false;
+var applyFiltersLargeTimer=null;
+function applyFiltersThrottled(){
+  if(pShown>REFLOW_LARGE_THRESHOLD){
+    if(applyFiltersLargeTimer)return;
+    applyFiltersLargeTimer=setTimeout(function(){
+      applyFiltersLargeTimer=null;
+      applyFilters();
+    },REFLOW_LARGE_DEBOUNCE);
+    return;
+  }
+  if(applyFiltersPending)return;
+  applyFiltersPending=true;
+  var run=function(){applyFiltersPending=false;applyFilters();};
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else setTimeout(run,16);
 }
 
 /* ---- 정원 정보로 찾기(검색어 없이 필터만으로 종을 찾는 기능) ----
@@ -1998,7 +2046,10 @@ function pHistPushDetail(uid){
 function pHistRestoreSearch(st){
   pSuppressHistory=true;
   var ov=document.getElementById('pov');
-  if(ov&&ov.style.display==='flex'){ov.style.display='none';pUnlockScroll();}
+  var wasOverlayOpen=!!(ov&&ov.style.display==='flex');
+  /* 스크롤 위치 복원(pUnlockScroll의 scrollTo)은 아래에서 화면 높이가 최종
+     확정된 뒤로 미룬다 - body의 fixed 잠금만 지금 풀어둔다. */
+  if(wasOverlayOpen){ov.style.display='none';pUnlockScrollBody();}
   var el=document.getElementById('psi');
   var q=(st&&st.q)||'';
   if(el)el.value=q;
@@ -2011,6 +2062,19 @@ function pHistRestoreSearch(st){
   else{hideLoading();hideAll();document.getElementById('pinit').style.display='block';document.getElementById('pcnt').style.display='none';}
   renderIndexBar();
   pSuppressHistory=false;
+  if(wasOverlayOpen){
+    /* 검색어·필터가 없어 맨 처음 안내 화면으로 돌아가는 경우(위 else 분기)처럼
+       문서 높이가 곧바로 크게 줄어드는 경우까지 반영된 뒤에 스크롤을 옮겨야
+       "닫으면 하단(푸터)으로 튀는" 문제가 재발하지 않는다 - 레이아웃이 다시
+       계산될 시간을 주기 위해 두 번의 requestAnimationFrame으로 미룬다
+       (runSearch/runFacetSearch처럼 네트워크 응답으로 나중에 채워지는 결과는
+       대개 안내 화면보다 페이지가 짧아지지 않으므로 이 정도로 충분하다). */
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        window.scrollTo(0,Math.min(pScrollLockY,pClampedScrollY()));
+      });
+    });
+  }
 }
 function pOnPopState(e){
   var st=e.state;
@@ -2961,14 +3025,24 @@ function renderPage(){
   hideLoading();
   hideAll();
   var g=document.getElementById('pgrid');
-  if(pShown===0)g.innerHTML='';
+  if(pShown===0){
+    g.innerHTML='';
+    /* g.innerHTML=''로 예전 카드 DOM은 화면에서 떼어내지만, pCardEls는 그
+       DOM 참조를 계속 붙들고 있어(uid마다 계속 누적) 자음을 여러 번 바꿀
+       때마다 이미 떨어져나간 카드 수천 개가 메모리에 계속 쌓이는 누수가
+       있었다 - 새 결과를 처음부터 그리는 시점(pShown===0)에 함께 비운다. */
+    pCardEls={};
+  }
   g.style.display='grid';
   showFilterBarIfNeeded();
   renderFilterPanel();
   var isFirstBatch=(pShown===0); /* 최초 화면(스크롤 없이 바로 보이는 카드들)은 이미지 우선순위를 높여 "최대한 빠르게" 노출한다 */
+  pRenderGen++;
+  var myGen=pRenderGen;
   var next=pAll.slice(pShown,pShown+PAGE_SIZE);
   next.forEach(function(it,idx){
     var eager=isFirstBatch&&idx<8;
+    it._gen=myGen;
     var d=document.createElement('div');
     d.className='pc';
     if(it.no)d.setAttribute('data-no',it.no);
@@ -2981,10 +3055,14 @@ function renderPage(){
     cmpBtn.onclick=function(e){e.stopPropagation();pToggleCompare(it,d);};
     g.appendChild(d);
     pCardEls[it._uid]={el:d};
-    var imgTask=function(){return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
-      it._hasPhoto=!!credit;
-      reflowGrid();
-    },eager);};
+    var imgTask=function(){
+      if(it._gen!==pRenderGen)return Promise.resolve(); /* 그 사이 다른 자음/필터를 눌러 낡은 요청이 됐으면 아예 요청하지 않는다 */
+      return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
+        if(it._gen!==pRenderGen)return;
+        it._hasPhoto=!!credit;
+        reflowGrid();
+      },eager);
+    };
     if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
     loadAndRenderAttrs(d,it);
     loadGardenTier(it);
@@ -3012,13 +3090,30 @@ function pLockScroll(){
   document.body.style.right='0';
   document.body.style.width='100%';
 }
-function pUnlockScroll(){
+/* body의 fixed 잠금만 풀고 스크롤 위치는 아직 건드리지 않는다 - 뒤로가기로
+   상세창을 닫을 때(pHistRestoreSearch)는 이 잠금 해제 시점에 아직 검색/필터
+   상태가 복원되기 전이라, 여기서 곧바로 스크롤을 옮기면 그 직후 화면이 훨씬
+   짧아질 수 있는 경우(예: 검색어·필터가 하나도 없어 맨 처음 안내 화면으로
+   돌아가는 경우)에 목표 지점이 이미 사라진 상태라 브라우저가 억지로 페이지
+   맨 아래(푸터)로 스크롤을 눌러버린다("팝업을 닫으면 하단으로 나온다" 버그의
+   원인) - 실제 스크롤 복원은 화면이 최종 높이로 자리잡은 뒤로 미룬다. */
+function pUnlockScrollBody(){
   document.body.style.position='';
   document.body.style.top='';
   document.body.style.left='';
   document.body.style.right='';
   document.body.style.width='';
-  window.scrollTo(0,pScrollLockY);
+}
+/* 복원하려는 위치(pScrollLockY)가 현재(어쩌면 더 짧아진) 문서 높이를 넘으면
+   그 값 그대로 scrollTo를 부르는 순간 브라우저가 최대치인 맨 아래로 클램프
+   해버린다 - 문서의 실제 최대 스크롤 값으로 한 번 눌러(clamp) 그 함정을
+   피한다. */
+function pClampedScrollY(){
+  return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+}
+function pUnlockScroll(){
+  pUnlockScrollBody();
+  window.scrollTo(0,Math.min(pScrollLockY,pClampedScrollY()));
 }
 /* 상세창을 닫을 때, 그 창을 열며 남긴 히스토리 항목이 있으면(history.back)
    그걸 소비하도록 뒤로가기를 호출한다 - popstate 핸들러(pOnPopState/
