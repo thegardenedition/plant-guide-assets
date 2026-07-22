@@ -2002,7 +2002,7 @@ function pIdentifyPhoto(file){
   var fd=new FormData();
   fd.append('images',file,file.name||'photo.jpg');
   fd.append('organs','auto');
-  var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=ko';
+  var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=en';
   fetch(url,{method:'POST',body:fd}).then(function(r){
     return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,body:j};});
   }).then(function(res){
