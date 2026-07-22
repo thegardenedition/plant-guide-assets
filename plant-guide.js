@@ -26,7 +26,12 @@ var PAGE_SIZE=Infinity;
    따르며, 섹션마다 24/24·24/8처럼 제각각이던 여백을 32px 한 값으로
    맞추고, 본문 줄간격도 1.6~1.9로 흩어져 있던 것을 1.75~1.8 두 값으로
    좁혔다. */
-var UI_ROW_LABEL='padding:16px 0;color:#ABABAB;width:30%;font-size:12px;letter-spacing:.2px;vertical-align:top;font-weight:500';
+/* 라벨 칸(UI_ROW_LABEL)에 줄간격을 지정하지 않았더니 사이트 전역 기본
+   줄간격(약 28px, 18px 기준)을 그대로 물려받아, 같은 행의 값 칸(1.75 =
+   14px*1.75=24.5px)과 줄간격이 어긋나 라벨·값이 미묘하게 다른 높이로
+   보였다(글자 강약이 흐트러져 보이는 원인 중 하나) - 값 칸과 같은 비율로
+   맞춘다. */
+var UI_ROW_LABEL='padding:16px 0;color:#ABABAB;width:30%;font-size:12px;letter-spacing:.2px;vertical-align:top;font-weight:500;line-height:1.75';
 var UI_ROW_VALUE='padding:16px 0;color:#121212;font-size:14px;line-height:1.75';
 function uiRows(rows){
   if(!rows||!rows.length)return'';
@@ -1926,6 +1931,58 @@ function pClearPhotoNote(){
   if(noteEl){noteEl.textContent='';noteEl.style.display='none';}
   if(suggEl){suggEl.innerHTML='';suggEl.style.display='none';}
 }
+
+/* ---- 뒤로가기(브라우저 History) 지원 ----
+   "뒤로가기를 누르면 식물도감 페이지 자체를 벗어난다"는 지적 대응 - 지금까지는
+   검색어를 바꾸거나 상세창을 열어도 브라우저 히스토리에 아무 흔적이 남지
+   않아서, 검색을 몇 번 하고 뒤로가기를 누르면 이 화면의 이전 검색 상태가
+   아니라 곧바로 이 페이지에 들어오기 전 화면(예: 홈)으로 빠져나갔다.
+   검색어가 바뀌거나(pSearch/pSuggest/검색어 지우기) 상세창을 열 때마다
+   history.pushState로 그 순간의 상태(검색어·필터·상세창 uid)를 기록해두고,
+   popstate(뒤로/앞으로가기)가 발생하면 실제 페이지 이동 없이 그 상태로
+   화면만 복원한다. 더 되돌릴 상태가 없을 때(state가 null)만 브라우저
+   기본 동작(진짜 뒤로가기)에 맡긴다. */
+var pSuppressHistory=false;
+function pFilterSnapshot(){return JSON.parse(JSON.stringify(pFilter));}
+function pHistPushSearch(){
+  if(pSuppressHistory)return;
+  history.pushState({type:'search',q:pQ,filter:pFilterSnapshot()},'',location.href);
+}
+function pHistPushDetail(uid){
+  if(pSuppressHistory)return;
+  history.pushState({type:'detail',uid:uid},'',location.href);
+}
+function pHistRestoreSearch(st){
+  pSuppressHistory=true;
+  var ov=document.getElementById('pov');
+  if(ov&&ov.style.display==='flex'){ov.style.display='none';pUnlockScroll();}
+  var el=document.getElementById('psi');
+  var q=(st&&st.q)||'';
+  if(el)el.value=q;
+  pFilter=(st&&st.filter)?st.filter:{usecat:[],origin:[],color:[],form:[],texture:[],cycle:[],light:[],story:[],initial:null};
+  renderFilterPanel();updateFilterBadge();
+  pQ=q;
+  pUpdateClearBtn();
+  if(pQ)runSearch();
+  else if(anyFilterActive())runFacetSearch();
+  else{hideLoading();hideAll();document.getElementById('pinit').style.display='block';document.getElementById('pcnt').style.display='none';}
+  renderIndexBar();
+  pSuppressHistory=false;
+}
+function pOnPopState(e){
+  var st=e.state;
+  if(!st)return; /* 더 되돌릴 상태가 없음 - 브라우저가 실제로 이전 페이지로 이동하게 둔다 */
+  if(st.type==='detail'){
+    var it=pAll.filter(function(x){return x._uid===st.uid;})[0];
+    pSuppressHistory=true;
+    if(it)pDetail(it);
+    else{var ov2=document.getElementById('pov');if(ov2){ov2.style.display='none';pUnlockScroll();}}
+    pSuppressHistory=false;
+  } else {
+    pHistRestoreSearch(st);
+  }
+}
+
 window.pOnSearchInput=function(){
   var el=document.getElementById('psi');
   if(el&&!el.value.trim())pClearedSearch(); /* note/psugg를 먼저 지운 뒤에 버튼 표시를 계산한다 */
@@ -1945,6 +2002,7 @@ window.pSuggest=function(term){
   if(el)el.value=term;
   pUpdateClearBtn();
   pQ=term;
+  pHistPushSearch();
   runSearch();
 };
 
@@ -1970,6 +2028,7 @@ window.pSearch=function(){
   }
   pQ=opt.q_title;
   pUpdateClearBtn();
+  pHistPushSearch();
   runSearch();
 };
 window.pMore=function(){
@@ -1984,6 +2043,7 @@ window.pMore=function(){
 window.pClearedSearch=function(){
   pQ='';
   pClearPhotoNote(); /* 사진 인식 안내/추천 칩이 남아있지 않도록 항상 함께 지운다 */
+  pHistPushSearch();
   if(anyFilterActive()){
     runFacetSearch();
   } else {
@@ -2816,7 +2876,14 @@ function pUnlockScroll(){
   document.body.style.width='';
   window.scrollTo(0,pScrollLockY);
 }
-window.pCD=function(){document.getElementById('pov').style.display='none';pUnlockScroll();};
+/* 상세창을 닫을 때, 그 창을 열며 남긴 히스토리 항목이 있으면(history.back)
+   그걸 소비하도록 뒤로가기를 호출한다 - popstate 핸들러(pOnPopState/
+   pHistRestoreSearch)가 실제로 창을 숨기고 이전 검색 상태를 복원해준다.
+   히스토리 상태가 없는 예외 상황(예: 구형 브라우저)에는 예전처럼 직접 닫는다. */
+window.pCD=function(){
+  if(history.state&&history.state.type==='detail'){history.back();return;}
+  document.getElementById('pov').style.display='none';pUnlockScroll();
+};
 
 function rowsTable(rows){
   if(!rows.length)return uiEmpty('상세 정보가 없습니다.');
@@ -2942,6 +3009,7 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
 }
 
 window.pDetail=function(it){
+  pHistPushDetail(it._uid); /* 뒤로가기로 이 상세창을 닫을 수 있도록 히스토리에 기록 */
   var no=it.no,nm=it.nm,sc=it.sc,specsId=it.specsId,origin=it.origin,raw=it.raw;
   var panel=document.getElementById('pdpanel');
   panel.style.position='';panel.style.left='';panel.style.top='';panel.style.margin='';
@@ -3193,4 +3261,12 @@ window.pDetail=function(it){
    응답을 기다릴 필요가 없다. */
 renderFilterPanel();
 updateFilterBadge();
+
+/* 뒤로가기 히스토리 기준점 - 이 페이지에 들어온 시점(검색어 없음)을
+   replaceState로 남겨둔다. 이후 검색/상세보기마다 쌓이는 pushState들이
+   결국 이 지점까지 돌아올 수 있고, 여기서 한 번 더 뒤로가기를 누르면
+   그때는 브라우저가 실제로 이 페이지 진입 전 화면으로 이동한다(의도된
+   동작 - 더 되돌릴 앱 내부 상태가 없으므로). */
+history.replaceState({type:'search',q:'',filter:pFilterSnapshot()},'',location.href);
+window.addEventListener('popstate',pOnPopState);
 })();
