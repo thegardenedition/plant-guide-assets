@@ -131,6 +131,7 @@ var TIMEOUT_PROXY=4000;  /* 농사로 Cloudflare 프록시 경유 호출 */
 var TIMEOUT_STATIC=6000; /* 페이지 로드 시 1회만 받는 정적 데이터셋/색인 */
 var TIMEOUT_PHOTO=3000;  /* 위키·iNaturalist·GBIF·수피 등 사진 보강 소스(단발) */
 var TIMEOUT_INAT_SEARCH=5000; /* iNaturalist를 검색 보충 소스로 쓸 때 */
+var TIMEOUT_TRANSLATE=3000;   /* Pl@ntNet 영문 이름 한글 번역(MyMemory) */
 /* 첫 호출이 실패/시간초과하면(=api.forest.go.kr가 이번 방문 세션 내내 응답을
    안 준다는 뜻일 가능성이 높음) 이후 상세창을 열 때마다 매번 3초씩 다시
    기다리지 않도록 회로차단기를 둔다. 한 번 성공하면 계속 정상 사용, 한 번
@@ -2086,10 +2087,13 @@ window.pClearedSearch=function(){
    따로 둘 필요 없음).
    Pl@ntNet이 돌려준 학명 후보는 이 앱이 이미 들고 있는 정적 데이터셋
    (STATIC_SPECIES/STATIC_NAME, 국가표준식물목록 3.6만종)과 대조해, 도감에
-   있는 종은 바로 검색 결과 카드로 보여주고(기존 renderPage 재사용), 도감에
-   없는 후보는 추천 검색어 칩으로만 제시해(기존 pSuggest 재사용) 사용자가
-   원하면 실시간 API 검색으로 더 찾아볼 수 있게 한다 - 새 렌더링 코드를
-   따로 만들지 않고 기존에 검증된 두 경로만 재사용해 위험을 줄였다. */
+   있는 종은 그 국명으로 바로 검색 결과 카드를 보여준다(기존 renderPage
+   재사용). "검색 결과 카드가 Pl@ntNet에서 가져오는 것을 1차로 보여달라"는
+   요청에 따라, 도감에 없는 종도 더 이상 추천 검색어 칩으로만 격하하지 않고
+   Pl@ntNet이 직접 알려준 학명·영문명·과명으로 카드를 만들어 도감 매칭종과
+   함께 유사도 순으로 나란히 보여준다(pIdentifyPhoto 참고) - 사진과 마찬가지로
+   loadCardImage가 학명 기준으로 위키·iNaturalist·GBIF 등에서 대표 사진을
+   찾아준다. */
 function pMatchLocalByName(sciNameRaw,pct){
   var key=cleanSciName(sciNameRaw);
   if(!key)return null;
@@ -2098,6 +2102,36 @@ function pMatchLocalByName(sciNameRaw,pct){
   var korNm=(sp&&sp.kn)||(nm&&nm.kn)||key;
   var fam=(nm&&nm.family)||'';
   return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',pct:(pct==null?null:pct),_uid:++pCardUid};
+}
+/* 도감에 없는 Pl@ntNet 후보의 카드 이름 - "학명·영명을 제외한 내용은 한글로
+   번역해서 보여달라"는 요청 대응. Pl@ntNet은 영문 커먼네임만 주므로(한국어
+   로케일 미지원), 그 영문명을 무료 번역 API(MyMemory, 별도 키 필요 없음)로
+   한글로 옮겨 카드 이름으로 쓰고, 원문 영문명은 괄호로 함께 남겨 번역이
+   틀렸을 때도 원래 이름을 바로 확인할 수 있게 한다. 학명(sc)은 카드에서
+   항상 원문 그대로(sciNameHtml) 보여주므로 이 함수가 건드리지 않는다.
+   번역 실패/시간초과/무료 할당량 소진 경고 등은 조용히 원문 영문명만 쓴다
+   (번역이 안 됐다고 카드 자체가 비거나 이상한 문구가 뜨면 안 되므로). */
+var pTranslateCache={};
+function translateEnToKo(text){
+  if(!text)return Promise.resolve('');
+  var key=text.trim().toLowerCase();
+  if(pTranslateCache[key]!==undefined)return Promise.resolve(pTranslateCache[key]);
+  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair=en|ko';
+  return fetchWithTimeout(url,TIMEOUT_TRANSLATE).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    var t=(j&&j.responseData&&j.responseData.translatedText)||'';
+    if(!t||/mymemory|invalid|quota/i.test(t))t=text; /* 경고 문구·빈 응답 방어 */
+    pTranslateCache[key]=t;
+    return t;
+  }).catch(function(){return text;});
+}
+/* 번역이 도착하면 이미 그려진 카드의 이름 텍스트만 갱신한다(사진 재요청·
+   정원정보 재조회·재정렬 없이) - 유사도(pct)는 그대로라 카드 순서가 바뀔
+   이유가 없고, 이름 텍스트 교체만으로 충분하다. */
+function updatePhotoIdCardName(it){
+  var rec=pCardEls[it._uid];
+  if(!rec)return;
+  var nmEl=rec.el.querySelector('.pc-name');
+  if(nmEl)nmEl.textContent=it.nm;
 }
 window.pPhotoTrigger=function(){
   var el=document.getElementById('pphotoinput');
@@ -2148,7 +2182,7 @@ function pIdentifyPhoto(files){
       return;
     }
     staticDataReady.then(function(){
-      var matched=[],seen={},suggestions=[];
+      var matched=[],seen={},toTranslate=[];
       results.slice(0,PLANTID_NB_RESULTS).forEach(function(r){
         if((r.score||0)<PLANTID_MIN_SCORE)return; /* 사실상 0에 가까운 점수는 노이즈로 취급 */
         var sci=r.species&&r.species.scientificNameWithoutAuthor;
@@ -2161,29 +2195,38 @@ function pIdentifyPhoto(files){
         if(hit){
           matched.push(hit);
         } else {
-          var commonNm=(r.species.commonNames&&r.species.commonNames[0])||sci;
-          suggestions.push({term:commonNm,sci:sci,pct:pct});
+          /* 도감에 없어도 "Pl@ntNet에서 가져오는 것을 1차로" 요청에 따라 더 이상
+             칩으로 격하하지 않고, Pl@ntNet이 준 학명·영문명·과명으로 바로 카드를
+             만든다. 이름 칸은 우선 영문명으로 채워 카드가 즉시 보이게 하고,
+             한글 번역이 도착하면 텍스트만 조용히 교체한다("최대한 빠르게"
+             요청과 병행). */
+          var engNm=(r.species.commonNames&&r.species.commonNames[0])||'';
+          var famNm=(r.species.family&&r.species.family.scientificNameWithoutAuthor)||'';
+          var card={nm:engNm||key,sc:key,fam:famNm,no:'',specsId:'',origin:'plantnet',pct:pct,_uid:++pCardUid,engNm:engNm};
+          matched.push(card);
+          if(engNm)toTranslate.push(card);
         }
       });
-      matched.sort(function(a,b){return(b.pct||0)-(a.pct||0);}); /* 도감 매칭종은 항상 유사도 높은 순으로 */
+      matched.sort(function(a,b){return(b.pct||0)-(a.pct||0);}); /* Pl@ntNet 유사도 높은 순으로, 도감 매칭 여부와 무관하게 나란히 정렬 */
       hideLoading();hideAll();
       pQ='';
       var noteEl=document.getElementById('pnote'),suggEl=document.getElementById('psugg');
-      if(suggestions.length){
-        suggEl.innerHTML=suggestions.map(function(s){
-          return '<span class="pchip" onclick="pSuggest(\''+s.sci.replace(/'/g,'')+'\')">'+esc(s.term)+' · 유사도 '+s.pct+'%</span>';
-        }).join('');
-        suggEl.style.display='flex';
-      } else {
-        suggEl.style.display='none';
-      }
+      suggEl.innerHTML='';suggEl.style.display='none'; /* 이제 모든 후보를 카드로 보여주므로 별도 추천 칩은 쓰지 않는다 */
       if(matched.length){
-        noteEl.textContent='사진 인식 결과입니다. 카드의 "유사도"는 Pl@ntNet의 인식 확신도이고, 사진은 도감에 등록된 참고 사진입니다. 여러 각도(특히 꽃·열매)의 사진을 함께 올리면 더 정확해져요.';
+        noteEl.textContent='사진 인식 결과입니다(Pl@ntNet). 카드의 "유사도"는 Pl@ntNet의 인식 확신도이고, 도감에 등록되지 않은 종은 Pl@ntNet이 알려준 이름을 한글로 옮겨 보여드려요(학명·영문명은 원문 그대로). 여러 각도(특히 꽃·열매)의 사진을 함께 올리면 더 정확해져요.';
         noteEl.style.display='block';
         pAll=matched;pShown=0;
         renderPage();
+        toTranslate.forEach(function(card){
+          translateEnToKo(card.engNm).then(function(ko){
+            if(ko&&ko.trim()&&ko.trim().toLowerCase()!==card.engNm.trim().toLowerCase()){
+              card.nm=ko.trim()+' ('+card.engNm+')';
+              updatePhotoIdCardName(card);
+            }
+          });
+        });
       } else {
-        noteEl.textContent=suggestions.length?'도감에 상세정보가 등록된 종은 찾지 못했습니다. 아래 추천 검색어로 다시 찾아보세요.':'도감에서 일치하는 식물을 찾지 못했습니다.';
+        noteEl.textContent='도감에서 일치하는 식물을 찾지 못했습니다.';
         noteEl.style.display='block';
         document.getElementById('pemp').style.display='block';
         document.getElementById('pcnt').style.display='none';
@@ -2958,7 +3001,7 @@ var ORIGIN_NOTICE={
   folk:'국립수목원 민속식물 목록에 포함된 종으로, 전통적으로 생활 속에서 이용되어 온 식물입니다.',
   seed:'국립수목원 종자정보 목록에 포함된 종으로, 채종·번식 관련 정보 위주로 제공됩니다.'
 };
-var ORIGIN_BADGE_TXT={spclt:'특산식물',rare:'적색식물',naturalized:'외래식물',folk:'민속식물',seed:'종자정보'};
+var ORIGIN_BADGE_TXT={spclt:'특산식물',rare:'적색식물',naturalized:'외래식물',folk:'민속식물',seed:'종자정보',plantnet:'Pl@ntNet 인식'};
 
 /* ---- 역할별 탭 구조 ----
    "정원 가이드도 개요에 포함" 요청에 따라 원래 4개(개요/정원 가이드/조경 스펙/
@@ -3196,6 +3239,19 @@ window.pDetail=function(it){
       var key=attrsCacheKeyFor(it);
       var profile=match?(pAttrCache[key]||deriveCuratedProfile({},match)):null;
       if(profile)pAttrCache[key]=profile;
+      applyCuratedProfile(profile);
+      pdFillOverviewExtras(profile,match,sc,nm,nsData);
+    });
+  } else if(origin==='plantnet'){
+    /* 사진으로 찾기 결과 중 국립수목원 도감에 등록되지 않은 종 - Pl@ntNet이
+       직접 알려준 학명·영문명·과명만 있고 별도 상세조회 API가 없다. 이름 칸의
+       한글은 영문 커먼네임을 번역한 것임을 분명히 밝혀 오해를 줄인다. */
+    var engNote=it.engNm?('Pl@ntNet이 알려준 영문명 "'+esc(it.engNm)+'"을(를) 한글로 옮긴 이름입니다. '):'';
+    setEl('pdbody','<p style="color:#787878;font-size:13px;text-align:center;padding:20px 0;line-height:1.7">국립수목원 도감·표본 자료에는 없는 종으로, 사진 인식(Pl@ntNet)으로 찾은 항목입니다. '+engNote+'형태·분포 등 상세 설명은 제공되지 않습니다.</p>');
+    staticDataReady.then(function(){
+      var match=getStaticMatch(sc);
+      var profile=match?deriveCuratedProfile({},match):null;
+      setPdCore(sc,(match&&match.name&&match.name.family)||it.fam||'',it.engNm||'');
       applyCuratedProfile(profile);
       pdFillOverviewExtras(profile,match,sc,nm,nsData);
     });
