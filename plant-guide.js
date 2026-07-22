@@ -1272,7 +1272,15 @@ function deriveUseCategory(item,attrs,shpe,grwOverride,famOverride){
   if(HEDGE_USE_RE.test(text))cats.push('생울타리');
   if(TURF_RE.test(nm+text))cats.push('잔디');
   if(HOUSEPLANT_RE.test(text)||attrs.hardiness==='실내 구성')cats.push('관엽/공기정화식물');
-  if(attrs.hardiness==='제한적 노지'&&SOUTHERN_RE.test(dstrb||''))cats.push('남부수종');
+  /* 예전엔 hardiness==='제한적 노지'(내한성 부족) 조건까지 함께 요구했는데,
+     hardiness는 국내 분포 서술(dstrb)에 "한국/전국"이 없으면 정보 부족으로도
+     기본값이 '제한적 노지'가 되는 반면, 정작 SOUTHERN_RE가 찾는 "남부/제주/
+     남해안" 언급은 원산지가 아니라 국내 자생 지역을 설명하는 문장에만 나온다
+     - 두 조건이 동시에 성립하는 경우가 사실상 없어(실측: 3.6만종 전체에서
+     0건) 이 칩을 눌러도 항상 결과가 없었다. 국내 남부/제주/남해안 자생·분포
+     언급이 있으면 그 자체로 남부수종으로 충분히 판단할 수 있으므로 내한성
+     조건을 뗀다. */
+  if(SOUTHERN_RE.test(dstrb||''))cats.push('남부수종');
   if(tags.indexOf('상록교목')!==-1){
     if(CONIFER_FAMILY_RE.test(fam)||/침엽수|바늘잎/.test(text))cats.push('상록침엽수');
     else cats.push('상록활엽수');
@@ -1833,6 +1841,13 @@ function runFacetSearch(){
       return;
     }
     renderPage();
+  }).catch(function(){
+    /* 이 체인에 .catch가 없으면(예전 상태) buildStaticIndex/필터링 중 예외가
+       하나라도 나면 로딩 스피너가 영원히 멈춘 채로 남아 "로딩이 느리다"·
+       "결과가 안 나온다"로 보인다 - 방어적으로 안내 문구를 띄우고 빠져나간다. */
+    if(myToken!==facetSearchToken)return;
+    hideLoading();hideAll();
+    showError('정원 정보로 찾는 중 문제가 발생했습니다. 다시 시도해주세요.');
   });
 }
 
@@ -2090,14 +2105,34 @@ window.pClearedSearch=function(){
    있는 종은 그 국명으로 바로 검색 결과 카드를 보여준다(기존 renderPage
    재사용). "검색 결과 카드가 Pl@ntNet에서 가져오는 것을 1차로 보여달라"는
    요청에 따라, 도감에 없는 종도 더 이상 추천 검색어 칩으로만 격하하지 않고
-   Pl@ntNet이 직접 알려준 학명·영문명·과명으로 카드를 만들어 도감 매칭종과
-   함께 유사도 순으로 나란히 보여준다(pIdentifyPhoto 참고) - 사진과 마찬가지로
-   loadCardImage가 학명 기준으로 위키·iNaturalist·GBIF 등에서 대표 사진을
-   찾아준다. */
+   Pl@ntNet이 직접 알려준 학명·영문명·과명으로 카드를 만든다 - 이 카드들
+   (origin:'plantnet')이 결과 맨 위에 우선 배치되고, 도감에서 국명까지 찾은
+   카드(origin:'static')는 그 뒤에 이어진다(각 그룹 내부는 유사도순, 자세한
+   정렬은 pIdentifyPhoto 참고) - 사진과 마찬가지로 loadCardImage가 학명
+   기준으로 위키·iNaturalist·GBIF 등에서 대표 사진을 찾아준다. */
+/* STATIC_NAME/STATIC_SPECIES는 국가표준식물목록 원본 표기(대개 "Genus species"
+   형태)를 키로 쓰는데, Pl@ntNet이 돌려주는 학명은 대소문자가 항상 그와 같다는
+   보장이 없다(실측으로 대소문자 표기가 어긋나는 사례 확인) - 정확히 같은
+   종인데도 대소문자 차이만으로 "도감에 없는 종"으로 잘못 분류돼 국명을 못
+   찾고 영문명 번역만 쓰던 사례의 원인 중 하나. 대소문자를 무시한 색인을
+   한 번만 만들어두고, 원문 그대로의 키로 못 찾았을 때만 보조로 쓴다(만들어
+   두는 비용을 아끼려 최초 실패 시점에 지연 생성). */
+var STATIC_NAME_LC=null,STATIC_SPECIES_LC=null;
+function buildStaticLcIndex(){
+  if(STATIC_NAME_LC)return;
+  STATIC_NAME_LC={};STATIC_SPECIES_LC={};
+  Object.keys(STATIC_NAME).forEach(function(k){STATIC_NAME_LC[k.toLowerCase()]=STATIC_NAME[k];});
+  Object.keys(STATIC_SPECIES).forEach(function(k){STATIC_SPECIES_LC[k.toLowerCase()]=STATIC_SPECIES[k];});
+}
 function pMatchLocalByName(sciNameRaw,pct){
   var key=cleanSciName(sciNameRaw);
   if(!key)return null;
   var sp=STATIC_SPECIES[key],nm=STATIC_NAME[key];
+  if(!sp&&!nm){
+    buildStaticLcIndex();
+    var lc=key.toLowerCase();
+    sp=STATIC_SPECIES_LC[lc];nm=STATIC_NAME_LC[lc];
+  }
   if(!sp&&!nm)return null;
   var korNm=(sp&&sp.kn)||(nm&&nm.kn)||key;
   var fam=(nm&&nm.family)||'';
@@ -2187,9 +2222,14 @@ function pIdentifyPhoto(files){
         if((r.score||0)<PLANTID_MIN_SCORE)return; /* 사실상 0에 가까운 점수는 노이즈로 취급 */
         var sci=r.species&&r.species.scientificNameWithoutAuthor;
         if(!sci)return;
-        var key=cleanSciName(sci).toLowerCase();
-        if(!key||seen[key])return;
-        seen[key]=true;
+        /* 카드에 보여줄 학명(sc)은 대소문자를 그대로 보존해야 sciNameHtml의
+           이탤릭 판정(속명은 첫 글자 대문자)이 정상 동작한다 - 중복 판정용
+           키(dedupeKey)만 별도로 소문자화한다(예전엔 이 둘을 하나로 합쳐써서
+           카드의 학명이 전부 소문자로 나오는 부작용이 있었다). */
+        var cleanSci=cleanSciName(sci);
+        var dedupeKey=cleanSci.toLowerCase();
+        if(!dedupeKey||seen[dedupeKey])return;
+        seen[dedupeKey]=true;
         var pct=Math.round((r.score||0)*100);
         var hit=pMatchLocalByName(sci,pct);
         if(hit){
@@ -2202,12 +2242,20 @@ function pIdentifyPhoto(files){
              요청과 병행). */
           var engNm=(r.species.commonNames&&r.species.commonNames[0])||'';
           var famNm=(r.species.family&&r.species.family.scientificNameWithoutAuthor)||'';
-          var card={nm:engNm||key,sc:key,fam:famNm,no:'',specsId:'',origin:'plantnet',pct:pct,_uid:++pCardUid,engNm:engNm};
+          var card={nm:engNm||cleanSci,sc:cleanSci,fam:famNm,no:'',specsId:'',origin:'plantnet',pct:pct,_uid:++pCardUid,engNm:engNm};
           matched.push(card);
           if(engNm)toTranslate.push(card);
         }
       });
-      matched.sort(function(a,b){return(b.pct||0)-(a.pct||0);}); /* Pl@ntNet 유사도 높은 순으로, 도감 매칭 여부와 무관하게 나란히 정렬 */
+      /* "plantnet 카드가 우선 나오게 하라"는 요청에 따라, 도감에 매칭되지 않아
+         Pl@ntNet이 알려준 정보를 그대로 쓰는 카드(origin:'plantnet')를 먼저
+         배치하고, 도감에서 찾은 카드(origin:'static')는 그 뒤에 둔다. 각
+         그룹 안에서는 여전히 Pl@ntNet 유사도(pct) 높은 순으로 정렬한다. */
+      matched.sort(function(a,b){
+        var ao=(a.origin==='plantnet')?0:1,bo=(b.origin==='plantnet')?0:1;
+        if(ao!==bo)return ao-bo;
+        return (b.pct||0)-(a.pct||0);
+      });
       hideLoading();hideAll();
       pQ='';
       var noteEl=document.getElementById('pnote'),suggEl=document.getElementById('psugg');
@@ -2483,21 +2531,47 @@ function isAttrsRich(attrs){return !!(attrs&&((attrs.tags&&attrs.tags.length)||(
    거의 동시에 몰리면(예: 이미지 수십 장이 한꺼번에 로드 완료) 매번 O(n log n) 정렬 +
    전체 DOM 재부착이 반복되어 프레임을 잡아먹는다 - "노출이 느리다"의 핵심 원인 중 하나.
    requestAnimationFrame으로 여러 번의 연속 호출을 프레임당 1회로 합친다(디바운스). */
+/* "정원 정보로 찾기"(필터만으로 검색)는 검색어 검색과 달리 결과가 한 번에
+   수백 건(233~560여 건 실측)에 달할 수 있다 - PAGE_SIZE=Infinity라 전부
+   카드로 그려지고, 카드마다 사진/정원정보/정원등급 로딩이 각자 비동기로
+   끝나면서 그때마다 이 reflowGrid를 부른다. 카드 200~500장을 대상으로 매번
+   O(n log n) 정렬(문자열 localeCompare 포함) + appendChild 재배치를 하면,
+   비동기 응답이 쏟아지는 수십 프레임 동안 이 작업이 계속 반복돼 브라우저가
+   버벅이거나(체감상 "로딩이 느리다") 심하면 몇 초간 멈춘 것처럼 보인다.
+   requestAnimationFrame 디바운스만으로는 "같은 프레임에 몰린 호출"만 합쳐질
+   뿐, 응답이 여러 프레임에 걸쳐 흩어져 도착하면 그만큼 여러 번 실행된다.
+   화면에 뜬 카드 수가 많을 때는(정상적인 검색어 검색 결과는 대개 수십 건
+   이내라 영향 없음) 정렬 주기를 프레임 단위 대신 일정 시간(500ms)으로
+   늦춰, 그 사이 도착하는 여러 비동기 완료를 한 번의 정렬로 묶는다. */
+var REFLOW_LARGE_THRESHOLD=80;
+var REFLOW_LARGE_DEBOUNCE=500;
 var reflowGridPending=false;
+var reflowGridLargeTimer=null;
+function reflowGridRun(){
+  var g=document.getElementById('pgrid');
+  if(!g)return;
+  var shown=pAll.slice(0,pShown).filter(function(it){return pCardEls[it._uid];});
+  shown.sort(function(a,b){
+    var d=displayScore(b)-displayScore(a);
+    if(d)return d;
+    return a.nm.localeCompare(b.nm,'ko');
+  });
+  shown.forEach(function(it){g.appendChild(pCardEls[it._uid].el);});
+}
 function reflowGrid(){
+  if(pShown>REFLOW_LARGE_THRESHOLD){
+    if(reflowGridLargeTimer)return;
+    reflowGridLargeTimer=setTimeout(function(){
+      reflowGridLargeTimer=null;
+      reflowGridRun();
+    },REFLOW_LARGE_DEBOUNCE);
+    return;
+  }
   if(reflowGridPending)return;
   reflowGridPending=true;
   var run=function(){
     reflowGridPending=false;
-    var g=document.getElementById('pgrid');
-    if(!g)return;
-    var shown=pAll.slice(0,pShown).filter(function(it){return pCardEls[it._uid];});
-    shown.sort(function(a,b){
-      var d=displayScore(b)-displayScore(a);
-      if(d)return d;
-      return a.nm.localeCompare(b.nm,'ko');
-    });
-    shown.forEach(function(it){g.appendChild(pCardEls[it._uid].el);});
+    reflowGridRun();
   };
   if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else setTimeout(run,16);
 }
