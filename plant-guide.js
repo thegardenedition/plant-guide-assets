@@ -74,7 +74,7 @@ function fetchNongsaroItems(path,params){
   if(!NONGSARO_PROXY)return Promise.resolve([]);
   var qs=Object.keys(params||{}).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
   var url=NONGSARO_PROXY.replace(/\/$/,'')+'/proxy/'+path+(qs?'?'+qs:'');
-  return fetch(url).then(function(r){return r.ok?r.text():'';}).then(function(txt){
+  return fetchWithTimeout(url,TIMEOUT_PROXY).then(function(r){return r.ok?r.text():'';}).then(function(txt){
     if(!txt)return [];
     var xml=new DOMParser().parseFromString(txt,'text/xml');
     var rc=xml.querySelector('resultCode');
@@ -111,6 +111,21 @@ function fetchWithTimeout(url,ms){
   var timer=setTimeout(function(){ctrl.abort();},ms);
   return fetch(url,{signal:ctrl.signal}).then(function(r){clearTimeout(timer);return r;},function(e){clearTimeout(timer);throw e;});
 }
+/* ---- 로딩 단축: 모든 외부 호출에 시간 제한 ----
+   "검색·노출·상세 사진 로딩이 너무 길다"는 지적을 실측해보니, 위 산림청
+   사례처럼 타임아웃 없는 일반 fetch()가 코드 곳곳(위키·iNaturalist·GBIF·
+   수피·농사로 프록시·정적 데이터셋)에 그대로 남아 있었다. 이 소스들은
+   Promise.all로 여러 개씩 묶여 있어, 그중 단 하나만 응답이 느려도(대부분
+   해외 공개 API라 응답 속도가 들쭉날쭉함) 이미 준비된 나머지 결과까지
+   함께 발이 묶였다. 아래 네 값으로 용도별 상한선을 통일해 모든 fetch를
+   감싼다 - "핵심 검색 결과(정부 API)"는 조금 더 기다려주고, "있으면 좋은
+   보강 자료(사진 등)"는 짧게 끊어서 화면이 그 자료 하나 때문에 밀리지
+   않게 한다. */
+var TIMEOUT_GOV=8000;    /* 정부 API(도감·표본 등 핵심 검색 결과) */
+var TIMEOUT_PROXY=4000;  /* 농사로 Cloudflare 프록시 경유 호출 */
+var TIMEOUT_STATIC=6000; /* 페이지 로드 시 1회만 받는 정적 데이터셋/색인 */
+var TIMEOUT_PHOTO=3000;  /* 위키·iNaturalist·GBIF·수피 등 사진 보강 소스(단발) */
+var TIMEOUT_INAT_SEARCH=5000; /* iNaturalist를 검색 보충 소스로 쓸 때 */
 /* 첫 호출이 실패/시간초과하면(=api.forest.go.kr가 이번 방문 세션 내내 응답을
    안 준다는 뜻일 가능성이 높음) 이후 상세창을 열 때마다 매번 3초씩 다시
    기다리지 않도록 회로차단기를 둔다. 한 번 성공하면 계속 정상 사용, 한 번
@@ -370,7 +385,7 @@ function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='fun
 function fetchJson(url,ms){
   return new Promise(function(resolve,reject){
     var c=new AbortController();
-    var t=setTimeout(function(){c.abort();reject(new Error('시간 초과'));},ms||15000);
+    var t=setTimeout(function(){c.abort();reject(new Error('시간 초과'));},ms||TIMEOUT_GOV);
     fetch(url,{signal:c.signal}).then(function(r){
       clearTimeout(t);
       if(!r.ok){reject(new Error('HTTP '+r.status));return null;}
@@ -437,7 +452,7 @@ var STATIC_SPECIES_URL='https://raw.githubusercontent.com/thegardenedition/plant
 var STATIC_NAME={},STATIC_SPECIES={};
 function loadStaticTable(url,dest){
   if(!url)return Promise.resolve();
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(t){
+  return fetchWithTimeout(url,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(t){
     if(!t||!t.fields||!t.rows)return;
     var fields=t.fields,keys=t.keys||[];
     t.rows.forEach(function(row,i){
@@ -488,7 +503,7 @@ var BOOK_FTC={},BOOK_GARDEN={},BOOK_FOREST300={};
    정확히 구분해야 하므로 별도로 축별 전체 정보를 보존하는 색인을 둔다). */
 var BOOK_AXIS_INDEX={};
 function loadBookAxisIndex(){
-  return fetch(BOOK_FTC_URL).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(BOOK_FTC_URL,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(j){
     if(!j||!j.fields||!j.rows)return;
     var f=j.fields,scIdx=f.indexOf('sc'),catIdx=f.indexOf('category'),axisIdx=f.indexOf('axis');
     j.rows.forEach(function(row){
@@ -654,7 +669,7 @@ var pImgCache={};
 var NATURE_IMG={};
 function loadNatureImageIndex(){
   var url='https://api.odcloud.kr/api/15116414/v1/uddi:b63f89a7-c57b-43c6-8868-f68d44ce17e5?page=1&perPage=5000&serviceKey='+encodeURIComponent(KEY);
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var rows=(j&&Array.isArray(j.data))?j.data:[];
     var seen={};
     rows.forEach(function(row){
@@ -688,7 +703,7 @@ function fetchINatPhoto(sciNm){
   var clean=cleanSciName(sciNm);
   if(!clean)return Promise.resolve(null);
   var url='https://api.inaturalist.org/v1/taxa?q='+encodeURIComponent(clean)+'&per_page=1';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var t=j&&j.results&&j.results[0];
     if(!t)return null;
     if(t.iconic_taxon_name!=='Plantae')return null;
@@ -712,7 +727,7 @@ function fetchINatPhoto(sciNm){
 function wikidataTaxonMatches(qid,clean){
   if(!qid||!clean)return Promise.resolve(false);
   var url='https://www.wikidata.org/wiki/Special:EntityData/'+encodeURIComponent(qid)+'.json';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var ent=j&&j.entities&&j.entities[qid];
     var p225=ent&&ent.claims&&ent.claims.P225;
     if(!p225||!p225.length)return false;
@@ -727,7 +742,7 @@ function fetchWikiThumb(lang,title,sciNm){
   var clean=cleanSciName(sciNm);
   if(!clean)return Promise.resolve(null); /* 학명이 없으면 동음이의 검증이 불가능 - 신뢰하지 않는다 */
   var url='https://'+lang+'.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(title);
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     if(!j||!j.thumbnail||!j.thumbnail.source)return null;
     return wikidataTaxonMatches(j.wikibase_item,clean).then(function(ok){
       return ok?{url:j.thumbnail.source,credit:'Wikipedia'}:null;
@@ -763,7 +778,7 @@ function fetchGbifPhoto(sciNm){
   var clean=cleanSciName(sciNm);
   if(!clean)return Promise.resolve(null);
   var url='https://api.gbif.org/v1/occurrence/search?scientificName='+encodeURIComponent(clean)+'&mediaType=StillImage&limit=20';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(d){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(d){
     var list=(d&&Array.isArray(d.results))?d.results:[];
     for(var i=0;i<list.length;i++){
       if(!gbifNameMatches(list[i],clean))continue; /* 학명이 문자 그대로 다르면 통째로 스킵 */
@@ -790,7 +805,7 @@ function fetchGbifPhoto(sciNm){
 function fetchBarkPhoto(korNm){
   if(!korNm)return Promise.resolve(null);
   var u='https://apis.data.go.kr/1400000/imageForest/getImageForestList?serviceKey='+encodeURIComponent(KEY)+'&commonNm='+encodeURIComponent(korNm)+'&numOfRows=1&pageNo=1&_type=json';
-  return fetch(u).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(u,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var res=(j&&j.response)||{};
     if((res.header||{}).resultCode!=='00')return null;
     var items=(res.body&&res.body.items&&res.body.items.item)||null;
@@ -811,7 +826,7 @@ function fetchINatPhotos(sciNm){
   var clean=cleanSciName(sciNm);
   if(!clean)return Promise.resolve([]);
   var url='https://api.inaturalist.org/v1/taxa?q='+encodeURIComponent(clean)+'&per_page=1';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var t=j&&j.results&&j.results[0];
     if(!t||t.iconic_taxon_name!=='Plantae')return [];
     if(String(t.name).toLowerCase()!==clean.toLowerCase())return [];
@@ -825,7 +840,7 @@ function fetchGbifPhotos(sciNm){
   var clean=cleanSciName(sciNm);
   if(!clean)return Promise.resolve([]);
   var url='https://api.gbif.org/v1/occurrence/search?scientificName='+encodeURIComponent(clean)+'&mediaType=StillImage&limit=20';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(d){
+  return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(d){
     var list=(d&&Array.isArray(d.results))?d.results:[];
     var seen={},out=[];
     list.forEach(function(rec){
@@ -847,7 +862,7 @@ function fetchGbifPhotos(sciNm){
 function fetchBarkPhotos(korNm){
   if(!korNm)return Promise.resolve([]);
   var u='https://apis.data.go.kr/1400000/imageForest/getImageForestList?serviceKey='+encodeURIComponent(KEY)+'&commonNm='+encodeURIComponent(korNm)+'&numOfRows=4&pageNo=1&_type=json';
-  return fetch(u).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(u,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var res=(j&&j.response)||{};
     if((res.header||{}).resultCode!=='00')return [];
     var items=(res.body&&res.body.items&&res.body.items.item)||null;
@@ -1825,8 +1840,11 @@ function makeLimiter(max){
        멈춰버렸던 이유. 8초 안에 끝나지 않는 작업은 포기하고 슬롯을 돌려줘
        나머지 카드들이 계속 채워지도록 한다(포기된 작업 자체가 나중에 실제로
        끝나면 그 카드에는 여전히 정상적으로 사진이 반영된다 - 대기열 진행만
-       막지 않을 뿐). */
-    setTimeout(advance,8000);
+       막지 않을 뿐). 카드 하나가 순차적으로 시도하는 사진 소스들의 개별
+       타임아웃이 이제 TIMEOUT_PHOTO(3초) 등으로 더 짧아졌으므로, 워치독도
+       그에 맞춰 8초 → 7초로 단축해 막힌 작업을 더 빨리 포기하고 다음 카드로
+       넘어가게 한다. */
+    setTimeout(advance,7000);
   }
   return function(fn){
     return new Promise(function(resolve,reject){
@@ -2174,7 +2192,7 @@ function fetchINatMatches(q){
   var cached=cacheGet(cacheKey,SEARCH_CACHE_TTL);
   if(cached!==undefined)return Promise.resolve(cached);
   var url='https://api.inaturalist.org/v1/taxa?q='+encodeURIComponent(q)+'&locale=ko&per_page=20';
-  return fetch(url).then(function(r){return r.ok?r.json():null;}).then(function(j){
+  return fetchWithTimeout(url,TIMEOUT_INAT_SEARCH).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var results=(j&&j.results)||[];
     var out=results.filter(function(t){
       return t.iconic_taxon_name==='Plantae'&&/^(species|subspecies|variety)$/.test(t.rank);
@@ -2337,16 +2355,28 @@ function isAttrsRich(attrs){return !!(attrs&&((attrs.tags&&attrs.tags.length)||(
    appendChild로 재배치만 해서 순서를 displayScore 기준으로 맞춘다. 사진/정원
    정보가 비동기로 속속 도착할 때마다 호출되므로, 카드를 새로 만들거나 이미
    불러온 사진을 다시 불러오지 않는다 - 순서만 바뀐다. */
+/* reflowGrid는 이미지 로드/속성 로드/정원등급 로드/소스별 검색 도착/카드 업그레이드 등
+   ~10곳의 비동기 완료 콜백에서 매번 호출된다. 결과가 수백 장인 상태에서 이 전부가
+   거의 동시에 몰리면(예: 이미지 수십 장이 한꺼번에 로드 완료) 매번 O(n log n) 정렬 +
+   전체 DOM 재부착이 반복되어 프레임을 잡아먹는다 - "노출이 느리다"의 핵심 원인 중 하나.
+   requestAnimationFrame으로 여러 번의 연속 호출을 프레임당 1회로 합친다(디바운스). */
+var reflowGridPending=false;
 function reflowGrid(){
-  var g=document.getElementById('pgrid');
-  if(!g)return;
-  var shown=pAll.slice(0,pShown).filter(function(it){return pCardEls[it._uid];});
-  shown.sort(function(a,b){
-    var d=displayScore(b)-displayScore(a);
-    if(d)return d;
-    return a.nm.localeCompare(b.nm,'ko');
-  });
-  shown.forEach(function(it){g.appendChild(pCardEls[it._uid].el);});
+  if(reflowGridPending)return;
+  reflowGridPending=true;
+  var run=function(){
+    reflowGridPending=false;
+    var g=document.getElementById('pgrid');
+    if(!g)return;
+    var shown=pAll.slice(0,pShown).filter(function(it){return pCardEls[it._uid];});
+    shown.sort(function(a,b){
+      var d=displayScore(b)-displayScore(a);
+      if(d)return d;
+      return a.nm.localeCompare(b.nm,'ko');
+    });
+    shown.forEach(function(it){g.appendChild(pCardEls[it._uid].el);});
+  };
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else setTimeout(run,16);
 }
 
 /* 새로 도착한 소스의 결과를 기존 목록에 중복 없이 이어붙인다. 실측 결과
