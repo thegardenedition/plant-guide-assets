@@ -1623,12 +1623,19 @@ window.pToggleFilterVal=function(kind,v,el){
   if(i===-1)arr.push(v);else arr.splice(i,1);
   if(el)el.classList.toggle('active');else renderFilterPanel();
   updateFilterBadge();
+  /* 필터 칩을 눌러 결과가 바뀌는 순간에도 히스토리 체크포인트를 남긴다 -
+     이게 없으면 필터만으로 찾다가 상세창을 열고 닫을 때(뒤로가기) 되돌아갈
+     지점이 없어 맨 처음 빈 화면으로 튀어버린다("팝업 닫으면 엉뚱한 화면에서
+     하단으로 나온다" 버그의 실제 발단 - 화면이 갑자기 훨씬 짧아지는 것도
+     이 때문이었다). */
+  pHistPushSearch();
   if(pQ)applyFilters();else runFacetSearch();
 };
 window.pResetFilters=function(){
   pFilter={usecat:[],origin:[],color:[],form:[],texture:[],cycle:[],light:[],story:[],initial:null};
   renderFilterPanel();
   updateFilterBadge();
+  pHistPushSearch();
   if(pQ)applyFilters();else runFacetSearch();
 };
 var USECAT_OPTS=['꽃나무/관목','상록침엽수','상록활엽수','낙엽교목','정원용초본(꽃/야생화)','꽃구근','과수/유실수','특용/약용수','잔디','씨앗','관엽/공기정화식물','생울타리','덩굴식물','수생식물','남부수종','희귀식물'];
@@ -1749,6 +1756,7 @@ function renderIndexBar(){
 window.pSetInitial=function(ch){
   pFilter.initial=(pFilter.initial===ch)?null:ch;
   renderIndexBar();
+  pHistPushSearch();
   if(pQ)applyFilters();else runFacetSearch();
 };
 function applyFilters(){
