@@ -1256,9 +1256,16 @@ var MEDICINAL_RE=/약용|약재|한약재|생약/;
 var HOUSEPLANT_RE=/관엽식물|공기\s*정화|미세먼지\s*저감|실내\s*조경/;
 var SOUTHERN_RE=/남부|제주|남해안/;
 var ORIGIN_USECAT={rare:'희귀식물',seed:'씨앗'};
-function deriveUseCategory(item,attrs,shpe,grwOverride,famOverride){
+function deriveUseCategory(item,attrs,shpe,grwOverride,famOverride,dstrbOverride){
   var grw=grwOverride!=null?grwOverride:val(item,'grwEvrntDesc');
-  var note=val(item,'note'),dstrb=val(item,'dstrb');
+  /* dstrbOverride가 없으면(호출부를 아직 안 고친 다른 자리) 예전처럼 item
+     원본의 dstrb 필드만 본다 - "정원 정보로 찾기"(runFacetSearch)가 쓰는
+     buildStaticIndex 경로에서는 item이 {plantGnrlNm:korNm} 뿐이라 item.dstrb가
+     항상 빈 문자열이었다. curationTags에는 정적 데이터로 보강한 dstrb를 이미
+     넘기면서 정작 이 함수에는 안 넘겨, "남부수종" 칩(SOUTHERN_RE가 이 dstrb를
+     봄)이 실제로는 늘 빈 텍스트만 검사해 항상 0건이었다(deriveCuratedProfile의
+     주석엔 "dstrb도 넘긴다"고 되어 있었지만 실제 호출부엔 빠져 있던 버그). */
+  var note=val(item,'note'),dstrb=dstrbOverride!=null?dstrbOverride:val(item,'dstrb');
   var text=(shpe||'')+' '+(grw||'')+' '+(note||'');
   var fam=famOverride||(val(item,'familyKorNm')||val(item,'apgFamilyKorNm')||'');
   var nm=val(item,'plantGnrlNm')||'';
@@ -1366,7 +1373,7 @@ function deriveCuratedProfile(item,staticMatch,sc){
      함수가 item 원본만 다시 들여다보면 정적 보강 내용(예: 정적 'form' 필드의
      "상록침엽교목")을 놓치게 된다. */
   attrs.tags=curationTags(item,attrs,shpe,dstrb,fam);
-  attrs.useCats=deriveUseCategory(item,attrs,shpe,grw,fam);
+  attrs.useCats=deriveUseCategory(item,attrs,shpe,grw,fam,dstrb);
   attrs.tagline=buildTagline(item,attrs,shpe,fam);
   attrs.plantingTip=buildPlantingTip(attrs,extractHeight(shpe));
   attrs.story=buildStory(item,dstrb);
