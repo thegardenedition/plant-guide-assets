@@ -1974,14 +1974,14 @@ window.pClearedSearch=function(){
    없는 후보는 추천 검색어 칩으로만 제시해(기존 pSuggest 재사용) 사용자가
    원하면 실시간 API 검색으로 더 찾아볼 수 있게 한다 - 새 렌더링 코드를
    따로 만들지 않고 기존에 검증된 두 경로만 재사용해 위험을 줄였다. */
-function pMatchLocalByName(sciNameRaw,pct){
+function pMatchLocalByName(sciNameRaw,pct,userPhotos){
   var key=cleanSciName(sciNameRaw);
   if(!key)return null;
   var sp=STATIC_SPECIES[key],nm=STATIC_NAME[key];
   if(!sp&&!nm)return null;
   var korNm=(sp&&sp.kn)||(nm&&nm.kn)||key;
   var fam=(nm&&nm.family)||'';
-  return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',pct:(pct==null?null:pct),_uid:++pCardUid};
+  return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',pct:(pct==null?null:pct),userPhotos:userPhotos||null,_uid:++pCardUid};
 }
 window.pPhotoTrigger=function(){
   var el=document.getElementById('pphotoinput');
@@ -2007,12 +2007,32 @@ window.pOnPhotoSelected=function(input){
    함께 보여줘 사용자가 그 결과를 어느 정도 신뢰할지 스스로 판단할 수 있다. */
 var PLANTID_NB_RESULTS=10;
 var PLANTID_MIN_SCORE=0.01;
+/* "Pl@ntNet 유사도 %와 화면에 뜨는 사진이 안 맞으면 헷갈린다"는 지적 대응 -
+   기존에는 매칭된 카드의 사진을 국립수목원/농사로/위키/iNaturalist/GBIF에서
+   따로 검색해 붙였는데, 이건 그 종의 "일반적인" 사진일 뿐 사용자가 실제로
+   찍어 올린 사진과 다를 수 있어 "92% 일치라면서 왜 사진이 다르게 생겼지?"
+   하는 혼동을 만들 수 있다. 그래서 사용자가 방금 업로드한 사진 자체를
+   (Object URL로) 카드 대표 사진·상세 슬라이드 맨 앞에 그대로 보여줘, 유사도
+   배지와 사진이 항상 "같은 사진 기준"으로 보이게 한다. 이전 식별 때 만든
+   Object URL은 더 이상 화면에 쓰이지 않으므로 메모리 누수 방지를 위해
+   새 식별을 시작할 때 미리 해제한다. */
+var pPhotoIdObjectUrls=[];
+function pRevokePhotoIdUrls(){
+  pPhotoIdObjectUrls.forEach(function(u){try{URL.revokeObjectURL(u);}catch(e){}});
+  pPhotoIdObjectUrls=[];
+}
 function pIdentifyPhoto(files){
   if(!NONGSARO_PROXY){
     showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
     return;
   }
   showLoading();
+  pRevokePhotoIdUrls();
+  var userPhotos=files.map(function(file){
+    var u=URL.createObjectURL(file);
+    pPhotoIdObjectUrls.push(u);
+    return {url:u,credit:'내가 업로드한 사진'};
+  });
   var fd=new FormData();
   files.forEach(function(file){
     fd.append('images',file,file.name||'photo.jpg');
@@ -2041,7 +2061,7 @@ function pIdentifyPhoto(files){
         if(!key||seen[key])return;
         seen[key]=true;
         var pct=Math.round((r.score||0)*100);
-        var hit=pMatchLocalByName(sci,pct);
+        var hit=pMatchLocalByName(sci,pct,userPhotos);
         if(hit){
           matched.push(hit);
         } else {
@@ -2062,7 +2082,7 @@ function pIdentifyPhoto(files){
         suggEl.style.display='none';
       }
       if(matched.length){
-        noteEl.textContent='사진 인식 결과입니다(각 카드의 "유사도"는 Pl@ntNet의 인식 확신도). 여러 각도(특히 꽃·열매)의 사진을 함께 올리면 더 정확해져요.';
+        noteEl.textContent='사진 인식 결과입니다. 카드 사진은 방금 올리신 사진이고, "유사도"는 그 사진에 대한 Pl@ntNet의 인식 확신도예요. 여러 각도(특히 꽃·열매)의 사진을 함께 올리면 더 정확해져요.';
         noteEl.style.display='block';
         pAll=matched;pShown=0;
         renderPage();
@@ -2728,10 +2748,15 @@ function renderPage(){
     cmpBtn.onclick=function(e){e.stopPropagation();pToggleCompare(it,d);};
     g.appendChild(d);
     pCardEls[it._uid]={el:d};
-    var imgTask=function(){return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
-      it._hasPhoto=!!credit;
-      reflowGrid();
-    },eager);};
+    /* 사진 인식 결과 카드는(userPhotos가 있으면) 사용자가 방금 올린 사진을
+       그대로 대표 사진으로 써서, 유사도 배지와 화면 사진이 항상 같은 사진을
+       가리키게 한다 - 네트워크로 다른(일반적인) 사진을 새로 찾지 않는다. */
+    var imgTask=it.userPhotos&&it.userPhotos.length
+      ? function(){applyThumb(d.querySelector('.pc-img'),it.userPhotos[0],eager);it._hasPhoto=true;reflowGrid();return Promise.resolve();}
+      : function(){return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
+          it._hasPhoto=!!credit;
+          reflowGrid();
+        },eager);};
     if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
     loadAndRenderAttrs(d,it);
     loadGardenTier(it);
@@ -2921,15 +2946,22 @@ window.pDetail=function(it){
      높은 국립수목원·농사로 사진(fast)이 먼저 도착하면 바로 보여주고, 위키·
      iNaturalist·GBIF·수피까지 다 모이면(all) 최종 사진 목록으로 한 번 더
      갱신한다 - 느린 소스 때문에 빠른 소스까지 늦게 뜨는 일을 막는다. */
+  /* 사용자가 사진으로 식별한 결과라면(it.userPhotos), 유사도 배지와 항상
+     같은 사진을 보여주도록 맨 앞 슬라이드로 먼저 즉시 띄운다(네트워크
+     대기 없이). 그 뒤 다른 소스(국립수목원·농사로·위키 등) 사진이 도착하면
+     참고용으로 뒤에 이어 붙인다 - "내 사진과 비교해서 맞는지" 확인 가능. */
+  var userPhotos=it.userPhotos||[];
+  if(userPhotos.length)renderImageSlider(pdimg,creditEl,userPhotos);
   var photoBundle=fetchAllPhotos(nm,sc);
   var photoRenderToken=++pDetailToken;
   photoBundle.fast.then(function(photos){
     if(pDetailToken!==photoRenderToken)return;
-    if(photos.length)renderImageSlider(pdimg,creditEl,photos);
+    var combined=userPhotos.concat(photos||[]);
+    if(combined.length)renderImageSlider(pdimg,creditEl,combined);
   });
   photoBundle.all.then(function(photos){
     if(pDetailToken!==photoRenderToken)return;
-    renderImageSlider(pdimg,creditEl,photos);
+    renderImageSlider(pdimg,creditEl,userPhotos.concat(photos||[]));
   });
   /* 개요 탭 안의 정원가이드/조경 스펙/학술정보 슬롯과 이야기 탭이 공유하는
      농사로 조회는 origin과 무관하게 학명 기준으로 한 번만 호출해 나눠 쓴다.
