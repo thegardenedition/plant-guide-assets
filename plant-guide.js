@@ -363,7 +363,7 @@ function pSpin(on){
 function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});}
 function showLoading(){hideAll();document.getElementById('pld').style.display='block';pSpin(true);}
 function hideLoading(){pSpin(false);document.getElementById('pld').style.display='none';}
-function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='function')pClearPhotoNote();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
+function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='function')pClearPhotoNote();if(typeof pUpdateClearBtn==='function')pUpdateClearBtn();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
 
 /* XML 대신 JSON으로 통신 (data.go.kr 표준 파라미터 _type=json 사용; returnType=json은
    이 API에서 작동하지 않음을 실측으로 확인함). JSON 파싱이 DOMParser보다 가볍고 코드도 간결해짐. */
@@ -1909,9 +1909,9 @@ function pClearPhotoNote(){
   if(suggEl){suggEl.innerHTML='';suggEl.style.display='none';}
 }
 window.pOnSearchInput=function(){
-  pUpdateClearBtn();
   var el=document.getElementById('psi');
-  if(el&&!el.value.trim())pClearedSearch();
+  if(el&&!el.value.trim())pClearedSearch(); /* note/psugg를 먼저 지운 뒤에 버튼 표시를 계산한다 */
+  pUpdateClearBtn();
 };
 /* "×" 버튼 또는 검색어를 손으로 지웠을 때 공통으로 타는 경로 - 새로 검색하고
    싶을 때는 이 버튼 한 번으로 검색어만 깔끔히 비우고, 선택해둔 필터는 그대로
@@ -1919,8 +1919,8 @@ window.pOnSearchInput=function(){
 window.pClearSearchBox=function(){
   var el=document.getElementById('psi');
   if(el)el.value='';
+  pClearedSearch(); /* note/psugg를 먼저 지운 뒤에 "×" 버튼 표시 여부를 계산해야 한다 */
   pUpdateClearBtn();
-  pClearedSearch();
 };
 window.pSuggest=function(term){
   var el=document.getElementById('psi');
@@ -2069,7 +2069,7 @@ function pIdentifyPhoto(files){
       });
       matched.sort(function(a,b){return(b.pct||0)-(a.pct||0);}); /* 도감 매칭종은 항상 유사도 높은 순으로 */
       hideLoading();hideAll();
-      pQ='';pUpdateClearBtn();
+      pQ='';
       var noteEl=document.getElementById('pnote'),suggEl=document.getElementById('psugg');
       if(suggestions.length){
         suggEl.innerHTML=suggestions.map(function(s){
@@ -2090,6 +2090,7 @@ function pIdentifyPhoto(files){
         document.getElementById('pemp').style.display='block';
         document.getElementById('pcnt').style.display='none';
       }
+      pUpdateClearBtn(); /* note/psugg 표시가 최종 확정된 뒤에 호출해야 "×" 버튼이 올바르게 나타난다 */
     });
   }).catch(function(){
     showError('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
