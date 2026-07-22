@@ -909,19 +909,39 @@ function fetchNongsaroPhotoList(korNm,sciNm){
    이제 "빠른 소스"(국립수목원+농사로)가 도착하는 즉시 먼저 보여주고("fast"),
    "느린 소스"까지 다 모이면 한 번 더 갱신한다("all") - 호출부(pDetail)에서
    fast가 오면 먼저 렌더링, all이 오면 최종본으로 다시 렌더링한다. */
-function fetchAllPhotos(korNm,sciNm){
-  var fast=Promise.all([
-    fetchNatureImagePhotos(sciNm),
-    fetchNongsaroPhotoList(korNm,sciNm)
-  ]).then(function(res){return dedupePhotos([].concat(res[0]||[],res[1]||[]));});
-  var slow=Promise.all([
-    fetchWikiThumb('ko',korNm,sciNm),
-    fetchINatPhotos(sciNm),
-    fetchGbifPhotos(sciNm),
-    fetchBarkPhotos(korNm)
-  ]).then(function(res){return [].concat(res[0]?[res[0]]:[],res[1]||[],res[2]||[],res[3]||[]);});
-  var all=Promise.all([fast,slow]).then(function(res){return dedupePhotos(res[0].concat(res[1])).slice(0,12);});
-  return {fast:fast,all:all};
+/* "사진이 늦게 나온다"는 지적 대응(커뮤니티 데이터처럼 국립수목원/농사로
+   매칭이 없는 종에서 특히 심했다) - 예전에는 "느린 소스" 4개(위키·
+   iNaturalist·GBIF·수피)를 Promise.all로 묶어, 그중 하나(예: 수피는 국명이
+   있어야만 뜻이 있고, 위키는 동음이의 검증까지 거쳐 원래 느림)가 3초 타임아웃
+   근처까지 가면 이미 훨씬 빨리 답한 GBIF/iNaturalist 사진까지 함께 3초 가까이
+   묶여 있었다. 이제 6개 출처(국립수목원/농사로/위키/iNaturalist/GBIF/수피)를
+   각각 독립적으로 요청해두고, 그중 아무거나 하나라도 도착하는 즉시
+   onUpdate 콜백으로 그 시점까지 모인 사진을 신뢰도 순서(국립수목원 > 농사로 >
+   위키 > iNaturalist > GBIF > 수피)로 합쳐 넘긴다 - 호출부(pDetail)가 매번
+   그걸로 슬라이드를 다시 그려, 가장 먼저 답한 출처의 사진을 최대한 빨리
+   보여주고 이후 더 신뢰도 높은 사진이 도착하면 자연스럽게 앞쪽으로 재정렬된다. */
+function fetchAllPhotos(korNm,sciNm,onUpdate){
+  var collected=[];
+  function mergeInOrder(){
+    var merged=[];
+    for(var i=0;i<6;i++){if(collected[i])merged=merged.concat(collected[i]);}
+    return dedupePhotos(merged).slice(0,12);
+  }
+  function addSource(rank,promise){
+    return promise.then(function(list){
+      collected[rank]=list||[];
+      if(onUpdate)onUpdate(mergeInOrder());
+    });
+  }
+  var done=Promise.all([
+    addSource(0,fetchNatureImagePhotos(sciNm)),
+    addSource(1,fetchNongsaroPhotoList(korNm,sciNm)),
+    addSource(2,fetchWikiThumb('ko',korNm,sciNm).then(function(t){return t?[t]:[];})),
+    addSource(3,fetchINatPhotos(sciNm)),
+    addSource(4,fetchGbifPhotos(sciNm)),
+    addSource(5,fetchBarkPhotos(korNm))
+  ]);
+  return {done:done,get:mergeInOrder};
 }
 /* 카드 그리드용 대표 사진 1장도 상세 슬라이드와 같은 신뢰도 순서(국립수목원 >
    농사로 > 한국어 위키 > iNaturalist > GBIF > 수피)를 따른다. 속도 최적화:
@@ -3034,19 +3054,16 @@ window.pDetail=function(it){
   var pdimg=document.getElementById('pdimg');
   pdimg.innerHTML=PLACEHOLDER_ICON;
   /* 상세창은 카드 그리드용 대표 사진 1장이 아니라, 여러 소스를 모두 훑어
-     가능한 만큼 모은 사진을 슬라이드로 보여준다("가능한 많은 이미지"). 신뢰도
-     높은 국립수목원·농사로 사진(fast)이 먼저 도착하면 바로 보여주고, 위키·
-     iNaturalist·GBIF·수피까지 다 모이면(all) 최종 사진 목록으로 한 번 더
-     갱신한다 - 느린 소스 때문에 빠른 소스까지 늦게 뜨는 일을 막는다. */
-  var photoBundle=fetchAllPhotos(nm,sc);
+     가능한 만큼 모은 사진을 슬라이드로 보여준다("가능한 많은 이미지"). 6개
+     출처(국립수목원/농사로/위키/iNaturalist/GBIF/수피)가 도착하는 대로
+     매번 그 시점까지 모인 사진으로 슬라이드를 다시 그린다 - 국립수목원/농사로
+     매칭이 없는 종(커뮤니티 데이터 등)도 가장 먼저 답한 출처의 사진을
+     최대한 빨리 보여주고, 이후 더 신뢰도 높은 출처가 도착하면 자연스럽게
+     앞쪽으로 재정렬된다("사진이 늦게 나온다"는 지적 대응). */
   var photoRenderToken=++pDetailToken;
-  photoBundle.fast.then(function(photos){
+  fetchAllPhotos(nm,sc,function(photos){
     if(pDetailToken!==photoRenderToken)return;
     if(photos.length)renderImageSlider(pdimg,creditEl,photos);
-  });
-  photoBundle.all.then(function(photos){
-    if(pDetailToken!==photoRenderToken)return;
-    renderImageSlider(pdimg,creditEl,photos);
   });
   /* 개요 탭 안의 정원가이드/조경 스펙/학술정보 슬롯과 이야기 탭이 공유하는
      농사로 조회는 origin과 무관하게 학명 기준으로 한 번만 호출해 나눠 쓴다.
