@@ -1974,35 +1974,51 @@ window.pClearedSearch=function(){
    없는 후보는 추천 검색어 칩으로만 제시해(기존 pSuggest 재사용) 사용자가
    원하면 실시간 API 검색으로 더 찾아볼 수 있게 한다 - 새 렌더링 코드를
    따로 만들지 않고 기존에 검증된 두 경로만 재사용해 위험을 줄였다. */
-function pMatchLocalByName(sciNameRaw){
+function pMatchLocalByName(sciNameRaw,pct){
   var key=cleanSciName(sciNameRaw);
   if(!key)return null;
   var sp=STATIC_SPECIES[key],nm=STATIC_NAME[key];
   if(!sp&&!nm)return null;
   var korNm=(sp&&sp.kn)||(nm&&nm.kn)||key;
   var fam=(nm&&nm.family)||'';
-  return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',_uid:++pCardUid};
+  return {nm:korNm,sc:key,fam:fam,no:'',specsId:'',origin:'static',pct:(pct==null?null:pct),_uid:++pCardUid};
 }
 window.pPhotoTrigger=function(){
   var el=document.getElementById('pphotoinput');
   if(el)el.click();
 };
+/* Pl@ntNet 공식 문서(FAQ)에 따르면 같은 개체의 사진을 여러 장(같은 부위라도,
+   특히 꽃·열매처럼 정보량이 많은 부위 위주로) 함께 보내면 한 장만 보낼 때보다
+   식별 정확도가 뚜렷하게 올라간다. 그래서 파일 입력에 multiple을 허용해
+   갤러리에서 여러 장을 한 번에 고르면 그대로 같은 개체의 사진들로 간주해
+   API 한 번에 함께 보낸다(장당 부위는 auto로 두어 AI가 각각 추정하게 하며,
+   API 제한대로 최대 5장까지만 사용한다). */
 window.pOnPhotoSelected=function(input){
-  var file=input&&input.files&&input.files[0];
-  if(!file)return;
-  pIdentifyPhoto(file);
+  var files=input&&input.files;
+  if(!files||!files.length)return;
+  pIdentifyPhoto(Array.prototype.slice.call(files,0,5));
   input.value=''; /* 같은 사진을 다시 골라도 change 이벤트가 다시 일어나도록 비워둔다 */
 };
-function pIdentifyPhoto(file){
+/* Pl@ntNet이 한 번에 돌려주는 후보를 5개만 보던 것을 10개로 늘려(nb-results),
+   도감에 있지만 순위가 다소 낮게 나온 종까지 매칭 기회를 넓힌다. 동시에
+   점수가 사실상 0에 가까운(1% 미만) 후보는 노이즈로 보고 매칭/추천 어느
+   쪽에도 올리지 않아, "낮은 확신도의 엉뚱한 결과"가 마치 정답처럼 보이는
+   일을 줄인다. 도감에서 찾은 종은 이제 Pl@ntNet 점수(유사도)를 배지로
+   함께 보여줘 사용자가 그 결과를 어느 정도 신뢰할지 스스로 판단할 수 있다. */
+var PLANTID_NB_RESULTS=10;
+var PLANTID_MIN_SCORE=0.01;
+function pIdentifyPhoto(files){
   if(!NONGSARO_PROXY){
     showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
     return;
   }
   showLoading();
   var fd=new FormData();
-  fd.append('images',file,file.name||'photo.jpg');
-  fd.append('organs','auto');
-  var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=en';
+  files.forEach(function(file){
+    fd.append('images',file,file.name||'photo.jpg');
+    fd.append('organs','auto');
+  });
+  var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=en&nb-results='+PLANTID_NB_RESULTS;
   fetch(url,{method:'POST',body:fd}).then(function(r){
     return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,body:j};});
   }).then(function(res){
@@ -2017,14 +2033,15 @@ function pIdentifyPhoto(file){
     }
     staticDataReady.then(function(){
       var matched=[],seen={},suggestions=[];
-      results.slice(0,5).forEach(function(r){
+      results.slice(0,PLANTID_NB_RESULTS).forEach(function(r){
+        if((r.score||0)<PLANTID_MIN_SCORE)return; /* 사실상 0에 가까운 점수는 노이즈로 취급 */
         var sci=r.species&&r.species.scientificNameWithoutAuthor;
         if(!sci)return;
         var key=cleanSciName(sci).toLowerCase();
         if(!key||seen[key])return;
         seen[key]=true;
         var pct=Math.round((r.score||0)*100);
-        var hit=pMatchLocalByName(sci);
+        var hit=pMatchLocalByName(sci,pct);
         if(hit){
           matched.push(hit);
         } else {
@@ -2032,6 +2049,7 @@ function pIdentifyPhoto(file){
           suggestions.push({term:commonNm,sci:sci,pct:pct});
         }
       });
+      matched.sort(function(a,b){return(b.pct||0)-(a.pct||0);}); /* 도감 매칭종은 항상 유사도 높은 순으로 */
       hideLoading();hideAll();
       pQ='';pUpdateClearBtn();
       var noteEl=document.getElementById('pnote'),suggEl=document.getElementById('psugg');
@@ -2044,7 +2062,7 @@ function pIdentifyPhoto(file){
         suggEl.style.display='none';
       }
       if(matched.length){
-        noteEl.textContent='사진 인식 결과입니다. 촬영 각도·초점에 따라 정확도가 달라질 수 있어요.';
+        noteEl.textContent='사진 인식 결과입니다(각 카드의 "유사도"는 Pl@ntNet의 인식 확신도). 여러 각도(특히 꽃·열매)의 사진을 함께 올리면 더 정확해져요.';
         noteEl.style.display='block';
         pAll=matched;pShown=0;
         renderPage();
@@ -2434,6 +2452,12 @@ var BADGE_LABEL={spclt:'특산식물',rare:'적색식물',naturalized:'외래식
 function badgeFor(it){
   if(it.no)return'';
   if(it.specsId)return'<span class="pc-tag">표본</span>';
+  /* 사진으로 식물 찾기 결과에만 pct(Pl@ntNet 유사도)가 채워진다 - 어떤 origin이든
+     이 배지를 최우선으로 보여줘, 결과가 어느 정도 확신도로 나온 것인지 사용자가
+     바로 알 수 있게 한다("정확도를 최대한 높여달라"는 요청 대응: 매칭 자체의
+     정확도뿐 아니라, 낮은 확신도 결과를 마치 확실한 정답처럼 보여주지 않는
+     투명성도 정확도의 일부로 본다). */
+  if(it.pct!=null)return'<span class="pc-tag">사진 인식 · 유사도 '+it.pct+'%</span>';
   if(BADGE_LABEL[it.origin])return '<span class="pc-tag">'+BADGE_LABEL[it.origin]+'</span>';
   if(it.origin==='inat')return'<span class="pc-tag">생물다양성DB</span>';
   if(it.origin==='static')return'<span class="pc-tag">정원 정보</span>';
