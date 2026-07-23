@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MAGAZINE GREEN · 글 등록 도구 (관리자 전용)</title>
+<style>
+  :root{
+    --green:#1B4D3E;
+    --ink:#121212;
+    --gray:#787878;
+    --line:#E6E6E6;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:'Pretendard','Apple SD Gothic Neo',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:#FAFAFA;
+    color:var(--ink);
+    padding:32px 16px 96px;
+    line-height:1.6;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:680px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--green);font-weight:700;margin:0 0 8px}
+  h1{font-size:24px;margin:0 0 6px;letter-spacing:-.3px}
+  .sub{color:var(--gray);font-size:14px;margin:0 0 28px}
+  form{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px}
+  @media (min-width:600px){ form{padding:32px} body{padding:48px 20px 96px} }
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+  .hint{font-size:12px;color:var(--gray);margin:-4px 0 10px;line-height:1.5}
+  input[type=text],input[type=password]{
+    width:100%;padding:14px;border:1.5px solid var(--line);border-radius:8px;
+    font-size:16px;font-family:inherit;margin-bottom:22px;color:var(--ink);background:#fff;
+  }
+  input:focus{outline:none;border-color:var(--green)}
+  input[type=file]{
+    width:100%;padding:14px;border:1.5px dashed var(--line);border-radius:8px;
+    margin-bottom:8px;font-size:13px;background:#FAFAFA;
+  }
+  #preview{display:none;margin:12px 0 22px;max-width:100%;max-height:280px;border-radius:8px;object-fit:cover}
+  button{
+    width:100%;padding:16px;background:var(--green);color:#fff;border:none;border-radius:8px;
+    font-size:15px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:opacity .2s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:hover{opacity:.9}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #status{margin-top:18px;font-size:13px;padding:14px 16px;border-radius:8px;display:none;line-height:1.6}
+  #status.ok{display:block;background:#E9F5EF;color:#11845B;border:1px solid #B9D6C2}
+  #status.err{display:block;background:#FFEFF0;color:#DC2B2B;border:1px solid #FFBEC2}
+  #status a{color:inherit;font-weight:700;text-decoration:underline}
+  .config-warning{
+    display:none;background:#FFF7E6;border:1px solid #FFE1A8;color:#8a5a00;
+    padding:14px 16px;border-radius:8px;font-size:13px;margin-bottom:24px;line-height:1.6;
+  }
+
+  /* ---- 리치 텍스트 에디터 ---- */
+  .editor-wrap{border:1.5px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:2px;padding:6px;background:#F3F3F1;
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;
+  }
+  .toolbar button{
+    all:unset;width:auto;min-width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700;color:var(--ink);border-radius:6px;cursor:pointer;padding:0 8px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .toolbar button:hover{background:#E6E6E4}
+  .toolbar button:active{background:#DADAD8}
+  .toolbar button.i{font-style:italic}
+  .toolbar .sep{width:1px;background:var(--line);margin:6px 4px;flex:none}
+  #editor{
+    min-height:260px;max-height:520px;overflow-y:auto;padding:16px;font-size:16px;
+    line-height:1.75;background:#fff;-webkit-user-select:text;
+  }
+  #editor:focus{outline:none}
+  #editor p{margin:0 0 1em}
+  #editor h2{font-size:20px;margin:1.2em 0 .5em;font-weight:700}
+  #editor h3{font-size:17px;margin:1.1em 0 .4em;font-weight:700}
+  #editor blockquote{margin:1em 0;padding:.4em 1em;border-left:3px solid var(--green);color:var(--gray)}
+  #editor img{max-width:100%;border-radius:6px;display:block;margin:1em 0}
+  #editor iframe{max-width:100%;border-radius:6px;display:block;margin:1em 0}
+  #editor ul,#editor ol{margin:0 0 1em;padding-left:1.4em}
+  #editor:empty:before{content:attr(data-placeholder);color:#B3B3B3}
+  .video-embed{position:relative;width:100%;padding-top:56.25%;margin:1em 0;background:#000;border-radius:6px;overflow:hidden}
+  .video-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;margin:0;border:0;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Admin Only</p>
+  <h1>MAGAZINE GREEN 글 등록 도구</h1>
+  <p class="sub">텍스트와 사진(+동영상)을 올리면 Webflow의 Blog Posts 컬렉션에 자동으로 글이 등록되고, 곧바로 사이트에 게시됩니다. 모바일에서도 그대로 사용할 수 있어요.</p>
+
+  <div id="configWarning" class="config-warning">
+    ⚠ 이 페이지 상단의 <code>WORKER_URL</code> 값이 아직 설정되지 않았습니다.
+    cms-submit-worker.js를 Cloudflare Workers에 배포한 뒤, 그 주소를 이 파일의
+    <code>WORKER_URL</code>에 붙여넣어 주세요.
+  </div>
+
+  <form id="cmsForm">
+    <label for="title">제목</label>
+    <input type="text" id="title" name="title" placeholder="예: 가을 정원을 준비하는 다섯 가지 방법" required>
+
+    <label for="editor">본문</label>
+    <div class="hint">
+      굵게·기울임·제목·인용·목록으로 서식을 지정할 수 있고, 사진 🖼과 유튜브/비메오 동영상 🎬을 원하는 위치에 바로 삽입할 수 있어요.
+      카드·상세페이지용 요약문 4종은 Claude가 30년차 매거진 카피라이터의 톤으로 새로 작성하며, Webflow 필드별 글자수 한도(120/101/78/190자)를 넘지 않도록 자동으로 맞춰집니다.
+    </div>
+    <div class="editor-wrap">
+      <div class="toolbar" id="toolbar">
+        <button type="button" data-cmd="bold" title="굵게"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="기울임"><span class="i">I</span></button>
+        <div class="sep"></div>
+        <button type="button" data-cmd="formatBlock" data-val="H2" title="큰 제목">H2</button>
+        <button type="button" data-cmd="formatBlock" data-val="H3" title="작은 제목">H3</button>
+        <button type="button" data-cmd="formatBlock" data-val="P" title="본문">P</button>
+        <div class="sep"></div>
+        <button type="button" data-cmd="insertUnorderedList" title="목록">•≡</button>
+        <button type="button" data-cmd="formatBlock" data-val="BLOCKQUOTE" title="인용">" "</button>
+        <div class="sep"></div>
+        <button type="button" id="insertImageBtn" title="사진 삽입">🖼</button>
+        <button type="button" id="insertVideoBtn" title="동영상 삽입(유튜브/비메오)">🎬</button>
+      </div>
+      <div id="editor" contenteditable="true" data-placeholder="본문 내용을 입력하세요..."></div>
+    </div>
+    <input type="file" id="inlineImageInput" accept="image/*" capture="environment" style="display:none">
+    <div class="hint" id="uploadHint" style="display:none">사진 업로드 중...</div>
+
+    <label for="photo" style="margin-top:22px">대표 사진</label>
+    <div class="hint">이 사진이 목록 카드와 상세 페이지 상단 이미지로 함께 사용됩니다.</div>
+    <input type="file" id="photo" name="photo" accept="image/*" capture="environment" required>
+    <img id="preview" alt="미리보기">
+
+    <label for="relatedPlants">관련 식물명 (선택)</label>
+    <div class="hint">쉼표로 구분해서 입력하면 식물도감 카드가 글에 자동으로 연결됩니다. 예: 맥문동, 산수국</div>
+    <input type="text" id="relatedPlants" name="relatedPlants" placeholder="예: 맥문동, 산수국">
+
+    <label for="adminKey">관리자 키</label>
+    <div class="hint">Cloudflare Worker에 설정한 ADMIN_KEY 값을 입력하세요.</div>
+    <input type="password" id="adminKey" name="adminKey" required>
+
+    <button type="submit" id="submitBtn">등록하고 게시하기</button>
+    <div id="status"></div>
+  </form>
+</div>
+
+<script>
+// Cloudflare Worker 배포 후 이 값을 그 주소로 바꿔주세요. 예: https://cms-submit.yourname.workers.dev
+const WORKER_URL = "";
+
+const cfgWarn = document.getElementById('configWarning');
+if (!WORKER_URL) cfgWarn.style.display = 'block';
+
+const photoInput = document.getElementById('photo');
+const preview = document.getElementById('preview');
+photoInput.addEventListener('change', function () {
+  const f = photoInput.files[0];
+  if (!f) { preview.style.display = 'none'; return; }
+  preview.src = URL.createObjectURL(f);
+  preview.style.display = 'block';
+});
+
+/* ---------- 리치 텍스트 툴바 ---------- */
+const editor = document.getElementById('editor');
+
+document.getElementById('toolbar').addEventListener('click', function (e) {
+  const btn = e.target.closest('button[data-cmd]');
+  if (!btn) return;
+  editor.focus();
+  const cmd = btn.dataset.cmd;
+  const val = btn.dataset.val || null;
+  document.execCommand(cmd, false, val);
+});
+
+/* 커서 위치(Range) 기억: 파일 선택창이 뜨는 동안 포커스가 빠지므로 미리 저장해둔다 */
+let savedRange = null;
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+    savedRange = sel.getRangeAt(0).cloneRange();
+  }
+}
+function restoreSelection() {
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  if (savedRange) {
+    sel.addRange(savedRange);
+  } else {
+    const r = document.createRange();
+    r.selectNodeContents(editor);
+    r.collapse(false);
+    sel.addRange(r);
+  }
+}
+editor.addEventListener('keyup', saveSelection);
+editor.addEventListener('mouseup', saveSelection);
+editor.addEventListener('blur', saveSelection);
+
+function insertNodeAtSelection(node) {
+  editor.focus();
+  restoreSelection();
+  const sel = window.getSelection();
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.setEndAfter(node);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  saveSelection();
+}
+
+/* ---------- 사진 삽입 (본문 중간) ---------- */
+const inlineImageInput = document.getElementById('inlineImageInput');
+const uploadHint = document.getElementById('uploadHint');
+
+document.getElementById('insertImageBtn').addEventListener('click', function () {
+  if (!WORKER_URL) { alert('WORKER_URL이 설정되지 않았습니다.'); return; }
+  saveSelection();
+  inlineImageInput.value = '';
+  inlineImageInput.click();
+});
+
+inlineImageInput.addEventListener('change', async function () {
+  const f = inlineImageInput.files[0];
+  if (!f) return;
+  const adminKey = document.getElementById('adminKey').value;
+  if (!adminKey) { alert('사진을 올리려면 먼저 관리자 키를 입력해주세요.'); return; }
+
+  uploadHint.style.display = 'block';
+  try {
+    const fd = new FormData();
+    fd.append('action', 'upload');
+    fd.append('adminKey', adminKey);
+    fd.append('photo', f);
+    const res = await fetch(WORKER_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || ('업로드 실패 (' + res.status + ')'));
+
+    const img = document.createElement('img');
+    img.src = data.url;
+    insertNodeAtSelection(img);
+  } catch (err) {
+    alert('사진 삽입 실패: ' + err.message);
+  } finally {
+    uploadHint.style.display = 'none';
+  }
+});
+
+/* ---------- 동영상 삽입 (유튜브 / 비메오) ---------- */
+function toEmbedUrl(url) {
+  try {
+    const u = new URL(url.trim());
+    if (u.hostname.includes('youtu.be')) {
+      return 'https://www.youtube.com/embed/' + u.pathname.slice(1);
+    }
+    if (u.hostname.includes('youtube.com')) {
+      const id = u.searchParams.get('v');
+      if (id) return 'https://www.youtube.com/embed/' + id;
+      if (u.pathname.startsWith('/embed/')) return url.trim();
+    }
+    if (u.hostname.includes('vimeo.com')) {
+      const id = u.pathname.split('/').filter(Boolean).pop();
+      if (id) return 'https://player.vimeo.com/video/' + id;
+    }
+  } catch (e) { /* fallthrough */ }
+  return null;
+}
+
+document.getElementById('insertVideoBtn').addEventListener('click', function () {
+  saveSelection();
+  const url = prompt('유튜브 또는 비메오 영상 주소를 붙여넣어 주세요.\n예: https://www.youtube.com/watch?v=xxxx');
+  if (!url) return;
+  const embed = toEmbedUrl(url);
+  if (!embed) { alert('유튜브 또는 비메오 주소만 지원합니다.'); return; }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'video-embed';
+  wrap.contentEditable = 'false';
+  const iframe = document.createElement('iframe');
+  iframe.src = embed;
+  iframe.setAttribute('allowfullscreen', '');
+  iframe.setAttribute('frameborder', '0');
+  wrap.appendChild(iframe);
+  insertNodeAtSelection(wrap);
+});
+
+/* ---------- 제출 ---------- */
+document.getElementById('cmsForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const statusEl = document.getElementById('status');
+  const btn = document.getElementById('submitBtn');
+  statusEl.className = '';
+  statusEl.style.display = 'none';
+
+  if (!WORKER_URL) {
+    statusEl.className = 'err';
+    statusEl.textContent = 'WORKER_URL이 설정되지 않아 전송할 수 없습니다. 파일 상단을 확인해주세요.';
+    return;
+  }
+
+  const bodyHtml = editor.innerHTML.trim();
+  if (!bodyHtml || editor.textContent.trim().length === 0) {
+    statusEl.className = 'err';
+    statusEl.textContent = '본문을 입력해주세요.';
+    return;
+  }
+
+  const fd = new FormData(e.target);
+  fd.set('body', bodyHtml);
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+
+  try {
+    const res = await fetch(WORKER_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || ('서버 오류 (' + res.status + ')'));
+
+    statusEl.className = 'ok';
+    statusEl.innerHTML = '등록 완료! "' + data.title + '" 글이 게시되었습니다. ' +
+      '<a href="https://www.magazinegreen.co.kr/blog-pages/blog-v3" target="_blank">에디션 페이지에서 확인하기 →</a>';
+    e.target.reset();
+    editor.innerHTML = '';
+    preview.style.display = 'none';
+  } catch (err) {
+    statusEl.className = 'err';
+    statusEl.textContent = '등록 실패: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '등록하고 게시하기';
+  }
+});
+</script>
+</body>
+</html>
