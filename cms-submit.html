@@ -177,6 +177,8 @@
       굵게·기울임·제목·인용·목록·글자 색상으로 서식을 지정할 수 있고, 사진 🖼과 유튜브/비메오 동영상 🎬을 원하는 위치에 바로 삽입할 수 있어요.
       카드·상세페이지용 요약문 4종은 Claude가 30년차 매거진 카피라이터의 톤으로 새로 작성하며, Webflow 필드별 글자수 한도(120/101/78/190자)를 넘지 않도록 자동으로 맞춰집니다.
     </div>
+    <button type="button" id="diagBtn" style="all:unset;cursor:pointer;color:var(--green);font-size:12px;font-weight:700;text-decoration:underline;margin:-6px 0 16px;display:inline-block">AI 요약 상태 확인</button>
+    <div id="diagResult" style="display:none;font-size:12px;margin:-10px 0 16px;line-height:1.6;padding:10px 12px;border-radius:6px"></div>
     <div class="editor-wrap">
       <div class="toolbar" id="toolbar">
         <button type="button" data-cmd="bold" title="굵게"><b>B</b></button>
@@ -529,6 +531,38 @@ document.getElementById('insertVideoBtn').addEventListener('click', function () 
   iframe.setAttribute('frameborder', '0');
   wrap.appendChild(iframe);
   insertNodeAtSelection(wrap);
+});
+
+/* ---------- AI 요약 상태 확인(진단) ---------- */
+document.getElementById('diagBtn').addEventListener('click', async function () {
+  const btn = this;
+  const out = document.getElementById('diagResult');
+  out.style.display = 'block';
+  out.style.background = '#F3F3F1';
+  out.style.color = 'var(--gray)';
+  out.textContent = '확인 중...';
+  btn.style.pointerEvents = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('action', 'diag');
+    const res = await fetch(WORKER_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.aiUsed) {
+      out.style.background = '#E9F5EF';
+      out.style.color = '#11845B';
+      out.textContent = '✅ AI 요약 정상 작동 중 (키 설정됨: ' + data.hasKey + ')';
+    } else {
+      out.style.background = '#FFEFF0';
+      out.style.color = '#DC2B2B';
+      out.textContent = '❌ AI 요약 실패 — 키 설정됨: ' + data.hasKey + ' / 원인: ' + data.aiError;
+    }
+  } catch (err) {
+    out.style.background = '#FFEFF0';
+    out.style.color = '#DC2B2B';
+    out.textContent = '진단 요청 자체가 실패했습니다: ' + err.message;
+  } finally {
+    btn.style.pointerEvents = 'auto';
+  }
 });
 
 /* ---------- 제출 ---------- */
