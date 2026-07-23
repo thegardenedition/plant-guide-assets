@@ -54,6 +54,11 @@
     display:none;background:#FFF7E6;border:1px solid #FFE1A8;color:#8a5a00;
     padding:14px 16px;border-radius:8px;font-size:13px;margin-bottom:24px;line-height:1.6;
   }
+  .remember-row{
+    display:flex;align-items:center;gap:8px;font-weight:400;font-size:13px;color:var(--gray);
+    margin:-12px 0 22px;cursor:pointer;
+  }
+  .remember-row input[type=checkbox]{width:18px;height:18px;margin:0;flex:none;accent-color:var(--green)}
 
   /* ---- 리치 텍스트 에디터 ---- */
   .editor-wrap{border:1.5px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
@@ -138,8 +143,12 @@
     <input type="text" id="relatedPlants" name="relatedPlants" placeholder="예: 맥문동, 산수국">
 
     <label for="adminKey">관리자 키</label>
-    <div class="hint">Cloudflare Worker에 설정한 ADMIN_KEY 값을 입력하세요.</div>
+    <div class="hint">Cloudflare Worker에 설정한 ADMIN_KEY 값을 입력하세요. "이 기기에 저장"을 체크하면 다음부터는 이 브라우저에서 자동으로 입력됩니다(다른 사람과 기기를 공유한다면 체크하지 마세요).</div>
     <input type="password" id="adminKey" name="adminKey" required>
+    <label class="remember-row" for="rememberKey">
+      <input type="checkbox" id="rememberKey">
+      <span>이 기기에 저장해서 다음부터 자동 입력</span>
+    </label>
 
     <button type="submit" id="submitBtn">등록하고 게시하기</button>
     <div id="status"></div>
@@ -152,6 +161,34 @@ const WORKER_URL = "";
 
 const cfgWarn = document.getElementById('configWarning');
 if (!WORKER_URL) cfgWarn.style.display = 'block';
+
+/* ---------- 관리자 키 기억하기 (이 브라우저에만 저장, 서버로는 전송되지 않음) ---------- */
+const ADMIN_KEY_STORAGE = 'mg_cms_admin_key';
+const adminKeyInput = document.getElementById('adminKey');
+const rememberKeyBox = document.getElementById('rememberKey');
+
+function restoreAdminKey() {
+  try {
+    const saved = localStorage.getItem(ADMIN_KEY_STORAGE);
+    if (saved) {
+      adminKeyInput.value = saved;
+      rememberKeyBox.checked = true;
+    }
+  } catch (e) { /* localStorage 사용 불가 환경이면 그냥 매번 입력 */ }
+}
+restoreAdminKey();
+
+function syncAdminKeyStorage() {
+  try {
+    if (rememberKeyBox.checked && adminKeyInput.value) {
+      localStorage.setItem(ADMIN_KEY_STORAGE, adminKeyInput.value);
+    } else {
+      localStorage.removeItem(ADMIN_KEY_STORAGE);
+    }
+  } catch (e) { /* 무시 */ }
+}
+adminKeyInput.addEventListener('input', syncAdminKeyStorage);
+rememberKeyBox.addEventListener('change', syncAdminKeyStorage);
 
 const photoInput = document.getElementById('photo');
 const preview = document.getElementById('preview');
@@ -324,6 +361,7 @@ document.getElementById('cmsForm').addEventListener('submit', async function (e)
     e.target.reset();
     editor.innerHTML = '';
     preview.style.display = 'none';
+    restoreAdminKey();
   } catch (err) {
     statusEl.className = 'err';
     statusEl.textContent = '등록 실패: ' + err.message;
