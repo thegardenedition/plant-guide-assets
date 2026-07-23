@@ -215,7 +215,7 @@ document.getElementById('lockForm').addEventListener('submit', function (e) {
 });
 
 // Cloudflare Worker 배포 후 이 값을 그 주소로 바꿔주세요. 예: https://cms-submit.yourname.workers.dev
-const WORKER_URL = "";
+const WORKER_URL = "https://cms-submit-worker.chgreena.workers.dev/";
 
 const cfgWarn = document.getElementById('configWarning');
 if (!WORKER_URL) cfgWarn.style.display = 'block';
