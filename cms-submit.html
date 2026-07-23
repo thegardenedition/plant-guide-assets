@@ -38,7 +38,6 @@
     width:100%;padding:14px;border:1.5px dashed var(--line);border-radius:8px;
     margin-bottom:8px;font-size:13px;background:#FAFAFA;
   }
-  #preview{display:none;margin:12px 0 22px;max-width:100%;max-height:280px;border-radius:8px;object-fit:cover}
   button{
     width:100%;padding:16px;background:var(--green);color:#fff;border:none;border-radius:8px;
     font-size:15px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:opacity .2s;
@@ -60,6 +59,34 @@
   }
   .remember-row input[type=checkbox]{width:18px;height:18px;margin:0;flex:none;accent-color:var(--green)}
 
+  select{
+    width:100%;padding:14px;border:1.5px solid var(--line);border-radius:8px;
+    font-size:16px;font-family:inherit;margin-bottom:22px;color:var(--ink);background:#fff;
+    appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='9'><path d='M1 1l6 6 6-6' stroke='%23787878' stroke-width='1.6' fill='none'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  select:focus{outline:none;border-color:var(--green)}
+
+  .toggle-group{border:1.5px solid var(--line);border-radius:8px;padding:2px 14px;margin-bottom:22px}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line)}
+  .toggle-row:last-child{border-bottom:none}
+  .toggle-row span{font-size:14px;font-weight:600}
+  .switch{position:relative;display:inline-block;width:44px;height:26px;flex:none}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .switch .slider{position:absolute;inset:0;background:#D9D9D9;border-radius:999px;transition:.2s;cursor:pointer}
+  .switch .slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch input:checked + .slider{background:var(--green)}
+  .switch input:checked + .slider:before{transform:translateX(18px)}
+
+  .photo-previews{display:flex;gap:12px;margin:2px 0 22px}
+  .photo-previews > div{flex:1;min-width:0}
+  .photo-previews .cap{font-size:11px;color:var(--gray);margin:0 0 6px}
+  .photo-previews img{display:none;width:100%;border-radius:8px;object-fit:cover;background:#F3F3F1}
+  #previewFeatured{aspect-ratio:1238/444}
+  #previewThumb{aspect-ratio:390/440}
+  .photo-previews .thumb-col{max-width:120px}
+
   /* ---- 리치 텍스트 에디터 ---- */
   .editor-wrap{border:1.5px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
   .toolbar{
@@ -75,6 +102,12 @@
   .toolbar button:active{background:#DADAD8}
   .toolbar button.i{font-style:italic}
   .toolbar .sep{width:1px;background:var(--line);margin:6px 4px;flex:none}
+  .toolbar input[type=color]{
+    -webkit-appearance:none;appearance:none;width:38px;height:38px;padding:0;border:none;
+    border-radius:6px;cursor:pointer;background:transparent;
+  }
+  .toolbar input[type=color]::-webkit-color-swatch-wrapper{padding:6px}
+  .toolbar input[type=color]::-webkit-color-swatch{border:1px solid var(--line);border-radius:4px}
   #editor{
     min-height:260px;max-height:520px;overflow-y:auto;padding:16px;font-size:16px;
     line-height:1.75;background:#fff;-webkit-user-select:text;
@@ -141,7 +174,7 @@
 
     <label for="editor">본문</label>
     <div class="hint">
-      굵게·기울임·제목·인용·목록으로 서식을 지정할 수 있고, 사진 🖼과 유튜브/비메오 동영상 🎬을 원하는 위치에 바로 삽입할 수 있어요.
+      굵게·기울임·제목·인용·목록·글자 색상으로 서식을 지정할 수 있고, 사진 🖼과 유튜브/비메오 동영상 🎬을 원하는 위치에 바로 삽입할 수 있어요.
       카드·상세페이지용 요약문 4종은 Claude가 30년차 매거진 카피라이터의 톤으로 새로 작성하며, Webflow 필드별 글자수 한도(120/101/78/190자)를 넘지 않도록 자동으로 맞춰집니다.
     </div>
     <div class="editor-wrap">
@@ -158,6 +191,8 @@
         <div class="sep"></div>
         <button type="button" id="insertImageBtn" title="사진 삽입">🖼</button>
         <button type="button" id="insertVideoBtn" title="동영상 삽입(유튜브/비메오)">🎬</button>
+        <div class="sep"></div>
+        <input type="color" id="textColor" title="글자 색상" value="#1B4D3E">
       </div>
       <div id="editor" contenteditable="true" data-placeholder="본문 내용을 입력하세요..."></div>
     </div>
@@ -165,9 +200,52 @@
     <div class="hint" id="uploadHint" style="display:none">사진 업로드 중...</div>
 
     <label for="photo" style="margin-top:22px">대표 사진</label>
-    <div class="hint">이 사진이 목록 카드와 상세 페이지 상단 이미지로 함께 사용됩니다.</div>
+    <div class="hint">사진 한 장을 올리면 배너용 비율(가로로 넓게)과 카드용 비율(정사각에 가깝게)로 각각 중앙 기준 자동 트리밍되어 미리보기에 나타납니다. 비율만 맞추고 확대·축소는 하지 않습니다.</div>
     <input type="file" id="photo" name="photo" accept="image/*" capture="environment" required>
-    <img id="preview" alt="미리보기">
+    <div class="hint" id="cropHint" style="display:none">사진 처리 중...</div>
+    <div class="photo-previews">
+      <div>
+        <p class="cap">배너용 미리보기</p>
+        <img id="previewFeatured" alt="배너용 미리보기">
+      </div>
+      <div class="thumb-col">
+        <p class="cap">카드용 미리보기</p>
+        <img id="previewThumb" alt="카드용 미리보기">
+      </div>
+    </div>
+
+    <label for="category">카테고리 (선택)</label>
+    <div class="hint">글에 맞는 분류를 선택하세요.</div>
+    <select id="category" name="category">
+      <option value="">선택 안 함</option>
+      <option value="6a432a076c02206e6cb02502">PEOPLE</option>
+      <option value="6a432a076c02206e6cb02503">GARDENS</option>
+      <option value="6a432a076c02206e6cb02505">JOURNAL</option>
+      <option value="6a432a076c02206e6cb02504">BRAND</option>
+      <option value="6a5ddae5d53727dee378d73d">LENS</option>
+      <option value="6a5ddbeb2d8992befe2e2943">정책</option>
+      <option value="6a5ddbeb2d8992befe2e2945">산업</option>
+      <option value="6a5ddbeb2d8992befe2e2947">행사</option>
+      <option value="6a5ddbeb2d8992befe2e2949">연구</option>
+      <option value="6a5ddbeb2d8992befe2e294b">동정</option>
+    </select>
+
+    <label>노출 옵션 (선택)</label>
+    <div class="hint">이 글을 어디에 강조해서 보여줄지 선택하세요.</div>
+    <div class="toggle-group">
+      <div class="toggle-row">
+        <span>대표 글로 노출 (Featured)</span>
+        <label class="switch"><input type="checkbox" id="isFeatured"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>인기 글로 노출 (Popular)</span>
+        <label class="switch"><input type="checkbox" id="isPopular"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>지금 뜨는 글로 노출 (Trending)</span>
+        <label class="switch"><input type="checkbox" id="isTrending"><span class="slider"></span></label>
+      </div>
+    </div>
 
     <label for="relatedPlants">관련 식물명 (선택)</label>
     <div class="hint">쉼표로 구분해서 입력하면 식물도감 카드가 글에 자동으로 연결됩니다. 예: 맥문동, 산수국</div>
@@ -248,13 +326,84 @@ function syncAdminKeyStorage() {
 adminKeyInput.addEventListener('input', syncAdminKeyStorage);
 rememberKeyBox.addEventListener('change', syncAdminKeyStorage);
 
+/* ---------- 대표 사진: 배너/카드 비율로 각각 중앙 기준 자동 트리밍 ---------- */
+/* 실제 사이트에서 쓰이는 비율을 그대로 반영 (배너 1238x444, 카드 390x440) */
+const FEATURED_RATIO = 1238 / 444;
+const THUMB_RATIO = 390 / 440;
+
+function cropCenterToBlob(file, ratio, maxWidth) {
+  return new Promise(function (resolve, reject) {
+    const img = new Image();
+    img.onload = function () {
+      let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      const srcRatio = sw / sh;
+      if (srcRatio > ratio) {
+        sw = sh * ratio;
+        sx = (img.width - sw) / 2;
+      } else {
+        sh = sw / ratio;
+        sy = (img.height - sh) / 2;
+      }
+      const outW = Math.min(maxWidth, Math.round(sw));
+      const outH = Math.round(outW / ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+      canvas.toBlob(function (blob) {
+        URL.revokeObjectURL(img.src);
+        if (blob) resolve(blob); else reject(new Error('이미지 처리에 실패했습니다.'));
+      }, 'image/jpeg', 0.87);
+    };
+    img.onerror = function () { reject(new Error('사진을 불러올 수 없습니다.')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 const photoInput = document.getElementById('photo');
-const preview = document.getElementById('preview');
+const previewFeatured = document.getElementById('previewFeatured');
+const previewThumb = document.getElementById('previewThumb');
+const cropHint = document.getElementById('cropHint');
+let featuredBlob = null;
+let thumbBlob = null;
+let cropPromise = Promise.resolve();
+
 photoInput.addEventListener('change', function () {
   const f = photoInput.files[0];
-  if (!f) { preview.style.display = 'none'; return; }
-  preview.src = URL.createObjectURL(f);
-  preview.style.display = 'block';
+  if (!f) {
+    previewFeatured.style.display = 'none';
+    previewThumb.style.display = 'none';
+    featuredBlob = null;
+    thumbBlob = null;
+    return;
+  }
+  cropHint.style.display = 'block';
+  cropPromise = Promise.all([
+    cropCenterToBlob(f, FEATURED_RATIO, 1600),
+    cropCenterToBlob(f, THUMB_RATIO, 900),
+  ]).then(function (results) {
+    featuredBlob = results[0];
+    thumbBlob = results[1];
+    previewFeatured.src = URL.createObjectURL(featuredBlob);
+    previewThumb.src = URL.createObjectURL(thumbBlob);
+    previewFeatured.style.display = 'block';
+    previewThumb.style.display = 'block';
+  }).catch(function (err) {
+    alert('사진 처리 실패: ' + err.message);
+    featuredBlob = null;
+    thumbBlob = null;
+  }).finally(function () {
+    cropHint.style.display = 'none';
+  });
+});
+
+/* ---------- 글자 색상 ---------- */
+document.getElementById('textColor').addEventListener('input', function (e) {
+  editor.focus();
+  restoreSelection();
+  document.execCommand('foreColor', false, e.target.value);
+  saveSelection();
 });
 
 /* ---------- 리치 텍스트 툴바 ---------- */
@@ -403,9 +552,25 @@ document.getElementById('cmsForm').addEventListener('submit', async function (e)
     return;
   }
 
+  btn.disabled = true;
+  btn.textContent = '사진 처리 중...';
+  await cropPromise;
+  if (!featuredBlob || !thumbBlob) {
+    statusEl.className = 'err';
+    statusEl.textContent = '대표 사진 처리에 실패했습니다. 사진을 다시 선택해주세요.';
+    btn.disabled = false;
+    btn.textContent = '등록하고 게시하기';
+    return;
+  }
+
   const fd = new FormData(e.target);
   fd.set('body', bodyHtml);
-  btn.disabled = true;
+  fd.delete('photo');
+  fd.set('photoFeatured', featuredBlob, 'featured.jpg');
+  fd.set('photoThumbnail', thumbBlob, 'thumbnail.jpg');
+  fd.set('isFeatured', document.getElementById('isFeatured').checked ? 'true' : 'false');
+  fd.set('isPopular', document.getElementById('isPopular').checked ? 'true' : 'false');
+  fd.set('isTrending', document.getElementById('isTrending').checked ? 'true' : 'false');
   btn.textContent = '등록 중...';
 
   try {
@@ -415,10 +580,14 @@ document.getElementById('cmsForm').addEventListener('submit', async function (e)
 
     statusEl.className = 'ok';
     statusEl.innerHTML = '등록 완료! "' + data.title + '" 글이 게시되었습니다. ' +
-      '<a href="https://www.magazinegreen.co.kr/blog-pages/blog-v3" target="_blank">에디션 페이지에서 확인하기 →</a>';
+      '<a href="https://www.magazinegreen.co.kr/blog-pages/blog-v3" target="_blank">에디션 페이지에서 확인하기 →</a>' +
+      (data.summaryNote ? '<br><span style="opacity:.75">⚠ ' + data.summaryNote + '</span>' : '');
     e.target.reset();
     editor.innerHTML = '';
-    preview.style.display = 'none';
+    previewFeatured.style.display = 'none';
+    previewThumb.style.display = 'none';
+    featuredBlob = null;
+    thumbBlob = null;
     restoreAdminKey();
   } catch (err) {
     statusEl.className = 'err';
