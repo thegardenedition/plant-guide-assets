@@ -84,8 +84,7 @@
   .photo-previews .cap{font-size:11px;color:var(--gray);margin:0 0 6px}
   .photo-previews img{display:none;width:100%;border-radius:8px;object-fit:cover;background:#F3F3F1}
   #previewFeatured{aspect-ratio:1238/444}
-  #previewThumb{aspect-ratio:390/440}
-  .photo-previews .thumb-col{max-width:120px}
+  #previewThumb{aspect-ratio:390/260}
 
   /* ---- 리치 텍스트 에디터 ---- */
   .editor-wrap{border:1.5px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
@@ -202,7 +201,7 @@
     <div class="hint" id="uploadHint" style="display:none">사진 업로드 중...</div>
 
     <label for="photo" style="margin-top:22px">대표 사진</label>
-    <div class="hint">사진 한 장을 올리면 배너용 비율(가로로 넓게)과 카드용 비율(정사각에 가깝게)로 각각 중앙 기준 자동 트리밍되어 미리보기에 나타납니다. 비율만 맞추고 확대·축소는 하지 않습니다.</div>
+    <div class="hint">사진 한 장을 올리면 배너용 비율(2.79:1, 가로로 넓게)과 카드용 비율(3:2, 가로형)로 각각 중앙 기준 자동 트리밍되어 미리보기에 나타납니다. 비율만 맞추고 확대·축소는 하지 않습니다.</div>
     <input type="file" id="photo" name="photo" accept="image/*" capture="environment" required>
     <div class="hint" id="cropHint" style="display:none">사진 처리 중...</div>
     <div class="photo-previews">
@@ -331,7 +330,7 @@ rememberKeyBox.addEventListener('change', syncAdminKeyStorage);
 /* ---------- 대표 사진: 배너/카드 비율로 각각 중앙 기준 자동 트리밍 ---------- */
 /* 실제 사이트에서 쓰이는 비율을 그대로 반영 (배너 1238x444, 카드 390x440) */
 const FEATURED_RATIO = 1238 / 444;
-const THUMB_RATIO = 390 / 440;
+const THUMB_RATIO = 390 / 260; // 가로형 카드(3:2) - 사진은 대부분 가로가 기본이므로
 
 function cropCenterToBlob(file, ratio, maxWidth) {
   return new Promise(function (resolve, reject) {
