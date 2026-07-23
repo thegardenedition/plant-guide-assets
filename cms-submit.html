@@ -388,7 +388,7 @@ document.getElementById('cmsForm').addEventListener('submit', async function (e)
   const statusEl = document.getElementById('status');
   const btn = document.getElementById('submitBtn');
   statusEl.className = '';
-  statusEl.style.display = 'none';
+  statusEl.removeAttribute('style');
 
   if (!WORKER_URL) {
     statusEl.className = 'err';
