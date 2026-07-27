@@ -2331,9 +2331,7 @@ function pIdentifyPhoto(files){
          배치하고, 도감에서 찾은 카드(origin:'static')는 그 뒤에 둔다. 각
          그룹 안에서는 여전히 Pl@ntNet 유사도(pct) 높은 순으로 정렬한다. */
       matched.sort(function(a,b){
-        var ao=(a.origin==='plantnet')?0:1,bo=(b.origin==='plantnet')?0:1;
-        if(ao!==bo)return ao-bo;
-        return (b.pct||0)-(a.pct||0);
+           return (b.pct||0)-(a.pct||0);
       });
       hideLoading();hideAll();
       pQ='';
