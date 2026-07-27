@@ -2257,11 +2257,53 @@ window.pPhotoTrigger=function(){
    갤러리에서 여러 장을 한 번에 고르면 그대로 같은 개체의 사진들로 간주해
    API 한 번에 함께 보낸다(장당 부위는 auto로 두어 AI가 각각 추정하게 하며,
    API 제한대로 최대 5장까지만 사용한다). */
+/* 휴대폰 카메라 원본은 수 MB~수십 MB에 이르러 업로드/분석 대기 시간이
+   길어지는 주된 원인이다. 캔버스로 긴 변 기준 1280px, JPEG 품질 0.85로
+   축소·재인코딩해 전송 용량을 크게 줄인다(Pl@ntNet 인식에는 이 정도
+   해상도로 충분). 압축 결과가 오히려 더 크거나 실패하면 원본을 그대로
+   사용해 기능이 깨지지 않게 한다. */
+var PLANTID_MAX_DIM=1280;
+var PLANTID_JPEG_QUALITY=0.85;
+function compressImageFile(file,maxDim,quality){
+  return new Promise(function(resolve){
+    if(!file||!/^image\//.test(file.type||'')){resolve(file);return;}
+    var url;
+    try{url=URL.createObjectURL(file);}catch(e){resolve(file);return;}
+    var img=new Image();
+    img.onload=function(){
+      URL.revokeObjectURL(url);
+      var w=img.width,h=img.height;
+      if(!w||!h){resolve(file);return;}
+      var scale=Math.min(1,maxDim/Math.max(w,h));
+      var tw=Math.max(1,Math.round(w*scale)),th=Math.max(1,Math.round(h*scale));
+      try{
+        var canvas=document.createElement('canvas');
+        canvas.width=tw;canvas.height=th;
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,tw,th);
+        canvas.toBlob(function(blob){
+          if(!blob||blob.size>=file.size){resolve(file);return;}
+          var newName=(file.name||'photo.jpg').replace(/\.[^.]+$/,'')+'.jpg';
+          var newFile;
+          try{newFile=new File([blob],newName,{type:'image/jpeg'});}
+          catch(e){newFile=blob;}
+          resolve(newFile);
+        },'image/jpeg',quality);
+      }catch(e){resolve(file);}
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
 window.pOnPhotoSelected=function(input){
   var files=input&&input.files;
   if(!files||!files.length)return;
-  pIdentifyPhoto(Array.prototype.slice.call(files,0,5));
+  var picked=Array.prototype.slice.call(files,0,5);
   input.value=''; /* 같은 사진을 다시 골라도 change 이벤트가 다시 일어나도록 비워둔다 */
+  showLoading(); /* 압축 중에도 바로 로딩 표시를 띄워 사용자가 멈춘 것으로 오해하지 않게 한다 */
+  Promise.all(picked.map(function(f){return compressImageFile(f,PLANTID_MAX_DIM,PLANTID_JPEG_QUALITY);})).then(function(compressed){
+    pIdentifyPhoto(compressed);
+  });
 };
 /* Pl@ntNet이 한 번에 돌려주는 후보를 5개만 보던 것을 10개로 늘려(nb-results),
    도감에 있지만 순위가 다소 낮게 나온 종까지 매칭 기회를 넓힌다. 동시에
@@ -2271,6 +2313,8 @@ window.pOnPhotoSelected=function(input){
    함께 보여줘 사용자가 그 결과를 어느 정도 신뢰할지 스스로 판단할 수 있다. */
 var PLANTID_NB_RESULTS=10;
 var PLANTID_MIN_SCORE=0.01;
+var PLANTID_TIMEOUT=25000; /* 사진 인식 요청이 이 시간(ms) 안에 끝나지 않으면
+   중단하고 안내 메시지를 보여준다(무한 로딩 방지) */
 function pIdentifyPhoto(files){
   if(!NONGSARO_PROXY){
     showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
@@ -2283,7 +2327,11 @@ function pIdentifyPhoto(files){
     fd.append('organs','auto');
   });
   var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=en&nb-results='+PLANTID_NB_RESULTS;
-  fetch(url,{method:'POST',body:fd}).then(function(r){
+  var pidCtrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  var pidTimedOut=false;
+  var pidTimer=pidCtrl?setTimeout(function(){pidTimedOut=true;pidCtrl.abort();},PLANTID_TIMEOUT):null;
+  fetch(url,{method:'POST',body:fd,signal:pidCtrl?pidCtrl.signal:undefined}).then(function(r){
+    if(pidTimer)clearTimeout(pidTimer);
     return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,body:j};});
   }).then(function(res){
     if(!res.ok||!res.body){
@@ -2331,7 +2379,9 @@ function pIdentifyPhoto(files){
          배치하고, 도감에서 찾은 카드(origin:'static')는 그 뒤에 둔다. 각
          그룹 안에서는 여전히 Pl@ntNet 유사도(pct) 높은 순으로 정렬한다. */
       matched.sort(function(a,b){
-           return (b.pct||0)-(a.pct||0);
+        var ao=(a.origin==='plantnet')?0:1,bo=(b.origin==='plantnet')?0:1;
+        if(ao!==bo)return ao-bo;
+        return (b.pct||0)-(a.pct||0);
       });
       hideLoading();hideAll();
       pQ='';
@@ -2359,7 +2409,12 @@ function pIdentifyPhoto(files){
       pUpdateClearBtn(); /* note/psugg 표시가 최종 확정된 뒤에 호출해야 "×" 버튼이 올바르게 나타난다 */
     });
   }).catch(function(){
-    showError('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    if(pidTimer)clearTimeout(pidTimer);
+    if(pidTimedOut){
+      showError('사진 분석이 너무 오래 걸려 중단했습니다. 사진 용량을 줄이거나 Wi-Fi 환경에서 다시 시도해주세요.');
+    } else {
+      showError('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
   });
 }
 
