@@ -168,10 +168,12 @@
   </div>
 
   <form id="cmsForm">
-    <label for="title">제목</label>
-    <input type="text" id="title" name="title" placeholder="예: 가을 정원을 준비하는 다섯 가지 방법" required>
-
-    <label for="editor">본문</label>
+<label for="title">제목</label>
+<input type="text" id="title" name="title" placeholder="예: 가을 정원을 준비하는 다섯 가지 방법" required>
+<label for="authorName" style="margin-top:22px">필자</label>
+<div class="hint">기사에 표시할 필자 이름을 입력하세요. 처음 쓰는 이름이면 자동으로 새 필자 프로필이 만들어지고, 이미 있는 이름이면 그 필자로 연결됩니다. 비워두면 필자 표시 없이 등록됩니다.</div>
+<input type="text" id="authorName" name="authorName" placeholder="예: 김민준">
+<label for="editor">본문</label>
     <div class="hint">
       굵게·기울임·제목·인용·목록·글자 색상으로 서식을 지정할 수 있고, 사진 🖼과 유튜브/비메오 동영상 🎬을 원하는 위치에 바로 삽입할 수 있어요.
       카드·상세페이지용 요약문 4종은 Claude가 30년차 매거진 카피라이터의 톤으로 새로 작성하며, Webflow 필드별 글자수 한도(120/101/78/190자)를 넘지 않도록 자동으로 맞춰집니다.
