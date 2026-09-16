@@ -821,7 +821,7 @@ function fetchGbifPhoto(sciNm){
    위해 우선순위를 가장 낮게 둔다). 초본류(꽃 등)는 대부분 0건으로 응답한다. */
 function fetchBarkPhoto(korNm){
   if(!korNm)return Promise.resolve(null);
-  var u='https://apis.data.go.kr/1400000/imageForest/getImageForestList?serviceKey='+encodeURIComponent(KEY)+'&commonNm='+encodeURIComponent(korNm)+'&numOfRows=1&pageNo=1&_type=json';
+  var u=NONGSARO_PROXY+'/gov/forest-image/getImageForestList?commonNm='+encodeURIComponent(korNm)+'&numOfRows=1&pageNo=1&_type=json';
   return fetchWithTimeout(u,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var res=(j&&j.response)||{};
     if((res.header||{}).resultCode!=='00')return null;
@@ -878,7 +878,7 @@ function fetchGbifPhotos(sciNm){
 }
 function fetchBarkPhotos(korNm){
   if(!korNm)return Promise.resolve([]);
-  var u='https://apis.data.go.kr/1400000/imageForest/getImageForestList?serviceKey='+encodeURIComponent(KEY)+'&commonNm='+encodeURIComponent(korNm)+'&numOfRows=4&pageNo=1&_type=json';
+  var u=NONGSARO_PROXY+'/gov/forest-image/getImageForestList?commonNm='+encodeURIComponent(korNm)+'&numOfRows=4&pageNo=1&_type=json';
   return fetchWithTimeout(u,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var res=(j&&j.response)||{};
     if((res.header||{}).resultCode!=='00')return [];
