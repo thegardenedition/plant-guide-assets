@@ -148,9 +148,14 @@ var TIMEOUT_TRANSLATE=3000;   /* Pl@ntNet 영문 이름 한글 번역(MyMemory) 
    기다리지 않도록 회로차단기를 둔다. 한 번 성공하면 계속 정상 사용, 한 번
    실패하면 이 세션 동안은 즉시 건너뛴다(새로고침하면 다시 시도). */
 var forestStoryBroken=false;
+/* 예전엔 이 호출이 api.forest.go.kr을 클라이언트 노출 키(KEY)로 직접 때렸다 -
+   PlantResource/odcloud/imageForest와 같은 문제(키 노출 + 남용 시 도감 전체
+   장애)인데, 정작 nongsaro-proxy 워커에는 이미 /gov/forest-story 라우트가
+   구현·배포까지 돼 있었고 아무도 호출을 안 하고 있었다. 그 기존 라우트로
+   바꾼다(서버가 자기 시크릿으로 serviceKey를 채워 넣으므로 KEY를 안 보낸다). */
 function fetchForestStory(nm){
-  if(!nm||forestStoryBroken)return Promise.resolve(null);
-  var url='https://api.forest.go.kr/openapi/service/cultureInfoService/fStoryOpenAPI?serviceKey='+encodeURIComponent(KEY)+'&searchWrd='+encodeURIComponent(nm)+'&numOfRows=1&pageNo=1';
+  if(!nm||forestStoryBroken||!NONGSARO_PROXY)return Promise.resolve(null);
+  var url=NONGSARO_PROXY+'/gov/forest-story/fStoryOpenAPI?searchWrd='+encodeURIComponent(nm)+'&numOfRows=1&pageNo=1';
   return fetchWithTimeout(url,2500).then(function(r){return r.ok?r.text():'';}).then(function(txt){
     if(!txt)return null;
     var xml=new DOMParser().parseFromString(txt,'text/xml');
@@ -174,6 +179,38 @@ function forestStoryHtml(nm){
     if(!rows.length&&!story)return '';
     return uiSection('숲이야기 · 산림청(산림문화·휴양정보)',uiBody(story)+uiRows(rows));
   }).catch(function(){return '';});
+}
+/* 워커에는 TourAPI(한국관광공사) 라우트(/tourapi/*)가 forest-story와 같은
+   TOURAPI_SERVICE_KEY로 이미 살아있었는데 프론트엔드 어디서도 부르지 않았다.
+   국명으로 키워드 검색해 관광지(contentTypeId=12)만 추려 "이 식물을 만날 수
+   있는 곳"으로 노출한다 - 나머지 콘텐츠 섹션과 같은 원칙대로, 실제로 매칭된
+   장소가 없으면 섹션 자체를 아예 숨긴다(빈 섹션을 보여주지 않는다). */
+var TOUR_SPOT_BROKEN=false;
+function fetchTourSpots(nm){
+  if(!nm||TOUR_SPOT_BROKEN||!NONGSARO_PROXY)return Promise.resolve([]);
+  var url=NONGSARO_PROXY+'/tourapi/searchKeyword2?keyword='+encodeURIComponent(nm)+'&contentTypeId=12&numOfRows=6&pageNo=1';
+  return fetchWithTimeout(url,3000).then(function(r){return r.ok?r.json():null;}).then(function(data){
+    var body=data&&data.response&&data.response.body;
+    var items=body&&body.items&&body.items.item;
+    if(!items)return[];
+    if(!Array.isArray(items))items=[items];
+    return items.filter(function(it){return it&&it.title;}).slice(0,3);
+  }).catch(function(){TOUR_SPOT_BROKEN=true;return[];});
+}
+function tourSpotsHtml(nm){
+  return fetchTourSpots(nm).then(function(items){
+    if(!items.length)return'';
+    var body='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">'
+      +items.map(function(it){
+        var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
+          +(it.firstimage?'<img src="'+esc(it.firstimage)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
+          +'</div>';
+        var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
+        return '<div>'+img+'<p style="font-size:12px;font-weight:600;color:#121212;margin:0 0 2px">'+esc(it.title)+'</p>'
+          +(addr?'<p style="font-size:11px;color:#6E6E6E;margin:0">'+esc(addr)+'</p>':'')+'</div>';
+      }).join('')+'</div>';
+    return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',body);
+  }).catch(function(){return'';});
 }
 /* 민간약초 API의 학명 필드(bneNm)는 "Potentilla kleiniana (장미과)"처럼 끝에
    과명이 괄호로 덧붙어 있어, cleanSciName에 넣기 전에 그 부분부터 떼어낸다. */
@@ -238,8 +275,14 @@ function loadNongsaroGeneral(){
   }).catch(function(){return {decor:[],make:[],video:[],pref:[]};});
   return nongsaroGeneralReady;
 }
+/* 사진이 있는 카드와 없는 카드가 섞이면(예: 꽃장식은 사진, 좋아하는 꽃은 사진
+   없음) 그리드 리듬이 깨진다 - 사진 없을 때도 다른 곳(#pdimg 등)과 같은
+   PLACEHOLDER_ICON을 같은 비율 박스 안에 넣어 칸 높이를 통일한다. */
 function pgcCard(it,kind){
-  var img=(it.imgUrl||it.imageFileUrl)?('<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px"><img src="'+esc(it.imgUrl||it.imageFileUrl)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy"></div>'):'';
+  var src=it.imgUrl||it.imageFileUrl;
+  var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
+    +(src?'<img src="'+esc(src)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
+    +'</div>';
   var label=kind==='pref'?[it.effectInfo,it.spceInfo].filter(Boolean).join(' · '):(it.cntntsSj||'');
   return '<div>'+img+'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
 }
@@ -252,20 +295,49 @@ function pgcGroup(title,items,kind){
 /* 상세창(정원 가이드 탭)에 이어붙일 조각을 만든다 - nm(국명)과 colors(꽃 색상
    배열)에 실제로 매칭되는 항목이 하나도 없으면 빈 문자열을 돌려주고, 그러면
    호출부에서 이 섹션 자체가 화면에 나타나지 않는다. */
+/* 국명 전체가 콘텐츠 제목에 그대로 들어있는 경우만 잡으면 "덩굴장미"처럼
+   [수식어+기본명] 복합 국명이 "장미코사지 만들기"(기본명 "장미"만 포함) 같은
+   글과 매칭되지 않는다. 전체 일치가 없으면 앞에서부터 한 글자씩 잘라가며
+   더 짧은(더 일반적인) 기본명 후보로 재시도 - 처음 매칭되는 후보가 가장
+   구체적인 후보이므로 그대로 채택한다. 2글자 미만으로는 내려가지 않는다. */
+function nongsaroNameMatch(list,nmClean){
+  if(!nmClean)return[];
+  var exact=list.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;});
+  if(exact.length)return exact;
+  for(var cut=1;cut<=nmClean.length-2;cut++){
+    var core=nmClean.slice(cut);
+    var m=list.filter(function(it){return (it.cntntsSj||'').indexOf(core)!==-1;});
+    if(m.length)return m;
+  }
+  return[];
+}
 function nongsaroGeneralHtml(nm,colors){
   return loadNongsaroGeneral().then(function(all){
     var nmClean=(nm||'').trim();
-    var decorM=nmClean?all.decor.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
-    var makeM=nmClean?all.make.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
-    var videoM=nmClean?all.video.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;}):[];
+    var decorM=nongsaroNameMatch(all.decor,nmClean);
+    var makeM=nongsaroNameMatch(all.make,nmClean);
+    var videoM=nongsaroNameMatch(all.video,nmClean);
     var colorSet={};(colors||[]).forEach(function(c){colorSet[c]=1;});
     var prefM=all.pref.filter(function(it){var mapped=PREF_COLOR_MAP[it.colorInfo]||'';return mapped&&colorSet[mapped];});
-    var body=pgcGroup('꽃장식과 정원 꾸미기',decorM.slice(0,3),'decor')
-      +pgcGroup('실내정원 만들기',makeM.slice(0,3),'make')
-      +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video')
-      +pgcGroup('',prefM.slice(0,2),'pref');
-    if(!body)return'';
-    return uiSection('가드닝 콘텐츠 · 농사로(농촌진흥청)',body);
+    var decorTop=decorM.slice(0,3);
+    /* flwrDecorList(목록)에는 imgUrl 계열 필드가 아예 없어 사진 없이 제목만
+       나오는 게 문제였다 - cateGardenMake/indoorpsncpaMvpLctre는 목록 자체에
+       이미지가 있어 그대로 쓰지만, decor만 상세 API(flwrDecorDtl)를 한 번 더
+       불러 imgUrl1을 채워야 pgcCard의 사진 렌더링이 실제로 동작한다. */
+    return Promise.all(decorTop.map(function(it){
+      return fetchNongsaroItems('flwrDecor/flwrDecorDtl',{cntntsNo:it.cntntsNo}).then(function(items){
+        var d=items[0];
+        if(d&&d.imgUrl1)it.imgUrl=d.imgUrl1;
+        return it;
+      }).catch(function(){return it;});
+    })).then(function(){
+      var body=pgcGroup('꽃장식과 정원 꾸미기',decorTop,'decor')
+        +pgcGroup('실내정원 만들기',makeM.slice(0,3),'make')
+        +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video')
+        +pgcGroup('',prefM.slice(0,2),'pref');
+      if(!body)return'';
+      return uiSection('가드닝 콘텐츠 · 농사로(농촌진흥청)',body);
+    });
   }).catch(function(){return'';});
 }
 /* 국명 후보들을 학명으로 검증한 뒤에만 채택 - 학명이 다르면(동명이인 국명)
@@ -1434,7 +1506,7 @@ function overviewSkeleton(){
      둔다 - 사실 정보(형태/분포 등)와 실용 정보(조경·농사로)를 먼저 읽고,
      이름의 유래·숲이야기 같은 서술형 콘텐츠는 마지막에 자연스럽게 이어지는
      순서다. */
-  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdstory']
+  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdtourspots','pdstory']
     .map(function(id){return '<div id="'+id+'"></div>';}).join('');
 }
 function setEl(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html||'';}
@@ -3290,9 +3362,22 @@ function pdRarityBadgesHtml(match){
 function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
   var bookData=bookProfileData(sc);
   var storyData=forestStoryHtml(nm);
-  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData]).then(function(res){
-    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'';
-    setEl('pdnsgarden',ns.gardenHtml||'');
+  /* nongsaroGeneralHtml(꽃장식/실내정원 만들기/동영상강좌/좋아하는 꽃)는 이미
+     완성돼 있었지만 이 파이프라인 어디에서도 호출되지 않아 화면에 전혀
+     나오지 않던 죽은 코드였다 - NONGSARO_API_KEY 복구로 데이터 자체는 이미
+     정상이라, 여기서 불러다가 같은 성격의 기존 슬롯(pdnsgarden)에 이어
+     붙인다. 새 슬롯을 만들려면 Webflow 임베드 쪽 HTML도 같이 고쳐야 해서,
+     당장 반영 가능한 기존 슬롯 재사용 쪽을 택했다. */
+  /* "좋아하는 꽃"(preferenceFlower) 섹션은 이 식물의 실제 꽃 색상(profile.colors,
+     deriveCuratedProfile이 이미 뽑아둔 값)과 같은 색 계열일 때만 채택하도록
+     설계돼 있었는데, 정작 호출부는 항상 빈 배열을 넘기고 있어 이 종류는 어떤
+     식물에서도 절대 뜰 수 없는 죽은 조건이었다 - 이미 계산돼 있는 값을 그대로
+     넘긴다(profile이 없을 수 있는 호출 경로도 있어 방어적으로 처리). */
+  var generalData=nongsaroGeneralHtml(nm,(profile&&profile.colors)||[]);
+  var tourData=tourSpotsHtml(nm);
+  Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData,generalData,tourData]).then(function(res){
+    var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'',general=res[4]||'',tour=res[5]||'';
+    setEl('pdnsgarden',(ns.gardenHtml||'')+general);
     setEl('pdnslandscape',ns.landscapeHtml||'');
     setEl('pdbookgarden',bk.gardenHtml||'');
     setEl('pdbooklandscape',bk.landscapeHtml||'');
@@ -3302,6 +3387,7 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
     var academicInner=badges+rarityTable+extra+(ns.academicHtml||'');
     var hasAcademic=!!(badges||rarityTable||extra||ns.academicHtml);
     setEl('pdacademic',hasAcademic?uiSection('학술정보',academicInner):'');
+    setEl('pdtourspots',tour);
     setEl('pdstory',(bk.storyHtml||'')+fs);
   }).catch(function(){
     setEl('pdstory','');
