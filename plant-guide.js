@@ -160,8 +160,12 @@ function fetchForestStory(nm){
     if(!txt)return null;
     var xml=new DOMParser().parseFromString(txt,'text/xml');
     if(xml.querySelector('parsererror'))return null;
+    /* 성공 코드가 '0000'인 줄 알고 그렇게만 검사했는데, 실제 응답은 '00'
+       (다른 농사로/산림청 API들과 같은 두 자리 코드)이었다 - 그래서 이
+       엔드포인트는 http 스킴 문제가 고쳐진 뒤에도 매번 조용히 null을
+       반환했다(fsstory 필드 문제와는 별개의 버그). 실측값 그대로 맞춘다. */
     var rc=xml.querySelector('resultCode');
-    if(rc&&rc.textContent.trim()!=='0000')return null;
+    if(rc&&rc.textContent.trim()!=='00')return null;
     var item=xml.querySelector('item');
     if(!item)return null;
     var o={};
@@ -172,8 +176,16 @@ function fetchForestStory(nm){
 function forestStoryHtml(nm){
   return fetchForestStory(nm).then(function(o){
     if(!o)return '';
-    var story=(o.fsstory||o.fsguide||'').trim();
+    /* fsstory 필드는 이름과 달리 실제 서술이 아니라 "09/07/10" 같은 등록일
+       값만 들어있다(여러 종으로 실측 확인) - 지금까지 이 필드를 본문으로
+       써온 탓에 진짜 유래 서술(fsoffer, 예: 은행나무 "열매가 살구 비슷하게
+       생겼다 하여...")은 한 번도 노출되지 않고, 매번 fsguide(짧은 분류 한
+       줄)로만 대체 표시되고 있었다. fsoffer를 본문으로 쓰고, fsguide는
+       분류 행으로 따로 보여준다. */
+    var story=(o.fsoffer||'').trim();
     var rows=[];
+    pushRow(rows,'영명',o.fsename);
+    pushRow(rows,'분류',o.fsguide);
     pushRow(rows,'서식장소',o.fsinhabit);
     pushRow(rows,'식물의 일생',o.fslifetime);
     if(!rows.length&&!story)return '';
