@@ -1,6 +1,6 @@
 
 (function(){
-var PB='https://apis.data.go.kr/1400119/PlantResource';
+var PB='https://nongsaro-proxy.chgreena.workers.dev/gov/plant';
 var KEY='57a313760f23320ea0e2f7b63e2a1ce80450c86a7470a67067e03a8037ff513e'; /* 공공데이터포털 일반 인증키(Decoding) */
 var pQ='',pST=null,pAll=[],pShown=0;
 /* "색인(초성)을 좌우로 왔다갔다 하면 결과값이 사라진다" 버그 대응 - 초성
