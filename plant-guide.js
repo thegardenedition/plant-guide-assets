@@ -685,7 +685,7 @@ var pImgCache={};
       한다. */
 var NATURE_IMG={};
 function loadNatureImageIndex(){
-  var url='https://api.odcloud.kr/api/15116414/v1/uddi:b63f89a7-c57b-43c6-8868-f68d44ce17e5?page=1&perPage=5000&serviceKey='+encodeURIComponent(KEY);
+  var url=NONGSARO_PROXY+'/gov/nature-image?page=1&perPage=5000';
   return fetchWithTimeout(url,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var rows=(j&&Array.isArray(j.data))?j.data:[];
     var seen={};
