@@ -520,13 +520,37 @@ function sciNameHtml(sc){
 function pSpin(on){
   var a=0,el=document.getElementById('pspin');
   if(pST)clearInterval(pST);
-  if(on)pST=setInterval(function(){a+=8;el.style.transform='rotate('+a+'deg)';},30);
-  else el.style.transform='';
+  if(on)pST=setInterval(function(){a+=8;if(el)el.style.transform='rotate('+a+'deg)';},30);
+  else if(el)el.style.transform='';
 }
 
 function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});}
-function showLoading(){hideAll();document.getElementById('pld').style.display='block';pSpin(true);}
-function hideLoading(){pSpin(false);document.getElementById('pld').style.display='none';}
+/* "검색이 느리다"는 지적의 상당 부분은 실제 지연이 아니라, 로딩 상태로
+   바뀌는 순간 아무 표시 없이 화면이 뚝 끊기듯 바뀌는 데서 온다(#pld를
+   display:none↔block으로 즉시 전환). 스피너를 키우고 포인트 그린으로
+   바꾸고, 나타날 때 페이드인시킨다 - "진행 중"은 실제로 의미 있는 임시
+   상태라 포인트 컬러를 쓴다(선택 상태에만 쓴다는 원칙과 같은 맥락: 지금
+   이 순간에만 해당하는 강조). */
+function pEnsureSpinStyle(){
+  var el=document.getElementById('pspin');
+  if(!el||el.dataset.styled)return;
+  el.dataset.styled='1';
+  el.style.width='28px';el.style.height='28px';el.style.borderWidth='2px';
+  el.style.borderColor='#E6E6E6';el.style.borderTopColor='#0B5345';
+}
+function showLoading(){
+  hideAll();
+  var pld=document.getElementById('pld');
+  if(pld){
+    pEnsureSpinStyle();
+    pld.style.transition='opacity .25s ease';
+    pld.style.opacity='0';
+    pld.style.display='block';
+    requestAnimationFrame(function(){pld.style.opacity='1';});
+  }
+  pSpin(true);
+}
+function hideLoading(){pSpin(false);var pld=document.getElementById('pld');if(pld){pld.style.display='none';pld.style.opacity='';}}
 function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='function')pClearPhotoNote();if(typeof pUpdateClearBtn==='function')pUpdateClearBtn();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
 
 /* XML 대신 JSON으로 통신 (data.go.kr 표준 파라미터 _type=json 사용; returnType=json은
@@ -2265,7 +2289,20 @@ window.pSuggest=function(term){
   runSearch();
 };
 
+/* 검색 버튼을 눌렀을 때 "눌렸다"는 반응이 전혀 없어 클릭이 먹혔는지조차
+   알 수 없다는 지적 대응 - 결과가 뜨기까지 걸리는 시간과 무관하게, 누른
+   즉시 버튼이 살짝 눌리는 느낌을 줘 클릭이 실제로 등록됐다는 걸 바로
+   알려준다. 실제 라이브 마크업의 클래스명(.psearch-submit)을 우선
+   찾고, 못 찾으면 onclick 속성으로 같은 버튼을 짚는다. */
+function pPulseSearchBtn(){
+  var btn=document.querySelector('.psearch-submit')||document.querySelector('button[onclick*="pSearch"]');
+  if(!btn)return;
+  btn.style.transition='transform .12s ease';
+  btn.style.transform='scale(.94)';
+  setTimeout(function(){btn.style.transform='';},140);
+}
 window.pSearch=function(){
+  pPulseSearchBtn();
   var raw=(document.getElementById('psi')||{value:''}).value;
   if(!raw||!raw.trim())return;
   var opt=optimizeQuery(raw);
@@ -3238,6 +3275,23 @@ window.pExportCompare=function(){
    보이는" 절약보다 "항상 확실히 다 채워지는" 안정성을 우선한다. limitCard가
    이미 동시 8개로 막아주므로 결과가 아무리 많아도 브라우저 동시 연결 한도나
    정부 API 과부하 문제는 그대로 방지된다.) */
+/* 결과가 한꺼번에 툭 나타나는 대신, 카드가 살짝 떠오르며 순서대로 옅게
+   나타나게 한다 - "검색이 됐다"는 게 눈에 보이는 사건이 되도록. 앞쪽 카드
+   10개까지만 순서를 살짝 어긋내고(그 이상은 화면 밖이라 체감이 없다) 나머지는
+   한꺼번에 - 과하게 늘어지지 않도록 절제한다. 애니메이션이 끝나면 인라인
+   transition을 지워, 이후 호버 등 다른 곳에서 정의한 트랜지션과 안 겹치게 한다. */
+function pRevealCard(el,idx){
+  var delay=Math.min(idx,10)*18;
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      setTimeout(function(){
+        el.style.opacity='1';
+        el.style.transform='';
+        setTimeout(function(){el.style.transition='';},360);
+      },delay);
+    });
+  });
+}
 function renderPage(){
   hideLoading();
   hideAll();
@@ -3262,6 +3316,9 @@ function renderPage(){
     it._gen=myGen;
     var d=document.createElement('div');
     d.className='pc';
+    d.style.opacity='0';
+    d.style.transform='translateY(6px)';
+    d.style.transition='opacity .35s ease,transform .35s ease';
     if(it.no)d.setAttribute('data-no',it.no);
     d.setAttribute('data-origin',it.origin||'');
     d.setAttribute('data-uid',it._uid);
@@ -3271,6 +3328,7 @@ function renderPage(){
     var cmpBtn=d.querySelector('.pc-cmpbtn');
     cmpBtn.onclick=function(e){e.stopPropagation();pToggleCompare(it,d);};
     g.appendChild(d);
+    pRevealCard(d,idx);
     pCardEls[it._uid]={el:d};
     var imgTask=function(){
       if(it._gen!==pRenderGen)return Promise.resolve(); /* 그 사이 다른 자음/필터를 눌러 낡은 요청이 됐으면 아예 요청하지 않는다 */
