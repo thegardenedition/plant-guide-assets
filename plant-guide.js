@@ -1,7 +1,14 @@
 
 (function(){
 var PB='https://nongsaro-proxy.chgreena.workers.dev/gov/plant';
-var KEY='57a313760f23320ea0e2f7b63e2a1ce80450c86a7470a67067e03a8037ff513e'; /* 공공데이터포털 일반 인증키(Decoding) */
+/* [2026-09-18] 공공데이터포털 인증키(KEY)는 이 파일에서 완전히 걷어냈다. 정부 API 는 전부
+   nongsaro-proxy 워커의 /gov/* 로 부르고 키는 워커가 붙인다(워커는 클라이언트가 보낸
+   serviceKey 를 무시한다). 이 파일은 GitHub Pages 에 공개되므로 키를 두면 안 된다. */
+/* [2026-09-18] 이 스크립트는 식물도감 페이지(/plant-guide)뿐 아니라 Webflow 기사 템플릿에도
+   실려 있어 모든 기사 방문마다 농사로 3종·표준식물목록 5,000행을 내려받고 있었다(마스터 v1.5
+   16절 D4). 검색창(#psi)이 없는 페이지에서는 상단 선로딩을 하지 않는다. (스크립트는 defer 라
+   이 시점에 DOM 은 이미 파싱돼 있다.) */
+var PG_PAGE=!!document.getElementById('psi');
 var pQ='',pST=null,pAll=[],pShown=0;
 /* "색인(초성)을 좌우로 왔다갔다 하면 결과값이 사라진다" 버그 대응 - 초성
    색인은 usecat 필터보다 훨씬 큰 결과(한 자음이 전체 3.6만종의 1/14 가량,
@@ -87,7 +94,7 @@ var PLACEHOLDER_ICON='<svg width="30" height="30" viewBox="0 0 24 24" fill="none
    배포해 발급받음): */
 var NONGSARO_PROXY='https://nongsaro-proxy.chgreena.workers.dev';
 function fetchNongsaroItems(path,params){
-  if(!NONGSARO_PROXY)return Promise.resolve([]);
+  if(!NONGSARO_PROXY||!PG_PAGE)return Promise.resolve([]);
   var qs=Object.keys(params||{}).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
   var url=NONGSARO_PROXY.replace(/\/$/,'')+'/proxy/'+path+(qs?'?'+qs:'');
   return fetchWithTimeout(url,TIMEOUT_PROXY).then(function(r){return r.ok?r.text():'';}).then(function(txt){
@@ -777,6 +784,7 @@ var pImgCache={};
       한다. */
 var NATURE_IMG={};
 function loadNatureImageIndex(){
+  if(!PG_PAGE)return Promise.resolve();
   var url=NONGSARO_PROXY+'/gov/nature-image?page=1&perPage=5000';
   return fetchWithTimeout(url,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(j){
     var rows=(j&&Array.isArray(j.data))?j.data:[];
@@ -1566,7 +1574,7 @@ function fetchPilbkItem(no){
   if(pItemCache[no])return Promise.resolve(pItemCache[no]);
   var cached=cacheGet('item|'+no,DETAIL_CACHE_TTL);
   if(cached!==undefined){pItemCache[no]=cached;return Promise.resolve(cached);}
-  var url=buildUrl('/plantPilbkInfo',{serviceKey:KEY,reqPlantPilbkNo:no});
+  var url=buildUrl('/plantPilbkInfo',{reqPlantPilbkNo:no});
   return fetchJson(url).then(function(data){
     var res=(data&&data.response)||{};
     var header=res.header||{};
@@ -2524,7 +2532,7 @@ function fetchSourceItems(path,q){
   var cacheKey='src|'+path+'|'+q;
   var cached=cacheGet(cacheKey,SEARCH_CACHE_TTL);
   if(cached!==undefined)return Promise.resolve(cached);
-  var url=buildUrl(path,{serviceKey:KEY,pageNo:1,numOfRows:50,reqSearchWrd:q});
+  var url=buildUrl(path,{pageNo:1,numOfRows:50,reqSearchWrd:q});
   return fetchJson(url).then(function(data){
     var res=(data&&data.response)||{};
     var header=res.header||{};
@@ -3498,7 +3506,7 @@ window.pDetail=function(it){
       pdFillOverviewExtras(null,getStaticMatch(sc),sc,nm,nsData);
     });
   } else if(specsId){
-    var url2=buildUrl('/plantSmplUnitList',{serviceKey:KEY,pageNo:1,numOfRows:5,reqPlantSpecsId:specsId});
+    var url2=buildUrl('/plantSmplUnitList',{pageNo:1,numOfRows:5,reqPlantSpecsId:specsId});
     var specimenHtml=fetchJson(url2).then(function(data){
       var res=(data&&data.response)||{};
       var header=res.header||{};
@@ -3691,6 +3699,23 @@ updateFilterBadge();
    동작 - 더 되돌릴 앱 내부 상태가 없으므로). */
 history.replaceState({type:'search',q:'',filter:pFilterSnapshot()},'',location.href);
 window.addEventListener('popstate',pOnPopState);
+
+/* [2026-09-18] ① Enter 로도 검색되게 한다 — 검색창·버튼이 form 안에 있지 않아 Enter 가
+   아무 일도 하지 않았다. 한글 조합 중(isComposing)의 Enter 는 무시한다.
+   ② 기사 페이지 푸터 스크립트가 만드는 딥링크 /plant-guide?q=식물명 을 읽어 검색창에 넣고
+   바로 검색한다(예전엔 검색창이 빈 채 열렸다 — 마스터 v1.5 16절 D3). */
+(function bindEnterAndDeepLink(){
+  var el=document.getElementById('psi');
+  if(!el)return;
+  el.addEventListener('keydown',function(e){
+    if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Enter'||e.keyCode===13){e.preventDefault();window.pSearch();}
+  });
+  try{
+    var q=new URLSearchParams(location.search).get('q');
+    if(q&&q.trim()&&!el.value.trim()){el.value=q.trim();pUpdateClearBtn();window.pSearch();}
+  }catch(e){}
+})();
 
 /* 홈페이지 사진검색 배너에서 카메라로 바로 찍은 사진을 세션스토리지에
    담아 이 페이지로 넘어온 경우("배너 클릭 -> 카메라 -> 자동 이동"),
