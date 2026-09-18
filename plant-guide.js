@@ -1502,11 +1502,16 @@ function deriveCuratedProfile(item,staticMatch,sc){
    ("검색부터 화면 구성까지" 역할별 재편 요청) 두 개로 쪼갰다 - 실내에서 키우는
    관점(광조건/수분/개화월/식재팁)은 정원 가이드 탭에, 전문적 분류·내한성·자생
    여부 같은 스펙성 정보는 조경 스펙 탭에 배치한다. */
+/* [디자인 토큰 시범 적용] 지금까지 이 앱은 흑백회 뿐이고 실제 브랜드 포인트
+   그린(#0B5345)은 어디에도 안 쓰이고 있었다 - "선택된 상태"처럼 사용자가
+   고른 값 하나를 짚어주는 자리에만 그린을 쓰고, 본문 텍스트·구조색(#121212/
+   #E6E6E6 등)은 그대로 둔다("무채색 + 포인트 그린 단 하나" 원칙, 대표 확정). */
+var ACCENT='#0B5345';
 function envBarHtml(label,options,active){
   return '<div style="margin-bottom:20px">'
     +'<p style="font-size:11px;letter-spacing:1px;color:#ABABAB;margin:0 0 8px">'+esc(label)+'</p>'
     +'<div style="display:flex;gap:6px">'
-    +options.map(function(o){var on=(o===active);return '<span style="flex:1;text-align:center;padding:8px 0;font-size:12px;letter-spacing:.2px;border:1px solid '+(on?'#121212':'#E6E6E6')+';background:'+(on?'#121212':'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
+    +options.map(function(o){var on=(o===active);return '<span style="flex:1;text-align:center;padding:8px 0;font-size:12px;letter-spacing:.2px;border:1px solid '+(on?ACCENT:'#E6E6E6')+';background:'+(on?ACCENT:'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
     +'</div></div>';
 }
 function envTripleHtml(p){
