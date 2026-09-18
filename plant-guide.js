@@ -1140,6 +1140,16 @@ function fetchNongsaroCardPhoto(korNm,sciNm){
    사진이 있으면(가장 신뢰도 높은 소스이므로) 조용히 교체해 최종 정확도는
    그대로 유지한다 - 국립수목원 인덱스가 이미 로드되어 있는 두 번째 검색부터는
    naturePromise 자체가 사실상 즉시 응답이라 교체가 거의 일어나지 않는다. */
+/* [성능] 예전엔 농사로/위키/iNaturalist/GBIF 네 소스를 Promise.all로 묶어
+   넷 다 끝날 때까지 기다린 뒤에야 그중 우선순위가 가장 높은 것 하나를
+   썼다 - 가장 먼저 답한 소스가 이미 좋은 사진을 줬어도, 가장 느린 소스가
+   끝날 때까지(각 3초 타임아웃, 일부는 순차 조회라 최대 6초 가까이) 화면엔
+   아무것도 안 보였다. "화면에 바로 보이는 카드"(eager, 첫 화면 8장)조차
+   이미지가 늦게 뜬다는 실사용 제보의 실제 원인(실측: 검색 11초 뒤에도 첫
+   화면 8장 중 1장만 로드). 이제 우선순위 순서대로 한 소스씩 확정되는 대로
+   검사해, 더 높은 우선순위 소스가 아직 안 끝났으면 기다리고(정확도 유지),
+   거기까지 다 끝났는데 값이 있으면 나머지 느린 소스를 기다리지 않고 바로
+   보여준다. */
 function loadCardImage(korNm,sciNm,imgWrap,onDone,eager){
   var key=korNm+'|'+sciNm;
   if(pImgCache[key]!==undefined){
@@ -1147,30 +1157,41 @@ function loadCardImage(korNm,sciNm,imgWrap,onDone,eager){
     if(onDone)onDone(pImgCache[key]&&pImgCache[key].credit);
     return Promise.resolve();
   }
-  var naturePromise=fetchNatureImagePhoto(sciNm);
-  var fallbackPromise=Promise.all([
-    fetchNongsaroCardPhoto(korNm,sciNm),
-    fetchWikiThumb('ko',korNm,sciNm),
-    fetchINatPhoto(sciNm),
-    fetchGbifPhoto(sciNm)
-  ]).then(function(res){
-    var r=res[0]||res[1]||res[2]||res[3];
-    if(r)return r;
-    return fetchBarkPhoto(korNm);
-  });
   var shown=false;
   function show(r){
     pImgCache[key]=r;
     applyThumb(imgWrap,r,eager);
     if(onDone)onDone(r&&r.credit);
   }
-  fallbackPromise.then(function(r){
-    if(!shown){shown=true;show(r);}
-  });
-  var natureDone=naturePromise.then(function(r){
+  var fallbackSources=[
+    fetchNongsaroCardPhoto(korNm,sciNm),
+    fetchWikiThumb('ko',korNm,sciNm),
+    fetchINatPhoto(sciNm),
+    fetchGbifPhoto(sciNm)
+  ];
+  var results=fallbackSources.map(function(){return undefined;});
+  var fallbackSettled=false;
+  function tryFallback(){
+    if(fallbackSettled)return;
+    for(var i=0;i<results.length;i++){
+      if(results[i]===undefined)return; /* 이 우선순위가 아직 안 끝났으면 기다린다 */
+      if(results[i]){
+        fallbackSettled=true;
+        if(!shown){shown=true;show(results[i]);}
+        return;
+      }
+    }
+    /* 여기 도달 = 네 소스 다 null - 마지막으로 수피 사진을 본다 */
+    fallbackSettled=true;
+    fetchBarkPhoto(korNm).then(function(r){if(!shown){shown=true;show(r);}});
+  }
+  var fallbackDone=Promise.all(fallbackSources.map(function(p,i){
+    return p.then(function(r){results[i]=r||null;tryFallback();},function(){results[i]=null;tryFallback();});
+  }));
+  var natureDone=fetchNatureImagePhoto(sciNm).then(function(r){
     if(r){shown=true;show(r);} /* 국립수목원 사진은 늦게 와도 항상 우선 채택(정확도 유지) */
   });
-  return Promise.all([natureDone,fallbackPromise]).then(function(){});
+  return Promise.all([natureDone,fallbackDone]).then(function(){});
 }
 function applyThumb(imgWrap,result,eager){
   if(!imgWrap||!imgWrap.isConnected)return;
