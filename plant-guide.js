@@ -214,10 +214,7 @@ function tourSpotsHtml(nm){
     if(!items.length)return'';
     var body='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">'
       +items.map(function(it){
-        /* TourAPI 이미지 URL이 http://로 오는 경우가 있어(tong.visitkorea.or.kr)
-           https 페이지에서 혼합 콘텐츠 경고가 뜬다 - 크롬은 자동 업그레이드해
-           주지만 모든 브라우저가 그런 건 아니라 명시적으로 https로 바꾼다. */
-        var img0=(it.firstimage||'').replace(/^http:\/\//,'https://');
+        var img0=toHttps(it.firstimage);
         var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
           +(img0?'<img src="'+esc(img0)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
           +'</div>';
@@ -295,7 +292,7 @@ function loadNongsaroGeneral(){
    없음) 그리드 리듬이 깨진다 - 사진 없을 때도 다른 곳(#pdimg 등)과 같은
    PLACEHOLDER_ICON을 같은 비율 박스 안에 넣어 칸 높이를 통일한다. */
 function pgcCard(it,kind){
-  var src=it.imgUrl||it.imageFileUrl;
+  var src=toHttps(it.imgUrl||it.imageFileUrl);
   var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
     +(src?'<img src="'+esc(src)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
     +'</div>';
@@ -376,14 +373,14 @@ function fetchGardenMatch(korNm,sciNm){
 function nongsaroGardenPhotos(d){
   if(!d||!d._list||!d._list.rtnFileUrl)return [];
   return d._list.rtnFileUrl.split('|').map(function(s){return s.trim();}).filter(Boolean).slice(0,6)
-    .map(function(u){return {url:u,credit:'사진 · 농사로(농촌진흥청) 실내정원용 식물'};});
+    .map(function(u){return {url:toHttps(u),credit:'사진 · 농사로(농촌진흥청) 실내정원용 식물'};});
 }
 function nongsaroHerbWeedPhotos(sciNm){
   var clean=cleanSciName(sciNm).toLowerCase(),out=[];
   var h=NONGSARO_HERB[clean];
-  if(h){for(var i=1;i<=6;i++){var u=h['imgUrl'+i];if(u)out.push({url:u,credit:'사진 · 농사로 민간약초정보'});}}
+  if(h){for(var i=1;i<=6;i++){var u=h['imgUrl'+i];if(u)out.push({url:toHttps(u),credit:'사진 · 농사로 민간약초정보'});}}
   var w=NONGSARO_WEED[clean];
-  if(w&&w.imgUrl)out.push({url:w.imgUrl,credit:'사진 · 농사로 잡초정보'});
+  if(w&&w.imgUrl)out.push({url:toHttps(w.imgUrl),credit:'사진 · 농사로 잡초정보'});
   return out;
 }
 /* 상세창이 역할별 탭(정원 가이드/조경 스펙/학술정보)으로 나뉘면서, 농사로
@@ -439,6 +436,13 @@ function nongsaroPanelData(korNm,sciNm){
 }
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+/* 정부 이미지 서버(forest.go.kr·nongsaro.go.kr·tong.visitkorea.or.kr 등)가
+   http://로 URL을 내려줄 때가 있다 - https 페이지에서 혼합 콘텐츠 경고가
+   뜬다(크롬은 자동 업그레이드하지만 전 브라우저가 그런 건 아니다). 사진
+   URL을 쓰는 자리마다 각자 따로 고치다가 한 곳(TourAPI)만 고치고 똑같은
+   문제가 있는 다른 곳(농사로 콘텐츠 카드, 수피 사진)을 빠뜨린 적이 있어서,
+   이제 이 헬퍼 하나로 통일한다. */
+function toHttps(u){return (u||'').replace(/^http:\/\//,'https://');}
 
 /* "학명은 기울임이 있는 것은 그대로 반영해줘" 대응 - 지금까지는 학명이 표시되는
    모든 자리(#pdsci, 카드의 .pc-sci, 비교표)에 CSS font-style:italic을 문자열
@@ -782,7 +786,7 @@ function loadNatureImageIndex(){
       if(kind!=='사진'||!sc||!path)return;
       var key=cleanSciName(sc).toLowerCase();
       if(!key)return;
-      var httpsUrl=path.replace(/^http:\/\//,'https://');
+      var httpsUrl=toHttps(path);
       if(seen[httpsUrl])return;
       seen[httpsUrl]=true;
       var cvMatch=sc.match(/'([^']+)'/);
@@ -815,7 +819,7 @@ function fetchINatPhoto(sciNm){
     if(String(t.name).toLowerCase()!==clean.toLowerCase())return null;
     var p=t.default_photo;
     if(!p||!p.license_code)return null;
-    return {url:p.medium_url||p.url,credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
+    return {url:toHttps(p.medium_url||p.url),credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
   }).catch(function(){return null;});
 }
 /* "갓(식물)"으로 검색했더니 전통 갓(모자) 사진이 나온 사고의 원인 - 한국어
@@ -894,7 +898,7 @@ function fetchGbifPhoto(sciNm){
         var m=media[j];
         if(m.type==='StillImage'&&m.identifier){
           var holder=m.rightsHolder||list[i].rightsHolder||list[i].recordedBy;
-          return {url:m.identifier,credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')};
+          return {url:toHttps(m.identifier),credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')};
         }
       }
     }
@@ -916,7 +920,7 @@ function fetchBarkPhoto(korNm){
     var items=(res.body&&res.body.items&&res.body.items.item)||null;
     var it=Array.isArray(items)?items[0]:items;
     if(!it||!it.photoFileUrl)return null;
-    return {url:it.photoFileUrl,credit:'수피 사진 · 산림청 국립수목원'+(it.photographingRgn?' ('+it.photographingRgn+')':'')};
+    return {url:toHttps(it.photoFileUrl),credit:'수피 사진 · 산림청 국립수목원'+(it.photographingRgn?' ('+it.photographingRgn+')':'')};
   }).catch(function(){return null;});
 }
 /* ---- 상세보기 전용: 사진을 "가능한 한 많이" 모아 슬라이드로 보여주기 ----
@@ -937,7 +941,7 @@ function fetchINatPhotos(sciNm){
     if(String(t.name).toLowerCase()!==clean.toLowerCase())return [];
     var photos=(t.taxon_photos||[]).map(function(tp){return tp.photo;}).filter(function(p){return p&&p.license_code;});
     return photos.slice(0,8).map(function(p){
-      return {url:p.medium_url||p.url,credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
+      return {url:toHttps(p.medium_url||p.url),credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
     });
   }).catch(function(){return [];});
 }
@@ -957,7 +961,7 @@ function fetchGbifPhotos(sciNm){
         if(m.type==='StillImage'&&m.identifier&&!seen[m.identifier]){
           seen[m.identifier]=true;
           var holder=m.rightsHolder||rec.rightsHolder||rec.recordedBy;
-          out.push({url:m.identifier,credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')});
+          out.push({url:toHttps(m.identifier),credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')});
         }
       });
     });
@@ -973,13 +977,19 @@ function fetchBarkPhotos(korNm){
     var items=(res.body&&res.body.items&&res.body.items.item)||null;
     var list=Array.isArray(items)?items:(items?[items]:[]);
     return list.filter(function(it){return it&&it.photoFileUrl;}).map(function(it){
-      return {url:it.photoFileUrl,credit:'수피 사진 · 산림청 국립수목원'+(it.photographingRgn?' ('+it.photographingRgn+')':'')};
+      return {url:toHttps(it.photoFileUrl),credit:'수피 사진 · 산림청 국립수목원'+(it.photographingRgn?' ('+it.photographingRgn+')':'')};
     });
   }).catch(function(){return [];});
 }
 function dedupePhotos(list){
   var seen={},out=[];
-  list.forEach(function(p){if(p&&p.url&&!seen[p.url]){seen[p.url]=true;out.push(p);}});
+  list.forEach(function(p){
+    if(!p||!p.url)return;
+    var url=toHttps(p.url);
+    if(seen[url])return;
+    seen[url]=true;
+    out.push(url===p.url?p:Object.assign({},p,{url:url}));
+  });
   return out;
 }
 function fetchNongsaroPhotoList(korNm,sciNm){
