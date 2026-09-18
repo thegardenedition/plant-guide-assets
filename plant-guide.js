@@ -298,10 +298,18 @@ function loadNongsaroGeneral(){
 /* 사진이 있는 카드와 없는 카드가 섞이면(예: 꽃장식은 사진, 좋아하는 꽃은 사진
    없음) 그리드 리듬이 깨진다 - 사진 없을 때도 다른 곳(#pdimg 등)과 같은
    PLACEHOLDER_ICON을 같은 비율 박스 안에 넣어 칸 높이를 통일한다. */
+/* 라디우스는 기본 0(각진 에디토리얼 톤)이 실제 브랜드 원칙 - 필터
+   칩·CTA에만 완전필(14px/80px)을 예외로 쓰는 방식이라, 일반 콘텐츠 카드에는
+   라디우스를 넣지 않는다(디자인 진단 세션이 실제 임베드로 확인). 동영상강좌
+   (kind==='video')만 재생 아이콘을 얹는다 - "영상이라는 게 실제로 다른
+   정보"이기 때문이지 장식이 아니다(사진·영상이 섞인 그리드에서 지금 이게
+   재생되는 콘텐츠인지 구분이 안 됐다). */
 function pgcCard(it,kind){
   var src=toHttps(it.imgUrl||it.imageFileUrl);
-  var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
+  var playBadge=kind==='video'?'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="width:36px;height:36px;border-radius:50%;background:rgba(18,18,18,.55);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div></div>':'';
+  var img='<div style="position:relative;width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
     +(src?'<img src="'+esc(src)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
+    +playBadge
     +'</div>';
   var label=kind==='pref'?[it.effectInfo,it.spceInfo].filter(Boolean).join(' · '):(it.cntntsSj||'');
   return '<div>'+img+'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
