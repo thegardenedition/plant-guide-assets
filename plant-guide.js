@@ -280,19 +280,17 @@ var nongsaroDataReady=Promise.all([loadNongsaroHerb(),loadNongsaroWeed(),loadNon
    - 좋아하는 꽃: 학명/국명 필드가 없는 대신 색상 계열(colorInfo)로만 분류되어
      있어, 이 앱이 이미 상세정보에서 뽑아내는 꽃 색상(attrs.colors)과 같은
      계열이면 채택한다. */
-var PREF_COLOR_MAP={'빨간색계열':'빨강','적색계열':'빨강','분홍색계열':'분홍','노란색계열':'노랑','주황색계열':'주황','흰색계열':'흰색','보라색계열':'보라','파란색계열':'파랑','녹색계열':'초록','검정색계열':'검정','검은색계열':'검정'};
 var nongsaroGeneralReady=null;
 function loadNongsaroGeneral(){
   if(nongsaroGeneralReady)return nongsaroGeneralReady;
-  if(!NONGSARO_PROXY){nongsaroGeneralReady=Promise.resolve({decor:[],make:[],video:[],pref:[]});return nongsaroGeneralReady;}
+  if(!NONGSARO_PROXY){nongsaroGeneralReady=Promise.resolve({decor:[],make:[],video:[]});return nongsaroGeneralReady;}
   nongsaroGeneralReady=Promise.all([
     fetchNongsaroItems('flwrDecor/flwrDecorList',{numOfRows:100,pageNo:1}),
     fetchNongsaroItems('cateGardenMake/cateGardenMakeLst',{numOfRows:60,pageNo:1}),
-    fetchNongsaroItems('indoorpsncpaMvpLctre/indoorpsncpaMvpLctreLst',{numOfRows:60,pageNo:1}),
-    fetchNongsaroItems('preferenceFlower/preferenceFlowerList',{numOfRows:30,pageNo:1})
+    fetchNongsaroItems('indoorpsncpaMvpLctre/indoorpsncpaMvpLctreLst',{numOfRows:60,pageNo:1})
   ]).then(function(res){
-    return {decor:res[0]||[],make:res[1]||[],video:res[2]||[],pref:res[3]||[]};
-  }).catch(function(){return {decor:[],make:[],video:[],pref:[]};});
+    return {decor:res[0]||[],make:res[1]||[],video:res[2]||[]};
+  }).catch(function(){return {decor:[],make:[],video:[]};});
   return nongsaroGeneralReady;
 }
 /* 사진이 있는 카드와 없는 카드가 섞이면(예: 꽃장식은 사진, 좋아하는 꽃은 사진
@@ -311,7 +309,7 @@ function pgcCard(it,kind){
     +(src?'<img src="'+esc(src)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
     +playBadge
     +'</div>';
-  var label=kind==='pref'?[it.effectInfo,it.spceInfo].filter(Boolean).join(' · '):(it.cntntsSj||'');
+  var label=it.cntntsSj||'';
   return '<div>'+img+'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
 }
 function pgcGroup(title,items,kind){
@@ -364,14 +362,18 @@ function nongsaroNameMatch(list,nmClean){
   }
   return[];
 }
-function nongsaroGeneralHtml(nm,colors){
+/* [2026-09-18] "좋아하는 꽃"(preferenceFlower) 섹션을 뺐다 - 이 API는 색상
+   계열(7~8종) 말고는 식물과 아무 연결고리가 없는 "꽃 배달 무드 추천" 콘텐츠라,
+   같은 색으로 묶이는 식물이면(예: 돌콩 같은 콩과 야생초까지) 전부 똑같은 장미
+   사진·문구를 보여줬다("가드닝 콘텐츠가 다 똑같다" 실사용 제보로 발견) - 이
+   식물에 대한 정보가 아니라 우연히 같은 색상 버킷에 들어간 것일 뿐이었다.
+   "정확한 데이터만 신뢰" 원칙에 맞지 않아 매칭 로직을 고치는 대신 아예 뺀다. */
+function nongsaroGeneralHtml(nm){
   return loadNongsaroGeneral().then(function(all){
     var nmClean=(nm||'').trim();
     var decorM=nongsaroNameMatch(all.decor,nmClean);
     var makeM=nongsaroNameMatch(all.make,nmClean);
     var videoM=nongsaroNameMatch(all.video,nmClean);
-    var colorSet={};(colors||[]).forEach(function(c){colorSet[c]=1;});
-    var prefM=all.pref.filter(function(it){var mapped=PREF_COLOR_MAP[it.colorInfo]||'';return mapped&&colorSet[mapped];});
     var decorTop=decorM.slice(0,3);
     /* flwrDecorList(목록)에는 imgUrl 계열 필드가 아예 없어 사진 없이 제목만
        나오는 게 문제였다 - cateGardenMake/indoorpsncpaMvpLctre는 목록 자체에
@@ -386,8 +388,7 @@ function nongsaroGeneralHtml(nm,colors){
     })).then(function(){
       var body=pgcGroup('꽃장식과 정원 꾸미기',decorTop,'decor')
         +pgcGroup('실내정원 만들기',makeM.slice(0,3),'make')
-        +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video')
-        +pgcGroup('',prefM.slice(0,2),'pref');
+        +pgcGroup('실내정원 동영상강좌',videoM.slice(0,2),'video');
       if(!body)return'';
       return uiSection('가드닝 콘텐츠 · 농사로(농촌진흥청)',body);
     });
@@ -3510,12 +3511,7 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
      정상이라, 여기서 불러다가 같은 성격의 기존 슬롯(pdnsgarden)에 이어
      붙인다. 새 슬롯을 만들려면 Webflow 임베드 쪽 HTML도 같이 고쳐야 해서,
      당장 반영 가능한 기존 슬롯 재사용 쪽을 택했다. */
-  /* "좋아하는 꽃"(preferenceFlower) 섹션은 이 식물의 실제 꽃 색상(profile.colors,
-     deriveCuratedProfile이 이미 뽑아둔 값)과 같은 색 계열일 때만 채택하도록
-     설계돼 있었는데, 정작 호출부는 항상 빈 배열을 넘기고 있어 이 종류는 어떤
-     식물에서도 절대 뜰 수 없는 죽은 조건이었다 - 이미 계산돼 있는 값을 그대로
-     넘긴다(profile이 없을 수 있는 호출 경로도 있어 방어적으로 처리). */
-  var generalData=nongsaroGeneralHtml(nm,(profile&&profile.colors)||[]);
+  var generalData=nongsaroGeneralHtml(nm);
   var tourData=tourSpotsHtml(nm);
   Promise.all([nsData,Promise.resolve(extraAcademicHtml||''),bookData,storyData,generalData,tourData]).then(function(res){
     var ns=res[0]||{},extra=res[1]||'',bk=res[2]||{},fs=res[3]||'',general=res[4]||'',tour=res[5]||'';
