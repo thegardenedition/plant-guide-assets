@@ -2891,6 +2891,18 @@ function runSearch(){
         document.getElementById('pemp').style.display='block';
       }
     }
+    /* [2026-09-18] 조용한 실패 금지(마스터 v1.5 16절 원칙 4, 백로그 26). 국립수목원 계열 소스가
+       전부 실패했는데 다른 출처(생물다양성DB·정원 정보)가 결과를 내면 예전엔 화면에 아무 표시가
+       없어, 2026-09-08~15 장애 때 "결과가 적네" 정도로만 보였다. 이제는 결과 위 안내줄(#pnote)에
+       연결 실패를 분명히 적고 콘솔에도 남긴다. 결과가 0건일 때는 위의 showError 가 그대로 맡는다. */
+    if(pending===0&&myQuery===pQ&&pAll.length&&!govOk&&govErr){
+      var noteEl=document.getElementById('pnote');
+      if(noteEl){
+        noteEl.textContent='국립수목원 도감 데이터에 연결하지 못했습니다('+(govErr.message||'네트워크 오류')+'). 지금 보이는 결과는 다른 출처(생물다양성DB·정원 정보)에서만 가져온 것이라 도감 상세·학명 정보가 빠져 있을 수 있습니다. 잠시 후 다시 검색해 주세요.';
+        noteEl.style.display='block';
+      }
+      if(window.console&&console.warn)console.warn('[plant-guide] 국립수목원 API 실패 — 다른 출처 결과만 표시:',govErr.message||govErr);
+    }
     updateLoadingNote();
   }
   function updateLoadingNote(){
