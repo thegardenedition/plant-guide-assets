@@ -317,15 +317,40 @@ function pgcGroup(title,items,kind){
    호출부에서 이 섹션 자체가 화면에 나타나지 않는다. */
 /* 국명 전체가 콘텐츠 제목에 그대로 들어있는 경우만 잡으면 "덩굴장미"처럼
    [수식어+기본명] 복합 국명이 "장미코사지 만들기"(기본명 "장미"만 포함) 같은
-   글과 매칭되지 않는다. 전체 일치가 없으면 앞에서부터 한 글자씩 잘라가며
-   더 짧은(더 일반적인) 기본명 후보로 재시도 - 처음 매칭되는 후보가 가장
-   구체적인 후보이므로 그대로 채택한다. 2글자 미만으로는 내려가지 않는다. */
+   글과 매칭되지 않는다.
+   예전엔 전체 일치가 없으면 앞에서부터 아무 글자나 한 자씩 잘라가며 남는
+   부분으로 재시도했다 - "정확한 데이터만 신뢰" 원칙과 안 맞았다: 잘라낸
+   조각이 실제 수식어라는 근거가 없어, 우연히 다른 뜻의 짧은 문자열과
+   겹치면 무관한 콘텐츠를 끌어올 위험이 있었다(예: 2글자까지 자르면 흔한
+   음절 조합이 의미 없이 일치할 수 있다). 대신 국명에 실제로 쓰이는
+   수식어(크기·색·자생지·형태·원산지)만 정해두고, 그 목록에 있는 접두어를
+   정확히 뗀 나머지로만 재시도한다 - 근거 없는 부분일치를 만들지 않는다.
+   이중 수식어(예: "미국개기장")에 대비해 최대 두 번까지 뗀다. */
+var NAME_MODIFIER_PREFIXES=[
+  '애기','각시','각씨','아기','좀','민','섬','왕','큰','참','개','돌','털',
+  '산','들','물','갯','메','묏','실',
+  '흰','붉은','노랑','자주','검은','푸른',
+  '겹','홑','반겹',
+  '덩굴','넝쿨','좁은잎','넓은잎','둥근잎',
+  '야생','재배',
+  '미국','중국','일본','유럽','서양','양','대만','인도','호주','아프리카','열대'
+];
+function stripKnownModifier(nm){
+  for(var i=0;i<NAME_MODIFIER_PREFIXES.length;i++){
+    var p=NAME_MODIFIER_PREFIXES[i];
+    if(nm.length>p.length+1&&nm.indexOf(p)===0)return nm.slice(p.length);
+  }
+  return null;
+}
 function nongsaroNameMatch(list,nmClean){
   if(!nmClean)return[];
   var exact=list.filter(function(it){return (it.cntntsSj||'').indexOf(nmClean)!==-1;});
   if(exact.length)return exact;
-  for(var cut=1;cut<=nmClean.length-2;cut++){
-    var core=nmClean.slice(cut);
+  var tries=[stripKnownModifier(nmClean)];
+  if(tries[0])tries.push(stripKnownModifier(tries[0]));
+  for(var i=0;i<tries.length;i++){
+    var core=tries[i];
+    if(!core)continue;
     var m=list.filter(function(it){return (it.cntntsSj||'').indexOf(core)!==-1;});
     if(m.length)return m;
   }
