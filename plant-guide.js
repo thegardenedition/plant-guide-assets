@@ -214,8 +214,12 @@ function tourSpotsHtml(nm){
     if(!items.length)return'';
     var body='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">'
       +items.map(function(it){
+        /* TourAPI 이미지 URL이 http://로 오는 경우가 있어(tong.visitkorea.or.kr)
+           https 페이지에서 혼합 콘텐츠 경고가 뜬다 - 크롬은 자동 업그레이드해
+           주지만 모든 브라우저가 그런 건 아니라 명시적으로 https로 바꾼다. */
+        var img0=(it.firstimage||'').replace(/^http:\/\//,'https://');
         var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
-          +(it.firstimage?'<img src="'+esc(it.firstimage)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
+          +(img0?'<img src="'+esc(img0)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
           +'</div>';
         var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
         return '<div>'+img+'<p style="font-size:12px;font-weight:600;color:#121212;margin:0 0 2px">'+esc(it.title)+'</p>'
