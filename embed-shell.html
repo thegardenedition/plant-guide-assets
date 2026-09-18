@@ -15,7 +15,7 @@
 <link rel="dns-prefetch" href="https://apis.data.go.kr">
 <link rel="dns-prefetch" href="https://api.inaturalist.org">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<div id="pnPage" style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FFFFFF;color:#121212">
+<div id="pnPage" style="font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;background:#FFFFFF;color:#121212">
 
 <div style="max-width:1200px;margin:0 auto;padding:80px 32px 64px;display:flex;align-items:flex-start;gap:64px;flex-wrap:wrap">
   <div style="flex:1;min-width:320px">
@@ -125,7 +125,7 @@
 
 <div id="pov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(18,18,18,.75);z-index:99999;align-items:center;justify-content:center;padding:24px;box-sizing:border-box" onclick="if(event.target===this)pCD()">
   <div id="pdpanel" style="background:#fff;width:100%;max-width:880px;max-height:88vh;overflow-y:auto;position:relative;margin:0 auto">
-    <div id="pdhead" style="background:#121212;color:#fff;padding:32px 36px;position:sticky;top:0;cursor:grab">
+    <div id="pdhead" style="background:#0B5345;color:#fff;padding:32px 36px;position:sticky;top:0;cursor:grab">
       <div id="pdgrip" title="드래그해서 창을 옮길 수 있습니다" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px;cursor:grab"></div>
       <button onclick="pCD()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;cursor:pointer;font-family:inherit">&#10005;</button>
       <p id="pdbadge" style="opacity:.5;font-size:11px;letter-spacing:1.5px;font-weight:600;margin:0 0 8px">PLANT</p>
@@ -141,7 +141,7 @@
   </div>
 </div>
 
-<div id="pcmpbar" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#121212;color:#fff;z-index:99998;padding:14px 24px;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 20px rgba(0,0,0,.2);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div id="pcmpbar" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#0B5345;color:#fff;z-index:99998;padding:14px 24px;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 20px rgba(0,0,0,.2);font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif">
   <p style="margin:0;font-size:11px;letter-spacing:1px;color:#ABABAB;white-space:nowrap">비교함 (<span id="pcmpcount">0</span>/4)</p>
   <div id="pcmpthumbs" style="display:flex;gap:8px;flex:1;overflow-x:auto"></div>
   <button onclick="pClearCompare()" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">비우기</button>
@@ -149,8 +149,8 @@
 </div>
 
 <div id="pcmpov" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(18,18,18,.75);z-index:100000;align-items:center;justify-content:center;padding:24px;box-sizing:border-box" onclick="if(event.target===this)pCloseCompare()">
-  <div style="background:#fff;width:100%;max-width:1040px;max-height:88vh;overflow:auto;position:relative;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-    <div style="background:#121212;color:#fff;padding:24px 32px;position:sticky;top:0;display:flex;align-items:center;justify-content:space-between">
+  <div style="background:#fff;width:100%;max-width:1040px;max-height:88vh;overflow:auto;position:relative;font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif">
+    <div style="background:#0B5345;color:#fff;padding:24px 32px;position:sticky;top:0;display:flex;align-items:center;justify-content:space-between">
       <p style="margin:0;font-size:15px;font-weight:600;letter-spacing:.5px">식물 비교</p>
       <div style="display:flex;align-items:center;gap:8px">
         <button onclick="pExportCompare()" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:8px 14px;font-size:11px;letter-spacing:.5px;cursor:pointer;font-family:inherit;white-space:nowrap">CSV 내보내기</button>
