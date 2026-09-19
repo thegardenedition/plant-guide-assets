@@ -80,16 +80,42 @@ function pApplyClamps(container){
   Array.prototype.forEach.call(container.querySelectorAll('.ui-clamp'),function(clamp){
     var btn=clamp.nextElementSibling;
     if(!btn||!btn.classList||!btn.classList.contains('ui-clamp-btn'))return;
-    btn.style.display=(clamp.scrollHeight>clamp.clientHeight+1)?'inline-block':'none';
+    var overflowing=clamp.scrollHeight>clamp.clientHeight+1;
+    btn.style.display=overflowing?'inline-block':'none';
+    if(overflowing)clamp.dataset.ch=clamp.clientHeight; /* [C2] 접힌(4줄) 상태의 실제 렌더 높이 - 펼침/접힘 애니메이션의 시작·종료값으로 쓴다 */
   });
 }
+/* [2026-09-19 UX 미세점검 C2] 예전엔 -webkit-line-clamp를 4↔none으로 즉시
+   바꿔 50ms 안에 펼쳐져 애니메이션이 없었다(line-clamp 자체는 transition이
+   안 먹는 속성). 대신 max-height를 접힌 높이↔전체 높이로 .2s 애니메이션하고,
+   펼칠 때는 그 직전에 line-clamp를 미리 꺼서 늘어나는 동안 전체 텍스트가
+   드러나게 한다(scrollHeight는 line-clamp가 걸려있어도 이미 전체 높이를
+   보고한다 - pApplyClamps가 넘침 판정에 쓰는 것과 같은 성질). */
 window.pToggleClamp=function(btn){
   var clamp=btn.previousElementSibling;
   if(!clamp)return;
-  var expanded=clamp.dataset.expanded==='1';
-  clamp.style.webkitLineClamp=expanded?'4':'none';
-  clamp.dataset.expanded=expanded?'0':'1';
-  btn.textContent=expanded?'더 보기':'접기';
+  var expanding=clamp.dataset.expanded!=='1';
+  var collapsedH=parseFloat(clamp.dataset.ch||clamp.clientHeight)||0;
+  if(expanding){
+    var fullH=clamp.scrollHeight;
+    clamp.style.maxHeight=collapsedH+'px';
+    clamp.style.webkitLineClamp='none';
+    clamp.getBoundingClientRect(); /* 강제 리플로우 - 위 maxHeight를 "시작값"으로 먼저 적용시켜, 바로 다음 줄의 변경이 transition 대상이 되게 한다 */
+    clamp.style.maxHeight=fullH+'px';
+    clamp.dataset.expanded='1';
+    btn.textContent='접기';
+  } else {
+    clamp.style.maxHeight=clamp.scrollHeight+'px';
+    clamp.getBoundingClientRect();
+    clamp.style.maxHeight=collapsedH+'px';
+    clamp.dataset.expanded='0';
+    btn.textContent='더 보기';
+  }
+  clamp.ontransitionend=function(){
+    clamp.ontransitionend=null;
+    if(clamp.dataset.expanded==='1')clamp.style.maxHeight='none';
+    else{clamp.style.webkitLineClamp='4';clamp.style.maxHeight='';}
+  };
 };
 function uiSection(title,inner){
   if(!inner)return'';
@@ -3284,6 +3310,26 @@ function runSearch(){
   var firstShown=false;
   var pending=9;
   var govOk=false,govErr=null;
+  var renderTimer=null;
+  /* [2026-09-19 UX 미세점검 B4] 소스 9개가 최대 2.6초에 걸쳐 따로따로
+     도착할 때마다 renderPage()를 매번 불러 카드가 1→4→9→11장씩 여러
+     번에 나눠 자라 보였다(실측 4번). 첫 배치는 체감 속도를 위해 즉시
+     그리고, 그 뒤 도착하는 소스들은 500ms 안에 모아 한 번만 그린다 -
+     마지막 남은 소스(pending===1)는 더 기다릴 다음 소스가 없으니
+     디바운스 없이 바로 그린다. 결과: 보통 최대 2배치로 줄어든다. */
+  function queueRender(flushNow){
+    if(flushNow){
+      if(renderTimer){clearTimeout(renderTimer);renderTimer=null;}
+      renderPage();
+      return;
+    }
+    if(renderTimer)return;
+    renderTimer=setTimeout(function(){
+      renderTimer=null;
+      if(myQuery!==pQ)return;
+      renderPage();
+    },500);
+  }
 
   function onSettled(){
     pending--;
@@ -3325,6 +3371,7 @@ function runSearch(){
       if(isGovOrigin(origin))govOk=true;
       var result=appendItems(pAll,items,origin);
       if(result.added.length){
+        var isFirst=!firstShown;
         if(!firstShown){
           hideLoading();hideAll();
           document.getElementById('pcnt').style.display='flex';
@@ -3337,7 +3384,7 @@ function runSearch(){
           var cntEl=document.getElementById('pcnt');
           if(cntEl)cntEl.scrollIntoView({behavior:'smooth',block:'start'});
         }
-        renderPage();
+        queueRender(isFirst||pending===1);
       }
       result.upgraded.forEach(refreshCard);
     }).catch(function(){}).then(onSettled);
@@ -3425,14 +3472,38 @@ window.pToggleCompare=function(it,cardEl){
   }
   renderCompareBar();
 };
+var pPrevCompareN=0;
+/* [2026-09-19 UX 미세점검 C4] display:none↔flex 직전환이라 등장 애니메이션이
+   없었다. display는 여전히 JS가 토글하되(완전히 감추기·탭 접근성), 등장/퇴장은
+   pcmpbar-visible 클래스의 transform(translateY)으로 애니메이션한다 - display:
+   none→flex 직후 강제 리플로우 없이 바로 클래스를 붙이면 시작 위치(화면 밖)가
+   적용되기 전에 도착 위치로 트랜지션이 생략될 수 있어 getBoundingClientRect로
+   한 번 리플로우를 강제한다. 사라질 때는 트랜지션(.2s)이 끝난 뒤에야
+   display:none으로 완전히 치운다(그 전에 없애면 애니메이션 없이 뚝 사라짐). */
 function renderCompareBar(){
   var bar=document.getElementById('pcmpbar');
   if(!bar)return;
   var n=compareCount();
-  document.getElementById('pcmpcount').textContent=n;
+  var cnt=document.getElementById('pcmpcount');
+  cnt.textContent=n;
+  if(n>pPrevCompareN){ /* 항목이 늘어날 때만 배지 펄스 - 비우기/제거는 펄스 없음 */
+    cnt.classList.remove('pcmpcount-pulse');
+    void cnt.offsetWidth; /* 강제 리플로우 - 클래스를 뗐다 바로 다시 붙여도 애니메이션이 재생되게 */
+    cnt.classList.add('pcmpcount-pulse');
+  }
+  pPrevCompareN=n;
   var go=document.getElementById('pcmpgo');
   go.disabled=n<2;
-  bar.style.display=n?'flex':'none';
+  if(n){
+    bar.style.display='flex';
+    bar.getBoundingClientRect();
+    bar.classList.add('pcmpbar-visible');
+  } else {
+    bar.classList.remove('pcmpbar-visible');
+    setTimeout(function(){
+      if(compareCount()===0)bar.style.display='none';
+    },220);
+  }
   var thumbs=document.getElementById('pcmpthumbs');
   thumbs.innerHTML=Object.keys(pCompareSet).map(function(uid){
     var rec=pCompareSet[uid];
@@ -3916,6 +3987,11 @@ function pEnsurePovAnimStyle(){
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:160px}' /* [백로그 38 P2-D 후속] 점프해도 섹션 첫 줄이 sticky 헤더(데스크톱 146px) 뒤로 들어가던 문제 - 비즈니스 세션 지적 */
+    +'#pcmpbar{transform:translateY(100%);transition:transform .2s ease-out}' /* [UX 미세점검 C4] display:none↔flex 뚝 전환 대신 슬라이드 인/아웃 - display는 JS(renderCompareBar)가 계속 토글, 위치만 애니메이션 */
+    +'#pcmpbar.pcmpbar-visible{transform:translateY(0)}'
+    +'#pcmpcount{display:inline-block}'
+    +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
+    +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
     +'@media (max-width:640px){'
     +'#pdtabbar{position:sticky;top:56px;background:#fff;z-index:1}' /* 컴팩트 헤더(56px) 바로 아래 고정 */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:100px}' /* 컴팩트 헤더 56px + 칩 바 높이 포함 */
@@ -3935,10 +4011,10 @@ function pEnsurePovAnimStyle(){
     +'#pdcompact{display:flex;position:sticky;top:0;z-index:3;align-items:center;padding:10px 60px 10px 20px;background:'+ACCENT+';color:#fff;height:56px;margin-bottom:-56px;box-sizing:border-box;opacity:0;pointer-events:none;transition:opacity .15s ease}' /* [2026-09-19 대표 3차 실기기 제보 "초록 헤더 위 흰 줄"] opacity:0은 화면엔 안 보여도 레이아웃 자리는 그대로 차지한다 - #pdhead 앞에서 56px를 항상 먹어치워 흰 여백처럼 보였다(디자인 세션이 스크린샷으로 잡아냄). margin-bottom을 자기 높이만큼 음수로 줘서 뒤에 오는 #pdhead를 그만큼 끌어올려 순 차지 공간을 0으로 만든다 - sticky는 이 "원래 있어야 했을 자리"를 기준으로 top:0에 붙으므로 스크롤 동작은 그대로 유지된다 */
     +'#pdcompact.pdcompact-visible{opacity:1;pointer-events:auto}'
     +'#pdcompact button{background:rgba(255,255,255,.1)!important;color:#fff!important;border:0!important}' /* [2026-09-19 대표 실기기 "엑스박스 깨짐"] 이 버튼은 JS가 만들어서 인라인 스타일이 없어(큰 헤더 ✕는 Webflow 임베드 인라인 스타일로 이미 되어있음) 사이트 전역 button 스타일(연회색 불투명 배경)을 그대로 물려받아 초록 바 위에 흰 ✕가 안 보이는 회색 네모로 보였다 - 큰 헤더 ✕와 같은 배경/색으로 맞춘다 */
-    +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}'
+    +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;transition:max-height .2s ease-out}' /* [UX 미세점검 C2] 펼침/접힘 애니메이션 - max-height를 pToggleClamp가 조작한다 */
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact{transition:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
   document.head.appendChild(s);
 }
 /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A] #pdhead 자체의 높이를 바꾸던
