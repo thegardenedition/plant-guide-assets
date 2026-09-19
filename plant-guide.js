@@ -754,8 +754,16 @@ function cleanSciName(sc){
    불러온다. GitHub(thegardenedition/plant-guide-assets)에 업로드해 jsDelivr
    CDN으로 서빙하며, 로드에 실패해도 사이트 나머지 기능은 기존 방식(실시간
    API + 정규식 추출)대로 정상 동작한다. */
-var STATIC_NAME_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/plant_name_master.json';
-var STATIC_SPECIES_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/plant_species_detail.json';
+/* [2026-09-19 정밀진단] raw.githubusercontent.com은 CDN이 아니다(Cache-Control:
+   no-store로 항상 재다운로드·gzip 압축 없음·GitHub 공식적으로 대량 트래픽에
+   비권장). 실측: plant_species_detail.json 8.8MB를 매 방문마다 압축 없이
+   raw로 받고 있었다(직접 fetch 3.86s). jsdelivr(@main, GitHub 파일을 그대로
+   미러링)로 바꾸면 gzip 압축+글로벌 엣지+브라우저 7일 캐시(바이트 동일 확인
+   완료) - 첫 방문도 더 빠르고(콜드 fetch 2.06s), 재방문은 사실상 0ms/0바이트.
+   이 데이터가 상세창 열기(pDetail)·검색 소스 중 하나(searchByFamily)를
+   막고 있어(staticDataReady를 기다림) 로딩 체감 속도에 직접 영향을 준다. */
+var STATIC_NAME_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_name_master.json';
+var STATIC_SPECIES_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/plant_species_detail.json';
 var STATIC_NAME={},STATIC_SPECIES={};
 function loadStaticTable(url,dest){
   if(!url)return Promise.resolve();
@@ -790,9 +798,9 @@ function getStaticMatch(sciNm){
    쓰고 있는 "정적 데이터셋은 외부 JSON으로 호스팅 후 URL만 채워 넣는다"는
    원칙을 그대로 따른다 - URL이 비어있으면 이 섹션만 조용히 빠지고 나머지
    기능에는 영향이 없다.
-   GitHub(thegardenedition/plant-guide-assets)에 업로드해 raw.githubusercontent.com로
-   서빙한다(정적 데이터셋과 동일한 방식 - fetch()로 받는 JSON이라 raw 도메인의
-   MIME 타입 제약을 받지 않는다).
+   GitHub(thegardenedition/plant-guide-assets)에 업로드해 jsdelivr(@main)로
+   서빙한다(위 STATIC_NAME/SPECIES와 동일한 이유 - raw.githubusercontent.com은
+   캐시·압축이 없어 2026-09-19 정밀진단으로 jsdelivr로 옮겼다).
    - 형태·질감·색으로 찾는 우리꽃 정원식물(3권, 총 450종) → 학술정보 탭
      (자생환경·국명유래·학명유래 등 분류학적 서술 중심), 국명/학명 유래가
      있는 종은 "스토리" 필터(pFilter.story)에도 매치된다(bookHasStory 참고).
@@ -800,9 +808,9 @@ function getStaticMatch(sciNm){
      → 정원 가이드 탭(자생지·식재·관리·증식 등 실제 재배 정보 중심)
    - 숲정원을 위한 식물 300종(248종) → 조경 스펙 탭(토성·광조건·내한성 표와
      재배품종 서술 중심) */
-var BOOK_FTC_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_form_texture_color.json';
-var BOOK_GARDEN_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_garden_encyclopedia.json';
-var BOOK_FOREST300_URL='https://raw.githubusercontent.com/thegardenedition/plant-guide-assets/main/book_forest_garden_300.json';
+var BOOK_FTC_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/book_form_texture_color.json';
+var BOOK_GARDEN_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/book_garden_encyclopedia.json';
+var BOOK_FOREST300_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide-assets@main/book_forest_garden_300.json';
 var BOOK_FTC={},BOOK_GARDEN={},BOOK_FOREST300={};
 /* BOOK_FTC는 학명 하나당 한 행만 남기므로(loadStaticTable이 같은 키를 덮어씀),
    세 책(형태/질감/색) 중 두 책 이상에 같은 종이 나오면 먼저 읽힌 축 정보가
