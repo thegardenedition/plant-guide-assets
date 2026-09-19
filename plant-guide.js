@@ -58,9 +58,13 @@ var UI_ROW_VALUE='padding:16px 0;color:#121212;font-size:14px;line-height:1.75';
    참고)라 데스크톱에선 클래스가 붙어도 눈에 보이는 변화가 없고, 버튼도
    pApplyClamps가 실제로 넘치는 경우에만 보여준다. */
 var UI_CLAMP_THRESHOLD=60;
+/* [백로그 38 P2-F] ≤640px 표가 라벨 30%·값 70% 2열이라 라벨 칸이 좁아
+   값이 줄바꿈되던 문제 - class="ui-rowtable"을 달아, 모바일 전용 CSS
+   (pEnsurePovAnimStyle)로 표/행/칸을 전부 block으로 바꿔 "라벨 위(작게,
+   #6E6E6E)/값 아래(15px)" 1열로 쌓는다. 데스크톱은 원래 2열 표 그대로. */
 function uiRows(rows){
   if(!rows||!rows.length)return'';
-  return '<table style="width:100%;border-collapse:collapse">'+rows.map(function(r){
+  return '<table class="ui-rowtable" style="width:100%;border-collapse:collapse">'+rows.map(function(r){
     var val=esc(r[1]);
     var valHtml=(r[1]&&r[1].length>UI_CLAMP_THRESHOLD)
       ?'<div class="ui-clamp">'+val+'</div><span class="ui-clamp-btn" onclick="pToggleClamp(this)" style="display:none;color:#0B5345;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px">더 보기</span>'
@@ -96,7 +100,14 @@ function uiSection(title,inner){
 function uiBody(text){return text?'<p style="color:#121212;font-size:14px;line-height:1.8;margin:0 0 16px;white-space:pre-line">'+esc(text)+'</p>':'';}
 function uiLabeledText(label,text){return text?'<p style="color:#121212;font-size:14px;line-height:1.8;margin:0 0 14px"><b style="font-weight:600">'+esc(label)+'</b> — '+esc(text)+'</p>':'';}
 function uiEmpty(msg){return '<p style="color:#ABABAB;text-align:center;padding:28px 0;font-size:13px;line-height:1.7">'+esc(msg||'정보가 없습니다.')+'</p>';}
-function uiTag(t){return '<span style="display:inline-block;border:1px solid #E6E6E6;padding:4px 10px;font-size:11px;color:#787878;margin:0 6px 6px 0;letter-spacing:.2px">#'+esc(t)+'</span>';}
+/* [백로그 38 P2-H] 태그가 정보 표시만 하고 아무 동작이 없다는 지적 - 탭하면
+   같은 말로 검색한다(기존 pSuggest 재사용). 상세창을 그대로 둔 채 뒤에서
+   검색 결과만 바뀌면 헷갈리므로 pTagSearch가 패널을 먼저 닫는다. */
+function uiTag(t){return '<span onclick="pTagSearch(\''+String(t).replace(/'/g,"")+'\')" style="display:inline-block;border:1px solid #E6E6E6;padding:4px 10px;font-size:11px;color:#787878;margin:0 6px 6px 0;letter-spacing:.2px;cursor:pointer">#'+esc(t)+'</span>';}
+window.pTagSearch=function(term){
+  pHidePov();pUnlockScroll();
+  window.pSuggest(term);
+};
 /* 사진이 없을 때 쓰던 나무 이모지(🌳)를 "이모지 대신 절제된 아이콘" 요청에
    따라 중립색(#D6D6D6) 선 아이콘(간단한 사진 자리표시 기호)으로 바꾼다 -
    배경색과 무관하게 어디서나 같은 톤으로 보인다. */
@@ -863,6 +874,20 @@ function bookProfileData(sc){
       storyHtml:ftc?bookFtcStoryHtml(ftc):''
     };
   }).catch(function(){return empty;});
+}
+/* [백로그 38 P2-C 요약 카드] 발간도서 3종 각각 height/bloom 필드가 있지만
+   종마다 어느 책에 실렸는지 다르다(부분집합) - gardenHtml처럼 다시 HTML로
+   렌더하지 않고 값만 뽑아, 있는 책 순서(정원식물도감→형태질감색→숲정원
+   300종)대로 먼저 값이 있는 쪽을 쓴다. */
+function bookSummaryFields(sc){
+  return bookDataReady.then(function(){
+    var key=cleanSciName(sc);
+    if(!key)return {height:'',bloom:''};
+    var ftc=BOOK_FTC[key],garden=BOOK_GARDEN[key],f300=BOOK_FOREST300[key];
+    var height=(garden&&garden.height)||(ftc&&ftc.height)||(f300&&f300.heightM?f300.heightM+'m':'');
+    var bloom=(garden&&garden.bloom)||(ftc&&ftc.bloom)||(f300&&f300.bloomTime)||'';
+    return {height:height,bloom:bloom};
+  }).catch(function(){return {height:'',bloom:''};});
 }
 
 var pImgCache={};
@@ -1632,12 +1657,89 @@ function deriveCuratedProfile(item,staticMatch,sc){
    고른 값 하나를 짚어주는 자리에만 그린을 쓰고, 본문 텍스트·구조색(#121212/
    #E6E6E6 등)은 그대로 둔다("무채색 + 포인트 그린 단 하나" 원칙, 대표 확정). */
 var ACCENT='#0B5345';
+/* [백로그 38 P2-G] 흰 테두리 버튼 3개가 "눌러도 되는 것처럼" 보인다는 지적
+   (진단 문서 - 실제로는 상태 표시일 뿐 클릭해도 아무 일도 안 일어남).
+   모바일에서는 선택 안 된 옵션을 숨기고 선택된 값 하나만 초록 칩으로 보여준다
+   (.env-opt-active만 남기는 CSS, pEnsurePovAnimStyle 참고) - 그러려면 활성/
+   비활성 여부를 class로도 표시해둬야 CSS가 골라낼 수 있다. 데스크톱은 기존
+   3버튼 스케일을 그대로 유지(골격 유지 원칙). */
 function envBarHtml(label,options,active){
-  return '<div style="margin-bottom:20px">'
+  return '<div class="env-bar" style="margin-bottom:20px">'
     +'<p style="font-size:11px;letter-spacing:1px;color:#ABABAB;margin:0 0 8px">'+esc(label)+'</p>'
     +'<div style="display:flex;gap:6px">'
-    +options.map(function(o){var on=(o===active);return '<span style="flex:1;text-align:center;padding:8px 0;font-size:12px;letter-spacing:.2px;border:1px solid '+(on?ACCENT:'#E6E6E6')+';background:'+(on?ACCENT:'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
+    +options.map(function(o){var on=(o===active);return '<span class="'+(on?'env-opt env-opt-active':'env-opt')+'" style="flex:1;text-align:center;padding:8px 0;font-size:12px;letter-spacing:.2px;border:1px solid '+(on?ACCENT:'#E6E6E6')+';background:'+(on?ACCENT:'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
     +'</div></div>';
+}
+/* [백로그 38 P2-C] 헤더 바로 아래 "스크롤 없이 보이는 첫 화면" 요약 카드 -
+   햇빛·물·다 자란 높이·개화기·난이도 중 값이 있는 것만 가로 스크롤 칸으로
+   보여준다(값 없는 항목은 아예 안 그림 - 빈 칸을 보여주는 것보다 나음).
+   출처가 서로 달라(광조건/수분은 정적 데이터셋 기반 curated profile, 키/
+   개화기는 발간도서 3종, 난이도는 농사로 실내정원 목록) 하나도 없는 종도
+   있을 수 있다 - 그럴 땐 카드 자체를 안 그린다. */
+var SUMMARY_ITEMS=[
+  {key:'sunlight',icon:'☀',label:'햇빛'},
+  {key:'moisture',icon:'💧',label:'물'},
+  {key:'height',icon:'📏',label:'키'},
+  {key:'bloom',icon:'🌸',label:'개화기'},
+  {key:'level',icon:'⚙',label:'난이도'}
+];
+function pdSummaryHtml(values){
+  var items=SUMMARY_ITEMS.filter(function(it){return values&&values[it.key];});
+  if(!items.length)return'';
+  return '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px">'
+    +items.map(function(it){
+      return '<div style="flex:0 0 auto;min-width:74px;text-align:center;background:#F8F8F8;border:1px solid #E6E6E6;padding:10px 8px">'
+        +'<div style="font-size:16px;margin-bottom:4px;line-height:1">'+it.icon+'</div>'
+        +'<div style="font-size:10px;color:#ABABAB;letter-spacing:.3px;margin-bottom:2px">'+esc(it.label)+'</div>'
+        +'<div style="font-size:13px;font-weight:600;color:#121212;white-space:nowrap">'+esc(values[it.key])+'</div>'
+        +'</div>';
+    }).join('')+'</div>';
+}
+/* [백로그 38 P2-D] 코드에 "#pdpane-overview 하나만 남은 탭 구조 흔적"이라고
+   불리던 #pdtabbar(정적 임베드에 이미 있는 빈 슬롯, 예전 탭 UI가 쓰던 자리)
+   를 섹션 점프 칩으로 되살린다. 각 칩은 이미 존재하는 스켈레톤 슬롯 id를
+   그대로 앵커로 쓴다(새 id를 붙일 필요 없음) - 그 슬롯이 비어 있어도
+   scrollIntoView는 안전하게 동작한다(그 자리로 스크롤할 뿐). */
+var PD_JUMP_SECTIONS=[
+  {id:'pdsummary',label:'개요'},
+  {id:'pdbody',label:'특징'},
+  {id:'pdenv',label:'재배'},
+  {id:'pdtourspots',label:'만날 곳'},
+  {id:'pdacademic',label:'자료'}
+];
+function pdJumpChipsHtml(){
+  return PD_JUMP_SECTIONS.map(function(s,i){
+    return '<span class="pdjump-chip'+(i===0?' pdjump-active':'')+'" data-target="'+s.id+'" onclick="pdJumpTo(\''+s.id+'\')">'+esc(s.label)+'</span>';
+  }).join('');
+}
+window.pdJumpTo=function(id){
+  var el=document.getElementById(id);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+};
+/* 지금 스크롤로 보고 있는 섹션에 맞춰 칩을 강조한다(IntersectionObserver).
+   상세창을 열 때마다 이전 종의 관찰 대상이 남아있지 않도록 매번 새 옵저버로
+   교체한다. rootMargin으로 화면 상단 10%~하단 70% 사이에 걸린 섹션을
+   "지금 보는 곳"으로 본다(맨 위/맨 아래 여백에서 너무 일찍/늦게 바뀌지
+   않도록). */
+var pdJumpObserver=null;
+function pdBindJumpObserver(){
+  var scroller=document.getElementById('pdpanel');
+  if(!scroller||!window.IntersectionObserver)return;
+  if(pdJumpObserver)pdJumpObserver.disconnect();
+  pdJumpObserver=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(!entry.isIntersecting)return;
+      var chip=document.querySelector('.pdjump-chip[data-target="'+entry.target.id+'"]');
+      if(!chip)return;
+      var bar=document.getElementById('pdtabbar');
+      if(bar)Array.prototype.forEach.call(bar.querySelectorAll('.pdjump-chip'),function(c){c.classList.remove('pdjump-active');});
+      chip.classList.add('pdjump-active');
+    });
+  },{root:scroller,rootMargin:'-10% 0px -70% 0px',threshold:0});
+  PD_JUMP_SECTIONS.forEach(function(s){
+    var el=document.getElementById(s.id);
+    if(el)pdJumpObserver.observe(el);
+  });
 }
 function envTripleHtml(p){
   var monthCells='';
@@ -1670,7 +1772,7 @@ function overviewSkeleton(){
      둔다 - 사실 정보(형태/분포 등)와 실용 정보(조경·농사로)를 먼저 읽고,
      이름의 유래·숲이야기 같은 서술형 콘텐츠는 마지막에 자연스럽게 이어지는
      순서다. */
-  return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdtourspots','pdstory']
+  return ['pdsummary','pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdtourspots','pdstory']
     .map(function(id){return '<div id="'+id+'"></div>';}).join('');
 }
 /* [백로그 38 P1-K] 6개 출처가 제각각 도착할 때마다 그 결과를 담는 슬롯
@@ -1696,9 +1798,11 @@ function setEl(id,html){
 /* 학명은 검색 결과에 항상 있어 즉시 채울 수 있지만, 과명·영명은 출처(도감/
    표본/정적 데이터셋)에 따라 조금 늦게 도착한다 - 도착하는 대로 다시 호출해도
    같은 슬롯을 덮어쓸 뿐이라 안전하다. */
+/* [백로그 38 P2-C] 학명은 헤더(#pdsci)에 이미 나와 있어 여기서는 뺀다 -
+   전엔 헤더 학명과 이 표의 학명이 그대로 중복이었다. 과명·영명만 남겨
+   "작은 메타 줄"로 내린다. */
 function setPdCore(sc,family,engNm){
   var rows=[];
-  pushRow(rows,'학명',sc);
   pushRow(rows,'과명',family);
   pushRow(rows,'영명',engNm);
   setEl('pdcore',rowsTable(rows));
@@ -3591,6 +3695,23 @@ function pdRarityBadgesHtml(match){
 function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
   var bookData=bookProfileData(sc);
   var storyData=forestStoryHtml(nm);
+  /* [백로그 38 P2-C] 요약 카드 - 광조건/수분은 profile(동기, curated
+     dataset)에서, 키/개화기는 발간도서에서, 난이도는 농사로 실내정원
+     목록에서 각각 다른 타이밍에 온다. 값이 있는 것만 pdSummaryHtml이
+     걸러 보여주므로 여기선 그냥 다 모아 던지면 된다. */
+  Promise.all([
+    bookSummaryFields(sc),
+    nongsaroDataReady.then(function(){var g=nongsaroGardenByName(nm);return (g&&g.managelevelCodeNm)||'';}).catch(function(){return '';})
+  ]).then(function(res){
+    var bk=res[0]||{},level=res[1]||'';
+    setEl('pdsummary',pdSummaryHtml({
+      sunlight:profile&&profile.sunlight,
+      moisture:profile&&profile.moisture,
+      height:bk.height,
+      bloom:bk.bloom,
+      level:level
+    }));
+  }).catch(function(){});
   /* nongsaroGeneralHtml(꽃장식/실내정원 만들기/동영상강좌/좋아하는 꽃)는 이미
      완성돼 있었지만 이 파이프라인 어디에서도 호출되지 않아 화면에 전혀
      나오지 않던 죽은 코드였다 - NONGSARO_API_KEY 복구로 데이터 자체는 이미
@@ -3645,7 +3766,17 @@ function pEnsurePovAnimStyle(){
     +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms ease-out,opacity '+POV_ANIM_MS+'ms ease-out}'
     +'#pdpanel.p-anim-hidden{opacity:0;transform:translateY(24px)}'
     +'#pdhead{transition:padding .2s ease;z-index:2}' /* sticky 헤더가 뒤의 #pdimg에 덮이던 문제(z-index:auto) 수정 - 비즈니스 세션 390 실측 지적 */
+    +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
+    +'.pdjump-chip:hover{color:#121212}'
+    +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
     +'@media (max-width:640px){'
+    +'.ui-rowtable,.ui-rowtable tbody,.ui-rowtable tr,.ui-rowtable td{display:block;width:auto}' /* [백로그 38 P2-F] 라벨 30%/값 70% 2열 표가 좁아 값이 줄바꿈되던 문제 - 1열로 쌓는다 */
+    +'.ui-rowtable tr{border-bottom:1px solid #E6E6E6;padding:12px 0}'
+    +'.ui-rowtable td{padding:0!important}'
+    +'.ui-rowtable td:first-child{color:#6E6E6E;font-size:12px;margin-bottom:4px}' /* 사이트 기존 회색 토큰(새 회색 추가 금지, 디자인 세션 09-19 확인) */
+    +'.ui-rowtable td:last-child{font-size:15px;padding-top:4px!important}'
+    +'.env-bar .env-opt:not(.env-opt-active){display:none}' /* [백로그 38 P2-G] 흰 테두리 버튼 3개가 눌러도 되는 것처럼 보인다는 지적 - 선택 안 된 옵션은 숨기고 선택값 하나만 칩으로 */
+    +'.env-bar .env-opt-active{flex:none!important;padding:6px 14px!important;border-radius:14px!important;font-weight:600}'
     +'#pov{padding:0;align-items:flex-end}'
     +'#pdpanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;height:92dvh!important;max-height:92dvh!important;margin:0;border-radius:16px 16px 0 0}' /* 인라인 max-height:88vh를 이겨야 해서 !important */
     +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
@@ -3722,6 +3853,8 @@ window.pDetail=function(it){
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   pdSet(overviewSkeleton());
   setPdCore(sc,'','');
+  var tabbarEl=document.getElementById('pdtabbar');
+  if(tabbarEl){tabbarEl.innerHTML=pdJumpChipsHtml();pdBindJumpObserver();}
   var creditEl=document.getElementById('pdcredit');
   creditEl.style.display='none';
   pShowPov();
