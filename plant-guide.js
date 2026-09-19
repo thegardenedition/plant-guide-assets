@@ -216,20 +216,40 @@ function fetchTourSpots(nm){
     return items.filter(function(it){return it&&it.title;}).slice(0,3);
   }).catch(function(){TOUR_SPOT_BROKEN=true;return[];});
 }
+/* [2026-09-19] 사진이 없는 장소가 4:3 회색 상자 + 깨진 아이콘으로 나와
+   "오류"처럼 보인다는 대표 제보(맥문동 "상주 맥문동 솔숲" 등) 대응.
+   firstimage가 없으면 애초에 상자를 그리지 않고 한 줄 카드(📍+제목+주소)로
+   낮춘다 - 사진 있는 곳만 가로 스크롤 썸네일(140×105)로 보여줘, 모바일에서
+   auto-fill 그리드가 1열이 되며 상자가 화면 폭 전체로 커지던 문제도 함께
+   없앤다. 사진 URL은 있는데 로드 자체가 실패하는 경우(tong.visitkorea
+   타임아웃 등)는 onerror에서 그 카드의 사진 칸만 지워, 깨진 이미지 아이콘
+   대신 제목·주소만 남긴 카드로 조용히 내려앉게 한다. */
 function tourSpotsHtml(nm){
   return fetchTourSpots(nm).then(function(items){
     if(!items.length)return'';
-    var body='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">'
-      +items.map(function(it){
-        var img0=toHttps(it.firstimage);
-        var img='<div style="width:100%;aspect-ratio:4/3;background:#F2F2F2;overflow:hidden;margin-bottom:6px;display:flex;align-items:center;justify-content:center">'
-          +(img0?'<img src="'+esc(img0)+'" style="width:100%;height:100%;object-fit:cover" loading="lazy">':PLACEHOLDER_ICON)
-          +'</div>';
+    var withPhoto=[],noPhoto=[];
+    items.forEach(function(it){(toHttps(it.firstimage)?withPhoto:noPhoto).push(it);});
+    var thumbs=!withPhoto.length?'':'<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:2px;margin-bottom:'+(noPhoto.length?'10px':'0')+'">'
+      +withPhoto.map(function(it){
         var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
-        return '<div>'+img+'<p style="font-size:12px;font-weight:600;color:#121212;margin:0 0 2px">'+esc(it.title)+'</p>'
-          +(addr?'<p style="font-size:11px;color:#6E6E6E;margin:0">'+esc(addr)+'</p>':'')+'</div>';
+        return '<div style="flex:0 0 140px;width:140px">'
+          +'<div style="width:140px;height:105px;background:#F2F2F2;overflow:hidden;margin-bottom:6px">'
+          +'<img src="'+esc(toHttps(it.firstimage))+'" style="width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s" loading="lazy" onload="this.style.opacity=1" onerror="this.closest(\'div\').style.display=\'none\'">'
+          +'</div>'
+          +'<p style="font-size:12px;font-weight:600;color:#121212;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+'</p>'
+          +(addr?'<p style="font-size:11px;color:#6E6E6E;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(addr)+'</p>':'')
+          +'</div>';
       }).join('')+'</div>';
-    return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',body);
+    var lines=!noPhoto.length?'':'<div style="display:flex;flex-direction:column;gap:8px">'
+      +noPhoto.map(function(it){
+        var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
+        return '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">'
+          +'<span style="font-size:13px">📍</span>'
+          +'<span style="font-size:13px;font-weight:600;color:#121212">'+esc(it.title)+'</span>'
+          +(addr?'<span style="font-size:12px;color:#6E6E6E">'+esc(addr)+'</span>':'')
+          +'</div>';
+      }).join('')+'</div>';
+    return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',thumbs+lines);
   }).catch(function(){return'';});
 }
 /* 민간약초 API의 학명 필드(bneNm)는 "Potentilla kleiniana (장미과)"처럼 끝에
@@ -2247,7 +2267,7 @@ function pHistRestoreSearch(st){
   var wasOverlayOpen=!!(ov&&ov.style.display==='flex');
   /* 스크롤 위치 복원(pUnlockScroll의 scrollTo)은 아래에서 화면 높이가 최종
      확정된 뒤로 미룬다 - body의 fixed 잠금만 지금 풀어둔다. */
-  if(wasOverlayOpen){ov.style.display='none';pUnlockScrollBody();}
+  if(wasOverlayOpen){pHidePov();pUnlockScrollBody();}
   var el=document.getElementById('psi');
   var q=(st&&st.q)||'';
   if(el)el.value=q;
@@ -2281,7 +2301,7 @@ function pOnPopState(e){
     var it=pAll.filter(function(x){return x._uid===st.uid;})[0];
     pSuppressHistory=true;
     if(it)pDetail(it);
-    else{var ov2=document.getElementById('pov');if(ov2){ov2.style.display='none';pUnlockScroll();}}
+    else{pHidePov();pUnlockScroll();}
     pSuppressHistory=false;
   } else {
     pHistRestoreSearch(st);
@@ -3418,7 +3438,7 @@ function pUnlockScroll(){
    히스토리 상태가 없는 예외 상황(예: 구형 브라우저)에는 예전처럼 직접 닫는다. */
 window.pCD=function(){
   if(history.state&&history.state.type==='detail'){history.back();return;}
-  document.getElementById('pov').style.display='none';pUnlockScroll();
+  pHidePov();pUnlockScroll();
 };
 
 function rowsTable(rows){
@@ -3553,6 +3573,55 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
   });
 }
 
+/* [2026-09-19] 대표 요청: 상세창이 display:none↔flex로 즉시 전환돼 열고 닫는
+   느낌이 없었다(transition:all이 있어도 display 전환 자체엔 무효). 데스크톱은
+   살짝 아래에서 페이드업, 모바일(≤640px)은 시트가 아래에서 올라오는 방식으로
+   연다. class를 넣은 채로 display만 바꾼 뒤 다음 프레임에 class를 빼서
+   transition이 실제로 발동하게 한다(카드 등장 애니메이션의 pRevealCard와
+   같은 이중 rAF 패턴). prefers-reduced-motion이면 즉시 전환. 카드 그리드
+   호버 모션(디자인 세션 mgpguidemotion)과 선택자가 겹치지 않도록 #pov/
+   #pdpanel에만 건다. */
+var POV_ANIM_MS=200;
+function pEnsurePovAnimStyle(){
+  if(document.getElementById('pov-anim-style'))return;
+  var s=document.createElement('style');
+  s.id='pov-anim-style';
+  s.textContent=
+    '#pov{transition:opacity '+POV_ANIM_MS+'ms ease}'
+    +'#pov.p-anim-hidden{opacity:0;pointer-events:none}' /* 닫히는 중엔 뒤로 겹쳐 보이는 검색결과 클릭을 막지 않는다 */
+    +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms ease-out,opacity '+POV_ANIM_MS+'ms ease-out}'
+    +'#pdpanel.p-anim-hidden{opacity:0;transform:translateY(24px)}'
+    +'@media (max-width:640px){'
+    +'#pdpanel{border-radius:16px 16px 0 0}'
+    +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
+    +'}'
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel{transition:none}}';
+  document.head.appendChild(s);
+}
+function pShowPov(){
+  pEnsurePovAnimStyle();
+  var ov=document.getElementById('pov'),panel=document.getElementById('pdpanel');
+  if(!ov||!panel)return;
+  ov.classList.add('p-anim-hidden');panel.classList.add('p-anim-hidden');
+  ov.style.display='flex';
+  var revealed=false;
+  function reveal(){if(revealed)return;revealed=true;ov.classList.remove('p-anim-hidden');panel.classList.remove('p-anim-hidden');}
+  /* 탭이 백그라운드로 밀려 rAF가 안 도는 드문 경우에도 패널이 opacity:0로
+     영영 안 보이는 상태로 남지 않도록, setTimeout을 안전망으로 같이 건다
+     (둘 중 먼저 오는 쪽이 실행 - revealed 플래그로 중복 실행만 막는다). */
+  requestAnimationFrame(function(){requestAnimationFrame(reveal);});
+  setTimeout(reveal,POV_ANIM_MS);
+}
+function pHidePov(){
+  var ov=document.getElementById('pov'),panel=document.getElementById('pdpanel');
+  if(!ov||ov.style.display==='none')return;
+  pEnsurePovAnimStyle();
+  ov.classList.add('p-anim-hidden');if(panel)panel.classList.add('p-anim-hidden');
+  setTimeout(function(){
+    ov.style.display='none';
+    ov.classList.remove('p-anim-hidden');if(panel)panel.classList.remove('p-anim-hidden');
+  },POV_ANIM_MS);
+}
 window.pDetail=function(it){
   pHistPushDetail(it._uid); /* 뒤로가기로 이 상세창을 닫을 수 있도록 히스토리에 기록 */
   var no=it.no,nm=it.nm,sc=it.sc,specsId=it.specsId,origin=it.origin,raw=it.raw;
@@ -3574,7 +3643,7 @@ window.pDetail=function(it){
   setPdCore(sc,'','');
   var creditEl=document.getElementById('pdcredit');
   creditEl.style.display='none';
-  document.getElementById('pov').style.display='flex';
+  pShowPov();
   pLockScroll();
   var pdimg=document.getElementById('pdimg');
   pdimg.innerHTML=PLACEHOLDER_ICON;
