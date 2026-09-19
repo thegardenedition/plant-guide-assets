@@ -4010,7 +4010,7 @@ function pEnsurePovAnimStyle(){
     +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
     +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
     +'@media (max-width:640px){'
-    +'.pd-slide-arrow{display:none}' /* [UX 미세점검 C3] 모바일은 스와이프로 충분하니 화살표는 숨긴다 - 카운터 칩이 "여러 장" 단서를 대신한다 */
+    +'.pd-slide-arrow{display:none!important}' /* [UX 미세점검 C3] 모바일은 스와이프로 충분하니 화살표는 숨긴다 - 카운터 칩이 "여러 장" 단서를 대신한다. 버튼 자체에 인라인 display:flex가 있어(renderImageSlider) !important 없이는 안 이겼다(비즈니스 세션 390 실측 지적) */
     +'#pdtabbar{position:sticky;top:56px;background:#fff;z-index:1}' /* 컴팩트 헤더(56px) 바로 아래 고정 */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:100px}' /* 컴팩트 헤더 56px + 칩 바 높이 포함 */
     +'.ui-rowtable,.ui-rowtable tbody,.ui-rowtable tr,.ui-rowtable td{display:block;width:auto}' /* [백로그 38 P2-F] 라벨 30%/값 70% 2열 표가 좁아 값이 줄바꿈되던 문제 - 1열로 쌓는다 */
