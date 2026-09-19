@@ -3813,6 +3813,8 @@ function pEnsurePovAnimStyle(){
     +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms ease-out,opacity '+POV_ANIM_MS+'ms ease-out}'
     +'#pdpanel.p-anim-hidden{opacity:0;transform:translateY(24px)}'
     +'#pdhead{transition:padding .2s ease;z-index:2}' /* sticky 헤더가 뒤의 #pdimg에 덮이던 문제(z-index:auto) 수정 - 비즈니스 세션 390 실측 지적 */
+    +'#pdcompact{display:none;touch-action:none}' /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A(구조)] 큰 헤더 자체를 컴팩트로 줄이던 방식(패딩·폰트 전환)은 스크롤 경계(60px)를 넘나들 때마다 높이가 122↔56으로 출렁이고 떨렸다. 헤더를 sticky에서 풀어 콘텐츠와 함께 스크롤되게 하고, 높이가 전혀 안 바뀌는 별도의 56px 바를 opacity로만 나타나게 한다(모바일 전용, 아래 media 블록) - 원리적으로 튐·떨림이 없다. 데스크톱에선 계속 display:none */
+    +'#pdcompact button{width:44px!important;height:44px!important;font-size:15px!important;position:absolute;top:6px;right:6px;display:flex!important;align-items:center;justify-content:center;touch-action:auto}'
     +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
@@ -3832,28 +3834,51 @@ function pEnsurePovAnimStyle(){
     +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
     +'#pdhead{touch-action:none}' /* 드래그다운 제스처 초반에 브라우저가 세로 스크롤로 가로채 가지 않도록(대표 실기기 "불안정" 제보 원인) - 닫기 버튼은 아래에서 다시 auto로 되돌린다 */
     +'#pdhead button{width:44px!important;height:44px!important;font-size:15px!important;top:6px!important;right:6px!important;display:flex!important;align-items:center;justify-content:center;touch-action:auto}'
-    +'#pdhead.pdhead-compact{padding:6px 60px 6px 20px!important;min-height:56px;display:flex;align-items:center;box-sizing:border-box}' /* 56px 고정 - 이름 아래 남은 인라인 margin(0 0 6px) 때문에 39px로 줄어들어 44px 닫기버튼이 삐져나오던 문제(비즈니스 세션 재측정 지적) 대응, padding 계산에 기대지 않고 min-height+flex로 직접 못박는다 */
-    +'#pdhead.pdhead-compact #pdgrip,#pdhead.pdhead-compact #pdbadge,#pdhead.pdhead-compact #pdsci{display:none}'
-    +'#pdhead.pdhead-compact #pdname{font-size:16px!important;margin:0!important}' /* 인라인 font-size:24px·margin:0 0 6px를 이겨야 해서 !important */
+    +'#pdhead{position:static!important}' /* 큰 헤더를 sticky에서 풀어 콘텐츠와 함께 스크롤되게 한다 - 높이가 전혀 안 바뀌는 #pdcompact 바가 그 역할을 대신 맡는다 */
+    +'#pdcompact{display:flex;position:sticky;top:0;z-index:3;align-items:center;padding:10px 60px 10px 20px;background:'+ACCENT+';color:#fff;min-height:56px;box-sizing:border-box;opacity:0;pointer-events:none;transition:opacity .15s ease}'
+    +'#pdcompact.pdcompact-visible{opacity:1;pointer-events:auto}'
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}'
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead{transition:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact{transition:none}}';
   document.head.appendChild(s);
 }
-/* 스크롤 60px 지나면 큰 헤더(배지+이름 24px+학명)를 컴팩트 바(이름 16px만)로
-   줄여, 늘 떠 있던 122px 헤더가 읽는 영역을 74%까지 깎아먹던 문제를 줄인다.
-   #pdpanel/#pdhead는 페이지에 하나뿐인 고정 요소라 리스너를 한 번만 건다
-   (상세창을 여닫을 때마다 다시 만들어지는 요소가 아님). CSS가 이 클래스를
-   모바일(≤640px)에서만 적용하므로 데스크톱에서는 클래스가 붙어도 눈에 보이는
-   변화가 없다. */
+/* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A] #pdhead 자체의 높이를 바꾸던
+   첫 시도는 스크롤 경계를 넘나들 때마다(특히 드래그로 위아래를 오갈 때)
+   출렁이고 떨렸다. 대신 높이가 고정된 별도 56px 바(#pdcompact)를 항상
+   DOM에 두고 opacity만 0↔1로 바꾼다 - 어떤 경우에도 레이아웃 크기 자체는
+   변하지 않으므로 원리적으로 튐이 없다. #pdhead는 이제 sticky를 풀어
+   콘텐츠와 함께 그냥 스크롤된다. */
+function panelIsSheetDragging(){
+  var p=document.getElementById('pdpanel');
+  return !!(p&&p.dataset.sheetDragging==='1');
+}
+function pdEnsureCompactBar(){
+  var bar=document.getElementById('pdcompact');
+  if(bar)return bar;
+  var head=document.getElementById('pdhead');
+  if(!head||!head.parentNode)return null;
+  bar=document.createElement('div');
+  bar.id='pdcompact';
+  bar.innerHTML=
+    '<div id="pdcompactgrip" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px"></div>'
+    +'<span id="pdcompactname" style="font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>'
+    +'<button onclick="pCD()">&#10005;</button>';
+  head.parentNode.insertBefore(bar,head);
+  return bar;
+}
+/* #pdpanel/#pdhead는 페이지에 하나뿐인 고정 요소라 리스너를 한 번만 건다
+   (상세창을 여닫을 때마다 다시 만들어지는 요소가 아님). CSS가 이 상태를
+   모바일(≤640px)에서만 보이게 하므로 데스크톱에서는 클래스가 붙어도 눈에
+   보이는 변화가 없다. */
 function pBindHeadCompact(){
   var scroller=document.getElementById('pdpanel'),head=document.getElementById('pdhead');
-  if(!scroller||!head||scroller.dataset.compactBound)return;
+  var bar=pdEnsureCompactBar();
+  if(!scroller||!head||!bar||scroller.dataset.compactBound)return;
   scroller.dataset.compactBound='1';
   scroller.addEventListener('scroll',function(){
-    if(scroller.scrollTop>60)head.classList.add('pdhead-compact');
-    else head.classList.remove('pdhead-compact');
+    if(panelIsSheetDragging())return; /* 드래그 중엔 컴팩트 전환을 잠근다(2차 실기기 피드백) */
+    bar.classList.toggle('pdcompact-visible',scroller.scrollTop>60);
   },{passive:true});
 }
 function pShowPov(){
@@ -3861,9 +3886,10 @@ function pShowPov(){
   pBindHeadCompact();
   var ov=document.getElementById('pov'),panel=document.getElementById('pdpanel');
   if(!ov||!panel)return;
-  var head=document.getElementById('pdhead');
-  if(head)head.classList.remove('pdhead-compact'); /* 새로 열 때마다 스크롤 0에서 시작하니 컴팩트 상태도 초기화 */
+  var head=document.getElementById('pdhead'); /* 컴팩트 바 초기화는 pDetail에서 pdEnsureCompactBar 호출 시 함께 처리 */
   panel.style.transform='';panel.style.transition=''; /* 직전 드래그다운 제스처가 남긴 인라인 transform 잔존 방지(대표 실기기 "불안정" 제보 원인 중 하나) */
+  ov.style.opacity='';ov.style.pointerEvents='';ov.style.transition=''; /* 드래그 중 손가락 위치에 맞춰 직접 건드린 배경 opacity/pointerEvents 잔존 방지(2차 실기기 피드백 원인 중 하나) */
+  panel.dataset.sheetDragging='';if(head)head.style.transition='';
   ov.classList.add('p-anim-hidden');panel.classList.add('p-anim-hidden');
   ov.style.display='flex';
   var revealed=false;
@@ -3897,7 +3923,10 @@ window.pDetail=function(it){
      숨긴다. */
   var hasKorNm=!!(nm&&nm.trim()&&nm.trim()!=='이름 없음');
   var sciEl=document.getElementById('pdsci');
-  document.getElementById('pdname').textContent=hasKorNm?nm:(sc||'이름 미확인');
+  var pdNameText=hasKorNm?nm:(sc||'이름 미확인');
+  document.getElementById('pdname').textContent=pdNameText;
+  var compactBar=pdEnsureCompactBar();
+  if(compactBar){var cn=document.getElementById('pdcompactname');if(cn)cn.textContent=pdNameText;compactBar.classList.remove('pdcompact-visible');} /* 새로 열 때마다 스크롤 0에서 시작하니 컴팩트 상태도 초기화 */
   if(hasKorNm&&sc){sciEl.innerHTML=sciNameHtml(sc);sciEl.style.display='';}
   else{sciEl.textContent='';sciEl.style.display='none';}
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
@@ -4093,6 +4122,7 @@ window.pDetail=function(it){
   var panel=document.getElementById('pdpanel');
   var head=document.getElementById('pdhead');
   var grip=document.getElementById('pdgrip');
+  var compactBar=pdEnsureCompactBar(); /* 큰 헤더가 스크롤로 밀려나면 컴팩트 바가 대신 보이므로, 아래로 끌어 닫는 제스처도 컴팩트 바에 똑같이 걸어야 한다 */
   if(!panel||!head)return;
   var dragging=false,moved=false,startX=0,startY=0,startLeft=0,startTop=0,startTime=0,lastDy=0;
   function onDown(e){
@@ -4124,18 +4154,43 @@ window.pDetail=function(it){
      속도 조건을 더한다. (5) onUp의 changedTouches 의존을 없애고 onMove가
      매번 저장해두는 lastDy를 그대로 쓴다. */
   function isMobileSheet(){return window.innerWidth<=640;}
+  /* [2026-09-19 대표 2차 실기기 피드백 "손 떼는 동작이 부자연스럽다"]
+     비즈니스 세션이 코드로 짚은 3가지:
+     1) 백드롭이 시트와 따로 논다 - 시트는 180ms에 다 내려갔는데 어두운
+        배경은 그 다음에야 pHidePov가 200ms 더 걸려 걷혀 "두 박자"로 보임.
+        → 드래그 중에도 손가락 위치에 맞춰 배경을 같이 옅게 하고, 닫을 때도
+        시트 이동과 배경 페이드를 한 애니메이션으로 동시에 재생한다.
+     2) 드래그 도중 컴팩트 헤더 전환(padding 트랜지션)이 같이 끼어들면
+        헤더 높이가 출렁인다 - 드래그 중엔 컴팩트 토글을 잠그고(panel의
+        data attribute로 pBindHeadCompact 스크롤 핸들러에 신호) 헤더
+        자체의 padding transition도 끈다.
+     3) 위로 끌면 touch-action:none 때문에 정말 아무 반응이 없었다 -
+        네이티브 스크롤을 대신 돌려줄 방법이 없어(CSS touch-action엔
+        "아래로만 허용" 값이 없음), 최소한 눈에 보이는 반응(작게 튕겼다
+        돌아오는 저항)을 준다. 닫힘 판정은 여전히 실제(감쇠 전) dy 기준이라
+        위로 끈 건 항상 스냅백된다.
+     덤: 손가락을 1:1로 그대로 따라가면 뻣뻣해 보인다는 지적 - 시각적
+     이동에만 0.85 감쇠를 주고(닫힘 판정 임계값은 감쇠 전 실제 dy 그대로). */
   function onMove(e){
     if(!dragging)return;
     var pt=e.touches?e.touches[0]:e;
     var dx=pt.clientX-startX,dy=pt.clientY-startY;
     if(isMobileSheet()){
+      var ov=document.getElementById('pov');
       if(dy<=0){
-        if(dragging)e.preventDefault(); /* 위로 살짝 흔들려도 브라우저가 스크롤로 못 채가게 */
+        moved=true;lastDy=dy;
+        panel.dataset.sheetDragging='1';
+        panel.style.transition='none';head.style.transition='none';
+        var upDamped=Math.max(dy*0.3,-24); /* 위로 끌어도 최대 24px까지만 살짝 들리는 저항 반응 - 항상 스냅백(닫히지 않음) */
+        panel.style.transform='translateY('+upDamped+'px)';
+        e.preventDefault();
         return;
       }
       moved=true;lastDy=dy;
-      panel.style.transition='none';
-      panel.style.transform='translateY('+dy+'px)';
+      panel.dataset.sheetDragging='1';
+      panel.style.transition='none';head.style.transition='none';
+      panel.style.transform='translateY('+(dy*0.85)+'px)';
+      if(ov){ov.style.transition='none';ov.style.opacity=String(Math.max(0,1-dy/(panel.offsetHeight||600)));}
       e.preventDefault();
       return;
     }
@@ -4156,16 +4211,26 @@ window.pDetail=function(it){
     e.preventDefault();
   }
   function finishSheetDrag(shouldClose){
+    var ov=document.getElementById('pov');
     panel.style.transition='transform 180ms ease-out';
+    if(ov)ov.style.transition='opacity 180ms ease-out';
     if(shouldClose){
       panel.style.transform='translateY(100%)';
+      if(ov){ov.style.opacity='0';ov.style.pointerEvents='none';} /* 시트가 내려가는 것과 배경이 걷히는 것을 같은 180ms로 동시 재생 - 따로 놀던 "두 박자" 닫힘 해소. pointerEvents는 클래스(.p-anim-hidden)가 아직 안 붙은 전환 구간에도 뒤 검색결과 클릭을 막지 않기 위해 미리 끈다 */
       setTimeout(function(){
         window.pCD();
         panel.style.transition='';panel.style.transform='';
+        if(ov){ov.style.transition='';ov.style.opacity='';}
+        panel.dataset.sheetDragging='';head.style.transition='';
       },180);
     } else {
       panel.style.transform='';
-      setTimeout(function(){panel.style.transition='';},180);
+      if(ov)ov.style.opacity='';
+      setTimeout(function(){
+        panel.style.transition='';
+        if(ov)ov.style.transition='';
+        panel.dataset.sheetDragging='';head.style.transition='';
+      },180);
     }
   }
   function onUp(){
@@ -4187,6 +4252,10 @@ window.pDetail=function(it){
   }
   head.addEventListener('mousedown',onDown);
   head.addEventListener('touchstart',onDown,{passive:true});
+  if(compactBar){
+    compactBar.addEventListener('mousedown',onDown);
+    compactBar.addEventListener('touchstart',onDown,{passive:true});
+  }
   window.addEventListener('mousemove',onMove,{passive:false});
   window.addEventListener('touchmove',onMove,{passive:false});
   window.addEventListener('mouseup',onUp);
