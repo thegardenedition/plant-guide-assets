@@ -1742,34 +1742,51 @@ function pdEnsureTabbar(){
   pane.parentNode.insertBefore(tb,pane);
   return tb;
 }
+/* [백로그 38 P2-D 재수정, 2026-09-19] 비즈니스 세션 390 실측: smooth
+   scrollIntoView가 두 가지로 어긋났다 - (1) 스크롤 60px 지점에서 헤더가
+   122→56px로 줄며 레이아웃이 66px 이동해 목표 위치가 그새 바뀌고,
+   (2) setEl의 K 레이아웃시프트 보정 같은 다른 프로그램적 스크롤이 끼면
+   Chrome이 진행 중이던 smooth 스크롤을 취소한다(실측 확인: pdbody/pdenv
+   점프가 아예 안 움직이거나 66px 어긋남). 컴팩트 상태를 먼저 강제로
+   확정해 높이를 고정한 뒤, 헤더+칩바 높이만큼 오프셋을 주고 instant로
+   scrollTop을 직접 설정한다(비즈니스 세션이 라이브에서 4/5 섹션 정확히
+   칩 바 하단에 맞는 것까지 실측 검증). */
 window.pdJumpTo=function(id){
-  var el=document.getElementById(id);
-  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+  var el=document.getElementById(id),p=document.getElementById('pdpanel');
+  if(!el||!p)return;
+  var head=document.getElementById('pdhead'),tb=document.getElementById('pdtabbar');
+  if(window.innerWidth<=640&&head)head.classList.add('pdhead-compact');
+  var off=(head?head.getBoundingClientRect().height:0)+(tb?tb.getBoundingClientRect().height:0);
+  p.scrollTop=el.offsetTop-off;
+  pdSetActiveChip(id);
 };
-/* 지금 스크롤로 보고 있는 섹션에 맞춰 칩을 강조한다(IntersectionObserver).
-   상세창을 열 때마다 이전 종의 관찰 대상이 남아있지 않도록 매번 새 옵저버로
-   교체한다. rootMargin으로 화면 상단 10%~하단 70% 사이에 걸린 섹션을
-   "지금 보는 곳"으로 본다(맨 위/맨 아래 여백에서 너무 일찍/늦게 바뀌지
-   않도록). */
-var pdJumpObserver=null;
+function pdSetActiveChip(id){
+  var bar=document.getElementById('pdtabbar');
+  if(!bar)return;
+  Array.prototype.forEach.call(bar.querySelectorAll('.pdjump-chip'),function(c){
+    c.classList.toggle('pdjump-active',c.getAttribute('data-target')===id);
+  });
+}
+/* IntersectionObserver는 여러 섹션이 동시에 화면에 걸리면(짧은 섹션들)
+   활성 칩이 부정확했다(실측: pdbody/pdacademic/pdtourspots로 점프해도
+   "재배"에 계속 걸려있음) - 섹션이 5개뿐이라, 스크롤할 때마다 "칩 바
+   하단을 이미 지난 마지막 섹션"을 직접 계산하는 쪽이 더 정확하고 가볍다.
+   #pdpanel은 상세창을 열 때마다 새로 만들어지는 요소가 아니라 리스너를
+   한 번만 건다(pBindHeadCompact와 같은 패턴). */
 function pdBindJumpObserver(){
   var scroller=document.getElementById('pdpanel');
-  if(!scroller||!window.IntersectionObserver)return;
-  if(pdJumpObserver)pdJumpObserver.disconnect();
-  pdJumpObserver=new IntersectionObserver(function(entries){
-    entries.forEach(function(entry){
-      if(!entry.isIntersecting)return;
-      var chip=document.querySelector('.pdjump-chip[data-target="'+entry.target.id+'"]');
-      if(!chip)return;
-      var bar=document.getElementById('pdtabbar');
-      if(bar)Array.prototype.forEach.call(bar.querySelectorAll('.pdjump-chip'),function(c){c.classList.remove('pdjump-active');});
-      chip.classList.add('pdjump-active');
+  if(!scroller||scroller.dataset.jumpScrollBound)return;
+  scroller.dataset.jumpScrollBound='1';
+  scroller.addEventListener('scroll',function(){
+    var head=document.getElementById('pdhead'),tb=document.getElementById('pdtabbar');
+    var threshold=scroller.scrollTop+(head?head.getBoundingClientRect().height:0)+(tb?tb.getBoundingClientRect().height:0)+8;
+    var current=PD_JUMP_SECTIONS[0].id;
+    PD_JUMP_SECTIONS.forEach(function(s){
+      var el=document.getElementById(s.id);
+      if(el&&el.offsetTop<=threshold)current=s.id;
     });
-  },{root:scroller,rootMargin:'-10% 0px -70% 0px',threshold:0});
-  PD_JUMP_SECTIONS.forEach(function(s){
-    var el=document.getElementById(s.id);
-    if(el)pdJumpObserver.observe(el);
-  });
+    pdSetActiveChip(current);
+  },{passive:true});
 }
 function envTripleHtml(p){
   var monthCells='';
