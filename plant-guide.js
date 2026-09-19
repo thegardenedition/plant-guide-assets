@@ -3934,6 +3934,7 @@ function pEnsurePovAnimStyle(){
     +'#pdhead{position:static!important}' /* 큰 헤더를 sticky에서 풀어 콘텐츠와 함께 스크롤되게 한다 - 높이가 전혀 안 바뀌는 #pdcompact 바가 그 역할을 대신 맡는다 */
     +'#pdcompact{display:flex;position:sticky;top:0;z-index:3;align-items:center;padding:10px 60px 10px 20px;background:'+ACCENT+';color:#fff;height:56px;margin-bottom:-56px;box-sizing:border-box;opacity:0;pointer-events:none;transition:opacity .15s ease}' /* [2026-09-19 대표 3차 실기기 제보 "초록 헤더 위 흰 줄"] opacity:0은 화면엔 안 보여도 레이아웃 자리는 그대로 차지한다 - #pdhead 앞에서 56px를 항상 먹어치워 흰 여백처럼 보였다(디자인 세션이 스크린샷으로 잡아냄). margin-bottom을 자기 높이만큼 음수로 줘서 뒤에 오는 #pdhead를 그만큼 끌어올려 순 차지 공간을 0으로 만든다 - sticky는 이 "원래 있어야 했을 자리"를 기준으로 top:0에 붙으므로 스크롤 동작은 그대로 유지된다 */
     +'#pdcompact.pdcompact-visible{opacity:1;pointer-events:auto}'
+    +'#pdcompact button{background:rgba(255,255,255,.1)!important;color:#fff!important;border:0!important}' /* [2026-09-19 대표 실기기 "엑스박스 깨짐"] 이 버튼은 JS가 만들어서 인라인 스타일이 없어(큰 헤더 ✕는 Webflow 임베드 인라인 스타일로 이미 되어있음) 사이트 전역 button 스타일(연회색 불투명 배경)을 그대로 물려받아 초록 바 위에 흰 ✕가 안 보이는 회색 네모로 보였다 - 큰 헤더 ✕와 같은 배경/색으로 맞춘다 */
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}'
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
