@@ -3650,9 +3650,9 @@ function pEnsurePovAnimStyle(){
     +'#pdpanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;height:92dvh!important;max-height:92dvh!important;margin:0;border-radius:16px 16px 0 0}' /* 인라인 max-height:88vh를 이겨야 해서 !important */
     +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
     +'#pdhead button{width:44px!important;height:44px!important;font-size:15px!important;top:6px!important;right:6px!important;display:flex!important;align-items:center;justify-content:center}'
-    +'#pdhead.pdhead-compact{padding:6px 60px 6px 20px!important}' /* 6+44(닫기버튼)+6=56px, 인라인 스타일을 이겨야 해서 !important */
+    +'#pdhead.pdhead-compact{padding:6px 60px 6px 20px!important;min-height:56px;display:flex;align-items:center;box-sizing:border-box}' /* 56px 고정 - 이름 아래 남은 인라인 margin(0 0 6px) 때문에 39px로 줄어들어 44px 닫기버튼이 삐져나오던 문제(비즈니스 세션 재측정 지적) 대응, padding 계산에 기대지 않고 min-height+flex로 직접 못박는다 */
     +'#pdhead.pdhead-compact #pdgrip,#pdhead.pdhead-compact #pdbadge,#pdhead.pdhead-compact #pdsci{display:none}'
-    +'#pdhead.pdhead-compact #pdname{font-size:16px!important;margin:0}' /* 인라인 font-size:24px를 이겨야 해서 !important */
+    +'#pdhead.pdhead-compact #pdname{font-size:16px!important;margin:0!important}' /* 인라인 font-size:24px·margin:0 0 6px를 이겨야 해서 !important */
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}'
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
