@@ -1384,35 +1384,40 @@ function renderImageSlider(wrap,creditEl,photos){
     track.appendChild(slide);
   });
   wrap.appendChild(track);
-  var dots=null,prev=null,next=null;
+  var counterEl=null,prev=null,next=null;
+  /* nudgePx: 첫 열림 스와이프 유도용 - idx 위치에서 몇 px 더 민 상태를 보여줄지(0=평상시) */
+  function trackTransform(nudgePx){
+    return 'translateX(calc(-'+(idx*100)+'% - '+(nudgePx||0)+'px))';
+  }
   function update(){
-    track.style.transform='translateX(-'+(idx*100)+'%)';
+    track.style.transform=trackTransform(0);
     if(creditEl){
       var c=photos[idx]&&photos[idx].credit;
       creditEl.textContent=c?'사진: '+c+' ('+(idx+1)+'/'+photos.length+')':'';
       creditEl.style.display=c?'block':'none';
     }
-    if(dots)Array.prototype.forEach.call(dots.children,function(d,i){d.style.opacity=i===idx?'1':'.4';});
+    if(counterEl)counterEl.textContent=(idx+1)+' / '+photos.length;
   }
   if(photos.length>1){
+    /* [2026-09-19 UX 미세점검 C3] 화살표 32px는 탭하기 작고(44px 미달),
+       점 인디케이터는 6px가 12개까지 늘어나면 탭도 안 되고 잘 읽히지도
+       않았다. 화살표는 44px로 키우고(모바일은 스와이프로 충분해 숨김 -
+       아래 mobile-only CSS), 점은 "n / 총n" 텍스트 카운터로 바꾼다. */
     prev=document.createElement('button');
-    prev.type='button';prev.innerHTML='&#10094;';
-    prev.style.cssText='position:absolute;left:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:14px;line-height:1';
+    prev.type='button';prev.className='pd-slide-arrow';prev.innerHTML='&#10094;';
+    prev.style.cssText='position:absolute;left:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center';
     prev.onclick=function(e){e.stopPropagation();idx=(idx-1+photos.length)%photos.length;update();};
     next=document.createElement('button');
-    next.type='button';next.innerHTML='&#10095;';
-    next.style.cssText='position:absolute;right:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:14px;line-height:1';
+    next.type='button';next.className='pd-slide-arrow';next.innerHTML='&#10095;';
+    next.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center';
     next.onclick=function(e){e.stopPropagation();idx=(idx+1)%photos.length;update();};
     wrap.appendChild(prev);wrap.appendChild(next);
-    dots=document.createElement('div');
-    dots.style.cssText='position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:6px';
-    photos.forEach(function(_,i){
-      var d=document.createElement('span');
-      d.style.cssText='width:6px;height:6px;border-radius:50%;background:#fff;opacity:.4;cursor:pointer;display:inline-block';
-      d.onclick=function(e){e.stopPropagation();idx=i;update();};
-      dots.appendChild(d);
-    });
-    wrap.appendChild(dots);
+    /* [디자인 세션 피드백 2026-09-19] 모바일은 화살표를 숨기므로(아래 mobile-only
+       CSS) 사진이 여러 장이라는 단서가 카운터 텍스트뿐이라 - 반투명 칩으로 눈에
+       띄게 하고, 사진 오른쪽 아래에 둔다. */
+    counterEl=document.createElement('div');
+    counterEl.style.cssText='position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.45);color:#fff;font-size:12px;font-weight:600;letter-spacing:.3px;padding:3px 9px;border-radius:10px;pointer-events:none';
+    wrap.appendChild(counterEl);
     var startX=null;
     wrap.addEventListener('touchstart',function(e){startX=e.touches[0].clientX;},{passive:true});
     wrap.addEventListener('touchend',function(e){
@@ -1421,6 +1426,18 @@ function renderImageSlider(wrap,creditEl,photos){
       if(Math.abs(dx)>40){if(dx<0)next.onclick(e);else prev.onclick(e);}
       startX=null;
     });
+    /* [디자인 세션 피드백] 첫 열림에 한 번, 다음 사진이 살짝(10px) 비쳤다
+       돌아오게 해서 "스와이프할 수 있다"는 걸 넌지시 알려준다 - 사용자가
+       이미 넘겼으면(idx변화) 하지 않는다. */
+    if(!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches)){
+      setTimeout(function(){
+        if(idx!==0)return;
+        track.style.transform=trackTransform(10);
+        setTimeout(function(){
+          if(idx===0)track.style.transform=trackTransform(0);
+        },400);
+      },500);
+    }
   }
   update();
 }
@@ -3993,6 +4010,7 @@ function pEnsurePovAnimStyle(){
     +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
     +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
     +'@media (max-width:640px){'
+    +'.pd-slide-arrow{display:none}' /* [UX 미세점검 C3] 모바일은 스와이프로 충분하니 화살표는 숨긴다 - 카운터 칩이 "여러 장" 단서를 대신한다 */
     +'#pdtabbar{position:sticky;top:56px;background:#fff;z-index:1}' /* 컴팩트 헤더(56px) 바로 아래 고정 */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:100px}' /* 컴팩트 헤더 56px + 칩 바 높이 포함 */
     +'.ui-rowtable,.ui-rowtable tbody,.ui-rowtable tr,.ui-rowtable td{display:block;width:auto}' /* [백로그 38 P2-F] 라벨 30%/값 70% 2열 표가 좁아 값이 줄바꿈되던 문제 - 1열로 쌓는다 */
