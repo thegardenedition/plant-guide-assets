@@ -51,12 +51,42 @@ var PAGE_SIZE=Infinity;
    맞춘다. */
 var UI_ROW_LABEL='padding:16px 0;color:#ABABAB;width:30%;font-size:12px;letter-spacing:.2px;vertical-align:top;font-weight:500;line-height:1.75';
 var UI_ROW_VALUE='padding:16px 0;color:#121212;font-size:14px;line-height:1.75';
+/* [백로그 38 P1-E] 형태·분포·생육환경처럼 원문이 그대로 오는 값(최장 420자
+   실측)은 모바일 한 화면의 6배 가까이 늘어져 스캔이 안 된다는 지적 대응.
+   60자보다 긴 값만 4줄 클램프+"더 보기"로 감싼다(짧은 라벨-값, 예: 학명·
+   과명은 그대로). 클램프는 모바일 전용 CSS(.ui-clamp, pEnsurePovAnimStyle
+   참고)라 데스크톱에선 클래스가 붙어도 눈에 보이는 변화가 없고, 버튼도
+   pApplyClamps가 실제로 넘치는 경우에만 보여준다. */
+var UI_CLAMP_THRESHOLD=60;
 function uiRows(rows){
   if(!rows||!rows.length)return'';
   return '<table style="width:100%;border-collapse:collapse">'+rows.map(function(r){
-    return '<tr style="border-bottom:1px solid #E6E6E6"><td style="'+UI_ROW_LABEL+'">'+esc(r[0])+'</td><td style="'+UI_ROW_VALUE+'">'+esc(r[1])+'</td></tr>';
+    var val=esc(r[1]);
+    var valHtml=(r[1]&&r[1].length>UI_CLAMP_THRESHOLD)
+      ?'<div class="ui-clamp">'+val+'</div><span class="ui-clamp-btn" onclick="pToggleClamp(this)" style="display:none;color:#0B5345;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px">더 보기</span>'
+      :val;
+    return '<tr style="border-bottom:1px solid #E6E6E6"><td style="'+UI_ROW_LABEL+'">'+esc(r[0])+'</td><td style="'+UI_ROW_VALUE+'">'+valHtml+'</td></tr>';
   }).join('')+'</table>';
 }
+/* clamp가 실제로 텍스트를 잘라낼 때만("더 보기"가 필요할 때만) 버튼을
+   보여준다 - 60자를 살짝 넘겨 4줄 안에 다 들어가는 값까지 괜히 버튼을
+   달지 않기 위해 실측(scrollHeight)으로 한 번 더 확인한다. */
+function pApplyClamps(container){
+  if(!container||!container.querySelectorAll)return;
+  Array.prototype.forEach.call(container.querySelectorAll('.ui-clamp'),function(clamp){
+    var btn=clamp.nextElementSibling;
+    if(!btn||!btn.classList||!btn.classList.contains('ui-clamp-btn'))return;
+    btn.style.display=(clamp.scrollHeight>clamp.clientHeight+1)?'inline-block':'none';
+  });
+}
+window.pToggleClamp=function(btn){
+  var clamp=btn.previousElementSibling;
+  if(!clamp)return;
+  var expanded=clamp.dataset.expanded==='1';
+  clamp.style.webkitLineClamp=expanded?'4':'none';
+  clamp.dataset.expanded=expanded?'0':'1';
+  btn.textContent=expanded?'더 보기':'접기';
+};
 function uiSection(title,inner){
   if(!inner)return'';
   return '<div style="border-top:1px solid #E6E6E6;padding-top:32px;margin-top:32px">'
@@ -216,40 +246,36 @@ function fetchTourSpots(nm){
     return items.filter(function(it){return it&&it.title;}).slice(0,3);
   }).catch(function(){TOUR_SPOT_BROKEN=true;return[];});
 }
-/* [2026-09-19] 사진이 없는 장소가 4:3 회색 상자 + 깨진 아이콘으로 나와
-   "오류"처럼 보인다는 대표 제보(맥문동 "상주 맥문동 솔숲" 등) 대응.
-   firstimage가 없으면 애초에 상자를 그리지 않고 한 줄 카드(📍+제목+주소)로
-   낮춘다 - 사진 있는 곳만 가로 스크롤 썸네일(140×105)로 보여줘, 모바일에서
-   auto-fill 그리드가 1열이 되며 상자가 화면 폭 전체로 커지던 문제도 함께
-   없앤다. 사진 URL은 있는데 로드 자체가 실패하는 경우(tong.visitkorea
-   타임아웃 등)는 onerror에서 그 카드의 사진 칸만 지워, 깨진 이미지 아이콘
-   대신 제목·주소만 남긴 카드로 조용히 내려앉게 한다. */
+/* [2026-09-19, 백로그 38 P1-I] 사진이 없는 장소가 4:3 회색 상자 + 깨진
+   아이콘으로 나와 "오류"처럼 보인다는 대표 제보(맥문동 "상주 맥문동 솔숲"
+   등) 대응. 처음엔 사진 유무로 썸네일행/텍스트행 두 그룹으로 나눴었는데,
+   비즈니스 세션 390px 정밀진단(팝업-UX-진단-2026-09-19.md, I항)을 반영해
+   전부 같은 높이의 한 줄 행(사진 있으면 64×64 왼쪽 썸네일, 없으면 텍스트만)
+   으로 통일 - 순서가 섞이지 않고 목록으로 스캔하기 쉽다. 각 행은 정원 지도로
+   이어지는 딥링크(/garden-map?q=)를 달아, "오류로 보이던 화면"을 "지도로
+   가는 길"로 바꾼다. 사진 URL은 있는데 로드 자체가 실패하면(tong.visitkorea
+   타임아웃 등) onerror에서 그 img만 지워 행이 자동으로 텍스트행으로
+   내려앉는다(래퍼를 새로 안 만들어도 flex 자식이 하나 줄 뿐이라 레이아웃이
+   깨지지 않는다). */
 function tourSpotsHtml(nm){
   return fetchTourSpots(nm).then(function(items){
     if(!items.length)return'';
-    var withPhoto=[],noPhoto=[];
-    items.forEach(function(it){(toHttps(it.firstimage)?withPhoto:noPhoto).push(it);});
-    var thumbs=!withPhoto.length?'':'<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:2px;margin-bottom:'+(noPhoto.length?'10px':'0')+'">'
-      +withPhoto.map(function(it){
-        var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
-        return '<div style="flex:0 0 140px;width:140px">'
-          +'<div style="width:140px;height:105px;background:#F2F2F2;overflow:hidden;margin-bottom:6px">'
-          +'<img src="'+esc(toHttps(it.firstimage))+'" style="width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s" loading="lazy" onload="this.style.opacity=1" onerror="this.closest(\'div\').style.display=\'none\'">'
-          +'</div>'
-          +'<p style="font-size:12px;font-weight:600;color:#121212;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+'</p>'
-          +(addr?'<p style="font-size:11px;color:#6E6E6E;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(addr)+'</p>':'')
-          +'</div>';
-      }).join('')+'</div>';
-    var lines=!noPhoto.length?'':'<div style="display:flex;flex-direction:column;gap:8px">'
-      +noPhoto.map(function(it){
-        var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
-        return '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">'
-          +'<span style="font-size:13px">📍</span>'
-          +'<span style="font-size:13px;font-weight:600;color:#121212">'+esc(it.title)+'</span>'
-          +(addr?'<span style="font-size:12px;color:#6E6E6E">'+esc(addr)+'</span>':'')
-          +'</div>';
-      }).join('')+'</div>';
-    return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',thumbs+lines);
+    var rows=items.map(function(it){
+      var img0=toHttps(it.firstimage);
+      var addr=[it.addr1,it.addr2].filter(Boolean).join(' ');
+      var href='/garden-map?q='+encodeURIComponent(it.title||nm);
+      var thumb=img0?('<img src="'+esc(img0)+'" style="width:64px;height:64px;object-fit:cover;flex-shrink:0;opacity:0;transition:opacity .25s" loading="lazy" onload="this.style.opacity=1" onerror="this.remove()">'):'';
+      return '<a href="'+esc(href)+'" style="display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 0;border-bottom:1px solid #E6E6E6;text-decoration:none;color:inherit;box-sizing:border-box">'
+        +thumb
+        +'<span style="flex:1;min-width:0">'
+        +'<span style="display:block;font-size:15px;font-weight:600;color:#121212;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+'</span>'
+        +(addr?'<span style="display:block;font-size:12px;color:#6E6E6E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(addr)+'</span>':'')
+        +'</span>'
+        +'<span style="color:#ABABAB;font-size:16px;flex-shrink:0">›</span>'
+        +'</a>';
+    }).join('');
+    var mapAll='<a href="/garden-map?q='+encodeURIComponent(nm)+'" style="display:block;text-align:center;padding:14px 0 0;font-size:12px;color:#0B5345;font-weight:600;text-decoration:none">지도에서 모두 보기 ›</a>';
+    return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',rows+mapAll);
   }).catch(function(){return'';});
 }
 /* 민간약초 API의 학명 필드(bneNm)는 "Potentilla kleiniana (장미과)"처럼 끝에
@@ -1647,7 +1673,26 @@ function overviewSkeleton(){
   return ['pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdtourspots','pdstory']
     .map(function(id){return '<div id="'+id+'"></div>';}).join('');
 }
-function setEl(id,html){var el=document.getElementById(id);if(el)el.innerHTML=html||'';}
+/* [백로그 38 P1-K] 6개 출처가 제각각 도착할 때마다 그 결과를 담는 슬롯
+   (setEl 호출 하나하나)이 본문 어딘가에서 갑자기 커진다 - 지금 읽고 있는
+   자리보다 위쪽 슬롯이 나중에 채워지면 화면이 아래로 밀려 "팝업이
+   이상하다"는 인상을 준다(진단 문서 1절 마지막 줄). 슬롯이 스크롤 위치보다
+   위에 있을 때만, 채우기 전/후 높이 차이만큼 스크롤을 같이 밀어줘 화면에
+   보이는 위치가 그대로 유지되게 한다(레이아웃 시프트 0). 슬롯이 지금 보이는
+   화면 안이거나 아래쪽이면 보정하지 않는다 - 보고 있는 내용이 커지는 건
+   정상적인 변화라 건드릴 이유가 없다. */
+function setEl(id,html){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var scroller=document.getElementById('pdpanel');
+  var beforeH=el.offsetHeight,wasAboveView=scroller&&el.offsetTop<scroller.scrollTop;
+  el.innerHTML=html||'';
+  pApplyClamps(el);
+  if(wasAboveView){
+    var delta=el.offsetHeight-beforeH;
+    if(delta)scroller.scrollTop+=delta;
+  }
+}
 /* 학명은 검색 결과에 항상 있어 즉시 채울 수 있지만, 과명·영명은 출처(도감/
    표본/정적 데이터셋)에 따라 조금 늦게 도착한다 - 도착하는 대로 다시 호출해도
    같은 슬롯을 덮어쓸 뿐이라 안전하다. */
@@ -3580,7 +3625,15 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
    transition이 실제로 발동하게 한다(카드 등장 애니메이션의 pRevealCard와
    같은 이중 rAF 패턴). prefers-reduced-motion이면 즉시 전환. 카드 그리드
    호버 모션(디자인 세션 mgpguidemotion)과 선택자가 겹치지 않도록 #pov/
-   #pdpanel에만 건다. */
+   #pdpanel에만 건다.
+
+   [백로그 38 P1] 비즈니스 세션 390px 실측 진단(팝업-UX-진단-2026-09-19.md)
+   반영 - 모바일(≤640px)을 데스크톱 모달 축소판이 아니라 전체화면 바텀시트로:
+   #pdpanel을 화면 하단에 고정하고(92dvh), 닫기 버튼을 44px로 키우고(원본
+   임베드가 28px 인라인 스타일이라 !important 필요), 스크롤 60px 지나면
+   헤더를 컴팩트 바로 줄인다(큰 헤더의 사진 오버레이 재구성까지는 이번 P1
+   범위에서 뺌 - 배지·학명 숨기고 이름만 작게). 그립은 "창 옮기기" 대신
+   "아래로 끌어서 닫기" 제스처로 의미를 바꿔 계속 쓴다(initDrag 참고). */
 var POV_ANIM_MS=200;
 function pEnsurePovAnimStyle(){
   if(document.getElementById('pov-anim-style'))return;
@@ -3591,17 +3644,42 @@ function pEnsurePovAnimStyle(){
     +'#pov.p-anim-hidden{opacity:0;pointer-events:none}' /* 닫히는 중엔 뒤로 겹쳐 보이는 검색결과 클릭을 막지 않는다 */
     +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms ease-out,opacity '+POV_ANIM_MS+'ms ease-out}'
     +'#pdpanel.p-anim-hidden{opacity:0;transform:translateY(24px)}'
+    +'#pdhead{transition:padding .2s ease}'
     +'@media (max-width:640px){'
-    +'#pdpanel{border-radius:16px 16px 0 0}'
+    +'#pov{padding:0;align-items:flex-end}'
+    +'#pdpanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;height:92dvh;max-height:92dvh;margin:0;border-radius:16px 16px 0 0}'
     +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
+    +'#pdhead button{width:44px!important;height:44px!important;font-size:15px!important;top:6px!important;right:6px!important;display:flex!important;align-items:center;justify-content:center}'
+    +'#pdhead.pdhead-compact{padding:10px 60px 10px 20px}'
+    +'#pdhead.pdhead-compact #pdgrip,#pdhead.pdhead-compact #pdbadge,#pdhead.pdhead-compact #pdsci{display:none}'
+    +'#pdhead.pdhead-compact #pdname{font-size:16px;margin:0}'
+    +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}'
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel{transition:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead{transition:none}}';
   document.head.appendChild(s);
+}
+/* 스크롤 60px 지나면 큰 헤더(배지+이름 24px+학명)를 컴팩트 바(이름 16px만)로
+   줄여, 늘 떠 있던 122px 헤더가 읽는 영역을 74%까지 깎아먹던 문제를 줄인다.
+   #pdpanel/#pdhead는 페이지에 하나뿐인 고정 요소라 리스너를 한 번만 건다
+   (상세창을 여닫을 때마다 다시 만들어지는 요소가 아님). CSS가 이 클래스를
+   모바일(≤640px)에서만 적용하므로 데스크톱에서는 클래스가 붙어도 눈에 보이는
+   변화가 없다. */
+function pBindHeadCompact(){
+  var scroller=document.getElementById('pdpanel'),head=document.getElementById('pdhead');
+  if(!scroller||!head||scroller.dataset.compactBound)return;
+  scroller.dataset.compactBound='1';
+  scroller.addEventListener('scroll',function(){
+    if(scroller.scrollTop>60)head.classList.add('pdhead-compact');
+    else head.classList.remove('pdhead-compact');
+  },{passive:true});
 }
 function pShowPov(){
   pEnsurePovAnimStyle();
+  pBindHeadCompact();
   var ov=document.getElementById('pov'),panel=document.getElementById('pdpanel');
   if(!ov||!panel)return;
+  var head=document.getElementById('pdhead');
+  if(head)head.classList.remove('pdhead-compact'); /* 새로 열 때마다 스크롤 0에서 시작하니 컴팩트 상태도 초기화 */
   ov.classList.add('p-anim-hidden');panel.classList.add('p-anim-hidden');
   ov.style.display='flex';
   var revealed=false;
@@ -3841,10 +3919,24 @@ window.pDetail=function(it){
     head.style.cursor='grabbing';
     if(grip)grip.style.cursor='grabbing';
   }
+  /* [백로그 38 P1] ≤640px에서는 #pdpanel이 화면에 고정된 바텀시트라 "창을
+     옮긴다"는 개념 자체가 없다(진단 문서: "폰에서 창 이동은 무의미"). 그립을
+     장식으로 남겨 어포던스만 틀리게 두느니, 같은 아래로 끄는 동작을 "시트
+     닫기"로 새로 연결한다 - 아래로 끌면 손가락을 따라 시트가 내려가고,
+     80px 이상 끌고 놓으면 닫히며, 못 미치면 원위치로 되돌아온다. */
+  function isMobileSheet(){return window.innerWidth<=640;}
   function onMove(e){
     if(!dragging)return;
     var pt=e.touches?e.touches[0]:e;
     var dx=pt.clientX-startX,dy=pt.clientY-startY;
+    if(isMobileSheet()){
+      if(dy<=0)return; /* 위로 끄는 건 무시 - 아래로 끌 때만 시트를 따라 내린다 */
+      moved=true;
+      panel.style.transition='none';
+      panel.style.transform='translateY('+dy+'px)';
+      e.preventDefault();
+      return;
+    }
     if(!moved&&Math.abs(dx)<3&&Math.abs(dy)<3)return; /* 3px 미만은 클릭으로 간주, 아직 fixed로 전환 안 함 */
     if(!moved){
       moved=true;
@@ -3861,7 +3953,14 @@ window.pDetail=function(it){
     panel.style.top=newTop+'px';
     e.preventDefault();
   }
-  function onUp(){
+  function onUp(e){
+    if(isMobileSheet()&&moved){
+      var pt=(e&&e.changedTouches&&e.changedTouches[0])||e||{};
+      var dy=(pt.clientY||0)-startY;
+      panel.style.transition='';
+      if(dy>80)window.pCD();
+      else panel.style.transform='';
+    }
     dragging=false;moved=false;
     head.style.cursor='grab';
     if(grip)grip.style.cursor='grab';
