@@ -110,16 +110,38 @@ function uiTag(t){return '<span onclick="pTagSearch(\''+String(t).replace(/'/g,"
    세션) - pCD()로 정식으로 닫고, history.back()이 실제로 걸렸을 때만
    그 popstate가 끝난 뒤(이벤트 자체를 기다림, 임의의 시간차 추측 아님)
    검색을 실행한다. */
+/* [2026-09-19 UX 미세점검 A3] 태그를 탭하면 그 글자 그대로 이름 검색으로
+   보내(pSuggest) 텍스트 검색 API가 카테고리를 이해 못 해 결과가 안 바뀌는
+   문제가 있었다(실측: "#꽃나무/관목" 탭해도 11건 그대로 - 이름 검색으로는
+   의미 없는 요청). 태그가 식물 유형(USECAT_OPTS) 값이면 그 패싯 필터로
+   전환해 "같은 유형 더 보기"가 되게 하고, 유형표에 없는 자유서술 태그는
+   예전처럼 이름 검색으로 보낸다. */
 window.pTagSearch=function(term){
   var wasDetail=!!(history.state&&history.state.type==='detail');
+  function afterClose(){
+    if(USECAT_OPTS.indexOf(term)!==-1){
+      pQ='';
+      var psi=document.getElementById('psi');if(psi)psi.value='';
+      pUpdateClearBtn();
+      pFilter.usecat=[term];
+      renderFilterPanel();
+      updateFilterBadge();
+      pHistPushSearch();
+      runFacetSearch();
+    } else {
+      window.pSuggest(term);
+    }
+    var panel=document.getElementById('pfilterbar');
+    if(panel)panel.scrollIntoView({behavior:'auto',block:'start'});
+  }
   window.pCD();
   if(wasDetail){
     window.addEventListener('popstate',function onPop(){
       window.removeEventListener('popstate',onPop);
-      window.pSuggest(term);
+      afterClose();
     },{once:true});
   } else {
-    window.pSuggest(term);
+    afterClose();
   }
 };
 /* 사진이 없을 때 쓰던 나무 이모지(🌳)를 "이모지 대신 절제된 아이콘" 요청에
@@ -610,19 +632,33 @@ function pEnsureSpinStyle(){
   el.style.width='28px';el.style.height='28px';el.style.borderWidth='2px';
   el.style.borderColor='#E6E6E6';el.style.borderTopColor='#0B5345';
 }
+/* [2026-09-19 UX 미세점검 B6] 캐시 적중 검색은 66~80ms 안에 끝나는데 그
+   짧은 순간에도 "검색 중…" 스피너가 뜨자마자 사라져 번쩍였다(실측). 150ms
+   이상 걸릴 때만 보이게 지연 표시한다 - hideAll()로 이전 화면(결과·오류
+   등)을 지우는 건 그대로 즉시 하고, 스피너/문구만 늦춘다. hideLoading이
+   150ms 안에 불리면 아예 안 뜬 채로 취소된다. */
+var pShowLoadingTimer=null;
 function showLoading(){
   hideAll();
-  var pld=document.getElementById('pld');
-  if(pld){
-    pEnsureSpinStyle();
-    pld.style.transition='opacity .25s ease';
-    pld.style.opacity='0';
-    pld.style.display='block';
-    requestAnimationFrame(function(){pld.style.opacity='1';});
-  }
-  pSpin(true);
+  clearTimeout(pShowLoadingTimer);
+  pShowLoadingTimer=setTimeout(function(){
+    var pld=document.getElementById('pld');
+    if(pld){
+      pEnsureSpinStyle();
+      pld.style.transition='opacity .25s ease';
+      pld.style.opacity='0';
+      pld.style.display='block';
+      requestAnimationFrame(function(){pld.style.opacity='1';});
+    }
+    pSpin(true);
+  },150);
 }
-function hideLoading(){pSpin(false);var pld=document.getElementById('pld');if(pld){pld.style.display='none';pld.style.opacity='';}}
+function hideLoading(){
+  clearTimeout(pShowLoadingTimer);
+  pSpin(false);
+  var pld=document.getElementById('pld');
+  if(pld){pld.style.display='none';pld.style.opacity='';}
+}
 function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='function')pClearPhotoNote();if(typeof pUpdateClearBtn==='function')pUpdateClearBtn();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
 
 /* XML 대신 JSON으로 통신 (data.go.kr 표준 파라미터 _type=json 사용; returnType=json은
@@ -1917,9 +1953,27 @@ function staticOnlyAttrs(it){
 /* renderPage/refreshCard가 공유하는 정원정보 로딩·렌더 로직. 도감 항목(no
    있음)은 실시간 API+정적 보강, 그 외 항목은 학명이 정적 데이터셋과 일치할
    때만 정적 데이터 단독으로 채운다(네트워크 요청 없이). */
+/* [2026-09-19 UX 미세점검 A1] renderPage는 검색 소스 하나가 도착할 때마다
+   (최대 9개 소스) pRenderGen을 다시 올린다 - 같은 검색 안에서도 카드가
+   화면에 그대로 남아있는데 gen만 계속 바뀌는 것이다. 예전엔 이 gen이
+   바뀌었다는 이유만으로 이미 큐에 들어간(아직 실행 전) 정원정보 요청을
+   "낡았다"고 버리고 다시 큐에 넣지 않아, 소스가 여러 번 도착하는 동안
+   먼저 대기열에 들어간 카드일수록 영영 응답을 못 받았다(실측: "분석 중
+   (0/9)"·"(3/9)"에서 20~30초 멈춤). 진짜 "낡았다"의 기준은 gen 숫자가
+   아니라 그 카드 DOM이 실제로 화면에서 떨어져 나갔는지(d.isConnected)다
+   - 완전히 새 검색이면 renderPage가 g.innerHTML=''로 옛 카드를 실제로
+   떼어내므로 isConnected가 자연히 false가 되고, 같은 검색 안의 소스
+   도착만으로는 카드가 안 떨어지므로 계속 유효하다고 본다. */
 function loadAndRenderAttrs(d,it){
-  var myGen=it._gen;
   var key=attrsCacheKeyFor(it);
+  /* 항목이 나중에 도감 상세(no)를 얻으면(승급) 캐시 키가 'u'+uid → no로
+     바뀐다 - 옛 uid 키 아래 이미 데이터가 있으면 그대로 옮겨 쓴다. 안 옮기면
+     (1) 이미 받은 데이터를 또 요청하고 (2) updateFilterProgress가 no 키만
+     찾다가 "분석 중"에서 안 움직이는 것처럼 보인다. */
+  if(!pAttrCache[key]&&it.no){
+    var oldKey='u'+it._uid;
+    if(pAttrCache[oldKey])pAttrCache[key]=pAttrCache[oldKey];
+  }
   if(pAttrCache[key]){
     renderCardAttrs(d,pAttrCache[key]);
     it._attrsRich=isAttrsRich(pAttrCache[key]);
@@ -1927,21 +1981,17 @@ function loadAndRenderAttrs(d,it){
     return;
   }
   var task=function(){
-    /* 그 사이 다른 자음/필터로 렌더가 새로 시작됐으면(pRenderGen 증가) 이
-       카드는 이미 화면에서 사라졌을 낡은 요청이다 - 대기열 차례가 와도
-       실제 API 호출 없이 바로 빠진다("왔다갔다"로 큐가 밀리는 문제 완화). */
-    if(myGen!=null&&myGen!==pRenderGen)return Promise.resolve(null);
+    if(!d.isConnected)return Promise.resolve(null); /* 카드가 실제로 화면에서 떨어져 나간 경우에만 건너뛴다 */
     return it.no?fetchPlantAttrs(it.no,it.sc):staticOnlyAttrs(it);
   };
   limitCard(task).then(function(attrs){
-    if(myGen!=null&&myGen!==pRenderGen)return; /* 낡은 렌더의 응답은 화면에 반영하지 않는다 */
     if(attrs&&d.isConnected){
-      var old=d.querySelector('.pc-attrs');if(old)old.remove();
-      renderCardAttrs(d,attrs);
+      renderCardAttrs(d,attrs); /* 기존 .pc-attrs 제거는 renderCardAttrs 안에서 항상 처리 */
     }
     it._attrsRich=isAttrsRich(attrs);
     applyFiltersThrottled();
     reflowGrid(); /* "정원 관련 식물 우선순위" - 용도/색상 등 정원 정보가 실제로 채워지면 순위 상승 */
+    updateFilterProgress();
   });
 }
 /* "1순위 실내 정원 식물, 2순위 국립수목원+농촌진흥청 모두 있는 식물" 판정.
@@ -1989,7 +2039,13 @@ function attrChipsHtml(attrs,small){
   });
   return chips.join('');
 }
+/* [2026-09-19 UX 미세점검 A1] 기존 .pc-attrs 제거를 네트워크 경로(구
+   loadAndRenderAttrs 1939행)에서만 했다 - 캐시 적중 경로(1923행)는 안 지우고
+   그냥 append해, refreshCard가 같은 카드에 반복 호출될 때마다(승급마다) 칩
+   줄이 쌓였다(실측: 칩 9개=3줄). 제거를 이 함수 안으로 옮겨 두 경로 모두
+   항상 하나만 남게 한다. */
 function renderCardAttrs(cardEl,attrs){
+  var old=cardEl.querySelector('.pc-attrs');if(old)old.remove();
   var body=cardEl.querySelector('.pc-body');
   var html=attrChipsHtml(attrs,true);
   if(body&&html){
@@ -2037,11 +2093,16 @@ window.pToggleFilterVal=function(kind,v,el){
   pHistPushSearch();
   if(pQ)applyFilters();else runFacetSearch();
 };
+/* [2026-09-19 UX 미세점검 A4] 초기화 뒤에도 history.state.filter에 이전
+   값이 남아있었다는 지적 - pHistPushSearch(pushState)는 매번 새 항목을
+   쌓는데, 초기화는 "새로운 탐색 지점"이 아니라 지금 서 있는 자리를 그대로
+   비우는 동작이라 replaceState가 더 맞다(현재 항목을 빈 필터로 덮어써,
+   비어있지 않은 옛 상태가 history.state로 남을 여지 자체를 없앤다). */
 window.pResetFilters=function(){
   pFilter={usecat:[],origin:[],color:[],form:[],texture:[],cycle:[],light:[],story:[],initial:null};
   renderFilterPanel();
   updateFilterBadge();
-  pHistPushSearch();
+  if(!pSuppressHistory)history.replaceState({type:'search',q:pQ,filter:pFilterSnapshot()},'',location.href);
   if(pQ)applyFilters();else runFacetSearch();
 };
 var USECAT_OPTS=['꽃나무/관목','상록침엽수','상록활엽수','낙엽교목','정원용초본(꽃/야생화)','꽃구근','과수/유실수','특용/약용수','잔디','씨앗','관엽/공기정화식물','생울타리','덩굴식물','수생식물','남부수종','희귀식물'];
@@ -2127,9 +2188,20 @@ function updateFilterProgress(){
     var no=c.getAttribute('data-no'),uid=c.getAttribute('data-uid');
     if(pAttrCache[no||('u'+uid)])done++;
   });
-  if(!total){el.textContent='분류 가능한 도감 항목이 없습니다.';return;}
-  el.textContent=(done<total)?('정원 정보 분석 중… ('+done+'/'+total+')'):('정원 정보 분석 완료 ('+total+'개)');
+  if(!total){el.textContent='';return;}
+  if(done<total){
+    el.textContent='정원 정보 분석 중… ('+done+'/'+total+')';
+    el.style.display='';
+    return;
+  }
+  /* [2026-09-19 UX 미세점검 A1] 완료 후에도 문구가 계속 떠 있을 이유가
+     없다 - 3초 보여준 뒤 스스로 사라진다. */
+  el.textContent='정원 정보 분석 완료 ('+total+'개)';
+  el.style.display='';
+  clearTimeout(pFilterProgressHideTimer);
+  pFilterProgressHideTimer=setTimeout(function(){el.style.display='none';},3000);
 }
+var pFilterProgressHideTimer=null;
 /* 필터 영역은 검색결과 유무와 무관하게 항상 노출되는 상시 UI다(사용자 요청).
    예전에는 검색 결과에 도감(no) 항목이 하나라도 있을 때만 보였는데, 결과가
    바뀔 때마다 패널이 나타났다 사라졌다 하는 것 자체가 어색하다는 피드백. */
@@ -2189,7 +2261,26 @@ function applyFilters(){
     card.style.display=show?'':'none';
   });
   updateFilterProgress();
+  updateVisibleCountText(); /* [2026-09-19 UX 미세점검 A2] 필터로 카드가 숨겨져도 "총 N건 중 M건 표시" 문구가 그대로였다 */
   renderIndexBar();
+}
+/* [2026-09-19 UX 미세점검 A2] 필터 적용 뒤 실제로 화면에 보이는 카드 수로
+   문구를 다시 쓴다. 조건에 맞는 카드가 하나도 없으면(꽃구근 필터 예시)
+   빈 결과 안내 + 필터 초기화 링크로 바꾼다. */
+function updateVisibleCountText(){
+  var el=document.getElementById('pcnttxt');
+  if(!el)return;
+  var cards=document.querySelectorAll('#pgrid .pc');
+  if(!cards.length)return;
+  var visible=0;
+  cards.forEach(function(c){if(c.style.display!=='none')visible++;});
+  if(anyFilterActive()&&visible===0){
+    el.innerHTML='조건에 맞는 식물이 없습니다 · <span style="text-decoration:underline;cursor:pointer" onclick="pResetFilters()">필터 초기화</span>';
+    return;
+  }
+  el.textContent=anyFilterActive()
+    ?('총 '+cards.length.toLocaleString()+'건 중 '+visible+'건 표시(필터 적용)')
+    :('총 '+pAll.length.toLocaleString()+'건 중 '+pShown+'건 표시');
 }
 /* applyFilters()는 #pgrid의 모든 카드를 매번 다시 훑는 O(카드 수) 작업인데,
    loadAndRenderAttrs가 카드마다 정원정보가 도착할 때마다 이 함수를 그대로
@@ -3239,6 +3330,12 @@ function runSearch(){
           document.getElementById('pcnt').style.display='flex';
           document.getElementById('pgrid').style.display='grid';
           firstShown=true;
+          /* [2026-09-19 UX 미세점검 B1] 검색 버튼을 눌러도 화면이 히어로에
+             그대로 있어 "아무 일도 안 일어난 것"처럼 보였다(실측: 첫 카드
+             top 1,163px). 결과 첫 배치가 도착하는 순간 결과 영역 상단으로
+             한 번 스크롤한다. */
+          var cntEl=document.getElementById('pcnt');
+          if(cntEl)cntEl.scrollIntoView({behavior:'smooth',block:'start'});
         }
         renderPage();
       }
@@ -4274,6 +4371,19 @@ window.pDetail=function(it){
    응답을 기다릴 필요가 없다. */
 renderFilterPanel();
 updateFilterBadge();
+/* [2026-09-19 UX 미세점검 B2·B5] #psi(검색창)·.pc-cmpbtn(비교 버튼)이
+   Webflow 임베드 쪽 정적 스타일에 있어 GitHub Pages 배포만으로는 못
+   고친다(#pdtabbar와 같은 위치 문제) - 페이지 로드 시 한 번 CSS를 얹어
+   우회한다. #psi는 16px 미만이면 iOS가 포커스 시 화면을 확대해버려서
+   16px로, 탭 영역은 44px 최소 높이로. .pc-cmpbtn은 40×27px·10px 글자라
+   탭 영역이 좁았던 것을 32px 이상·12px로. */
+(function(){
+  var s=document.createElement('style');
+  s.textContent=
+    '#psi{font-size:16px!important;min-height:44px!important;box-sizing:border-box}'
+    +'.pc-cmpbtn{min-height:32px!important;font-size:12px!important;padding:8px 12px!important;box-sizing:border-box}';
+  document.head.appendChild(s);
+})();
 
 /* 뒤로가기 히스토리 기준점 - 이 페이지에 들어온 시점(검색어 없음)을
    replaceState로 남겨둔다. 이후 검색/상세보기마다 쌓이는 pushState들이
