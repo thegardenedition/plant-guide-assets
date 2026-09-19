@@ -104,9 +104,23 @@ function uiEmpty(msg){return '<p style="color:#ABABAB;text-align:center;padding:
    같은 말로 검색한다(기존 pSuggest 재사용). 상세창을 그대로 둔 채 뒤에서
    검색 결과만 바뀌면 헷갈리므로 pTagSearch가 패널을 먼저 닫는다. */
 function uiTag(t){return '<span onclick="pTagSearch(\''+String(t).replace(/'/g,"")+'\')" style="display:inline-block;border:1px solid #E6E6E6;padding:4px 10px;font-size:11px;color:#787878;margin:0 6px 6px 0;letter-spacing:.2px;cursor:pointer">#'+esc(t)+'</span>';}
+/* [백로그 38 P2-H 후속] pHidePov()를 직접 불러 닫으면 history의 'detail'
+   상태가 안 지워져(pCD는 history.back()으로 닫는데 여기선 건너뜀) 태그
+   검색 뒤 뒤로가기를 누르면 복원 로직이 엉킬 수 있다는 지적(비즈니스
+   세션) - pCD()로 정식으로 닫고, history.back()이 실제로 걸렸을 때만
+   그 popstate가 끝난 뒤(이벤트 자체를 기다림, 임의의 시간차 추측 아님)
+   검색을 실행한다. */
 window.pTagSearch=function(term){
-  pHidePov();pUnlockScroll();
-  window.pSuggest(term);
+  var wasDetail=!!(history.state&&history.state.type==='detail');
+  window.pCD();
+  if(wasDetail){
+    window.addEventListener('popstate',function onPop(){
+      window.removeEventListener('popstate',onPop);
+      window.pSuggest(term);
+    },{once:true});
+  } else {
+    window.pSuggest(term);
+  }
 };
 /* 사진이 없을 때 쓰던 나무 이모지(🌳)를 "이모지 대신 절제된 아이콘" 요청에
    따라 중립색(#D6D6D6) 선 아이콘(간단한 사진 자리표시 기호)으로 바꾼다 -
@@ -1711,6 +1725,22 @@ function pdJumpChipsHtml(){
   return PD_JUMP_SECTIONS.map(function(s,i){
     return '<span class="pdjump-chip'+(i===0?' pdjump-active':'')+'" data-target="'+s.id+'" onclick="pdJumpTo(\''+s.id+'\')">'+esc(s.label)+'</span>';
   }).join('');
+}
+/* [백로그 38 P2-D 후속, 2026-09-19] 비즈니스 세션 390 실측으로 발견: 저장소
+   embed-shell.html 137행엔 #pdtabbar가 있지만 실제 라이브 Webflow 임베드엔
+   없다(백로그 27 편입 때 어긋난 것) - document.getElementById가 null을
+   돌려줘 점프 칩이 통째로 안 그려졌다. Webflow 재발행 없이, 없으면 여기서
+   직접 만들어 #pdpane-overview 앞에 끼워 넣는다(정본 마크업과 같은 자리). */
+function pdEnsureTabbar(){
+  var tb=document.getElementById('pdtabbar');
+  if(tb)return tb;
+  var pane=document.getElementById('pdpane-overview');
+  if(!pane||!pane.parentNode)return null;
+  tb=document.createElement('div');
+  tb.id='pdtabbar';
+  tb.style.cssText='display:flex;border-bottom:1px solid #E6E6E6;padding:0 20px;overflow-x:auto';
+  pane.parentNode.insertBefore(tb,pane);
+  return tb;
 }
 window.pdJumpTo=function(id){
   var el=document.getElementById(id);
@@ -3769,7 +3799,10 @@ function pEnsurePovAnimStyle(){
     +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
+    +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:160px}' /* [백로그 38 P2-D 후속] 점프해도 섹션 첫 줄이 sticky 헤더(데스크톱 146px) 뒤로 들어가던 문제 - 비즈니스 세션 지적 */
     +'@media (max-width:640px){'
+    +'#pdtabbar{position:sticky;top:56px;background:#fff;z-index:1}' /* 컴팩트 헤더(56px) 바로 아래 고정 */
+    +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:100px}' /* 컴팩트 헤더 56px + 칩 바 높이 포함 */
     +'.ui-rowtable,.ui-rowtable tbody,.ui-rowtable tr,.ui-rowtable td{display:block;width:auto}' /* [백로그 38 P2-F] 라벨 30%/값 70% 2열 표가 좁아 값이 줄바꿈되던 문제 - 1열로 쌓는다 */
     +'.ui-rowtable tr{border-bottom:1px solid #E6E6E6;padding:12px 0}'
     +'.ui-rowtable td{padding:0!important}'
@@ -3853,7 +3886,7 @@ window.pDetail=function(it){
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   pdSet(overviewSkeleton());
   setPdCore(sc,'','');
-  var tabbarEl=document.getElementById('pdtabbar');
+  var tabbarEl=pdEnsureTabbar();
   if(tabbarEl){tabbarEl.innerHTML=pdJumpChipsHtml();pdBindJumpObserver();}
   var creditEl=document.getElementById('pdcredit');
   creditEl.style.display='none';
