@@ -3649,7 +3649,8 @@ function pEnsurePovAnimStyle(){
     +'#pov{padding:0;align-items:flex-end}'
     +'#pdpanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;height:92dvh!important;max-height:92dvh!important;margin:0;border-radius:16px 16px 0 0}' /* 인라인 max-height:88vh를 이겨야 해서 !important */
     +'#pdpanel.p-anim-hidden{opacity:1;transform:translateY(100%)}'
-    +'#pdhead button{width:44px!important;height:44px!important;font-size:15px!important;top:6px!important;right:6px!important;display:flex!important;align-items:center;justify-content:center}'
+    +'#pdhead{touch-action:none}' /* 드래그다운 제스처 초반에 브라우저가 세로 스크롤로 가로채 가지 않도록(대표 실기기 "불안정" 제보 원인) - 닫기 버튼은 아래에서 다시 auto로 되돌린다 */
+    +'#pdhead button{width:44px!important;height:44px!important;font-size:15px!important;top:6px!important;right:6px!important;display:flex!important;align-items:center;justify-content:center;touch-action:auto}'
     +'#pdhead.pdhead-compact{padding:6px 60px 6px 20px!important;min-height:56px;display:flex;align-items:center;box-sizing:border-box}' /* 56px 고정 - 이름 아래 남은 인라인 margin(0 0 6px) 때문에 39px로 줄어들어 44px 닫기버튼이 삐져나오던 문제(비즈니스 세션 재측정 지적) 대응, padding 계산에 기대지 않고 min-height+flex로 직접 못박는다 */
     +'#pdhead.pdhead-compact #pdgrip,#pdhead.pdhead-compact #pdbadge,#pdhead.pdhead-compact #pdsci{display:none}'
     +'#pdhead.pdhead-compact #pdname{font-size:16px!important;margin:0!important}' /* 인라인 font-size:24px·margin:0 0 6px를 이겨야 해서 !important */
@@ -3681,6 +3682,7 @@ function pShowPov(){
   if(!ov||!panel)return;
   var head=document.getElementById('pdhead');
   if(head)head.classList.remove('pdhead-compact'); /* 새로 열 때마다 스크롤 0에서 시작하니 컴팩트 상태도 초기화 */
+  panel.style.transform='';panel.style.transition=''; /* 직전 드래그다운 제스처가 남긴 인라인 transform 잔존 방지(대표 실기기 "불안정" 제보 원인 중 하나) */
   ov.classList.add('p-anim-hidden');panel.classList.add('p-anim-hidden');
   ov.style.display='flex';
   var revealed=false;
@@ -3909,13 +3911,13 @@ window.pDetail=function(it){
   var head=document.getElementById('pdhead');
   var grip=document.getElementById('pdgrip');
   if(!panel||!head)return;
-  var dragging=false,moved=false,startX=0,startY=0,startLeft=0,startTop=0;
+  var dragging=false,moved=false,startX=0,startY=0,startLeft=0,startTop=0,startTime=0,lastDy=0;
   function onDown(e){
     if(e.target.closest('button'))return; /* 닫기 버튼은 드래그 대상에서 제외 */
     var pt=e.touches?e.touches[0]:e;
     var rect=panel.getBoundingClientRect();
-    dragging=true;moved=false;
-    startX=pt.clientX;startY=pt.clientY;
+    dragging=true;moved=false;lastDy=0;
+    startX=pt.clientX;startY=pt.clientY;startTime=Date.now();
     startLeft=rect.left;startTop=rect.top;
     head.style.cursor='grabbing';
     if(grip)grip.style.cursor='grabbing';
@@ -3924,15 +3926,31 @@ window.pDetail=function(it){
      옮긴다"는 개념 자체가 없다(진단 문서: "폰에서 창 이동은 무의미"). 그립을
      장식으로 남겨 어포던스만 틀리게 두느니, 같은 아래로 끄는 동작을 "시트
      닫기"로 새로 연결한다 - 아래로 끌면 손가락을 따라 시트가 내려가고,
-     80px 이상 끌고 놓으면 닫히며, 못 미치면 원위치로 되돌아온다. */
+     80px 이상 끌고 놓으면 닫히며, 못 미치면 원위치로 되돌아온다.
+     [2026-09-19 실기기 불안정 제보 수정] 대표가 "닫히긴 하는데 불안정하다"고
+     확인해줘서 비즈니스 세션이 짚어준 원인 5개를 고친다: (1) 닫을 때 dy
+     위치에서 그대로 pCD()만 불러 인라인 transform이 안 지워지고 다음에 열
+     때 그 자리에서 다시 시작됐다 - 이제 남은 거리를 마저 애니메이션으로
+     내려보낸 뒤에만 닫는다(finishSheetDrag). (2) touchcancel을 안 받아
+     브라우저가 제스처를 가로채면 dragging=true로 낀 채 남았다 - 캔슬도
+     onUp과 같은 정리를 거치게 한다. (3) 위로 살짝 흔들리는 첫 움직임에
+     preventDefault를 안 해 브라우저가 스크롤로 확정해버릴 수 있었다 -
+     #pdhead에 touch-action:none(CSS, pEnsurePovAnimStyle)을 걸어 애초에
+     제스처를 뺏기지 않게 하고, JS에서도 방어적으로 preventDefault한다.
+     (4) 80px 고정 임계값만 보고 짧고 빠르게 튕기는 제스처를 안 닫았다 -
+     속도 조건을 더한다. (5) onUp의 changedTouches 의존을 없애고 onMove가
+     매번 저장해두는 lastDy를 그대로 쓴다. */
   function isMobileSheet(){return window.innerWidth<=640;}
   function onMove(e){
     if(!dragging)return;
     var pt=e.touches?e.touches[0]:e;
     var dx=pt.clientX-startX,dy=pt.clientY-startY;
     if(isMobileSheet()){
-      if(dy<=0)return; /* 위로 끄는 건 무시 - 아래로 끌 때만 시트를 따라 내린다 */
-      moved=true;
+      if(dy<=0){
+        if(dragging)e.preventDefault(); /* 위로 살짝 흔들려도 브라우저가 스크롤로 못 채가게 */
+        return;
+      }
+      moved=true;lastDy=dy;
       panel.style.transition='none';
       panel.style.transform='translateY('+dy+'px)';
       e.preventDefault();
@@ -3954,14 +3972,32 @@ window.pDetail=function(it){
     panel.style.top=newTop+'px';
     e.preventDefault();
   }
-  function onUp(e){
-    if(isMobileSheet()&&moved){
-      var pt=(e&&e.changedTouches&&e.changedTouches[0])||e||{};
-      var dy=(pt.clientY||0)-startY;
-      panel.style.transition='';
-      if(dy>80)window.pCD();
-      else panel.style.transform='';
+  function finishSheetDrag(shouldClose){
+    panel.style.transition='transform 180ms ease-out';
+    if(shouldClose){
+      panel.style.transform='translateY(100%)';
+      setTimeout(function(){
+        window.pCD();
+        panel.style.transition='';panel.style.transform='';
+      },180);
+    } else {
+      panel.style.transform='';
+      setTimeout(function(){panel.style.transition='';},180);
     }
+  }
+  function onUp(){
+    if(isMobileSheet()&&moved){
+      var elapsed=Math.max(1,Date.now()-startTime);
+      var velocity=lastDy/elapsed; /* px/ms */
+      finishSheetDrag(lastDy>80||(lastDy>24&&velocity>0.5));
+    }
+    dragging=false;moved=false;
+    head.style.cursor='grab';
+    if(grip)grip.style.cursor='grab';
+  }
+  function onCancel(){
+    /* 제스처가 브라우저에 가로채여 끊긴 경우 - 닫지 않고 안전하게 원위치로만 되돌린다 */
+    if(isMobileSheet()&&moved)finishSheetDrag(false);
     dragging=false;moved=false;
     head.style.cursor='grab';
     if(grip)grip.style.cursor='grab';
@@ -3972,6 +4008,7 @@ window.pDetail=function(it){
   window.addEventListener('touchmove',onMove,{passive:false});
   window.addEventListener('mouseup',onUp);
   window.addEventListener('touchend',onUp);
+  window.addEventListener('touchcancel',onCancel);
 })();
 
 /* "정원 정보로 찾기" 패널은 검색을 한 번도 하지 않은 첫 화면에서도 바로
