@@ -1412,11 +1412,11 @@ function renderImageSlider(wrap,creditEl,photos){
        않았다. 화살표는 44px로 키우고(모바일은 스와이프로 충분해 숨김 -
        아래 mobile-only CSS), 점은 "n / 총n" 텍스트 카운터로 바꾼다. */
     prev=document.createElement('button');
-    prev.type='button';prev.className='pd-slide-arrow';prev.innerHTML='&#10094;';
+    prev.type='button';prev.className='pd-slide-arrow';prev.innerHTML='&#10094;';prev.setAttribute('aria-label','이전 사진');
     prev.style.cssText='position:absolute;left:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center';
     prev.onclick=function(e){e.stopPropagation();idx=(idx-1+photos.length)%photos.length;update();};
     next=document.createElement('button');
-    next.type='button';next.className='pd-slide-arrow';next.innerHTML='&#10095;';
+    next.type='button';next.className='pd-slide-arrow';next.innerHTML='&#10095;';next.setAttribute('aria-label','다음 사진');
     next.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:none;background:rgba(18,18,18,.55);color:#fff;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center';
     next.onclick=function(e){e.stopPropagation();idx=(idx+1)%photos.length;update();};
     wrap.appendChild(prev);wrap.appendChild(next);
@@ -1845,6 +1845,7 @@ window.pdJumpTo=function(id){
   if(window.innerWidth<=640&&head)head.classList.add('pdhead-compact');
   var off=(head?head.getBoundingClientRect().height:0)+(tb?tb.getBoundingClientRect().height:0);
   p.scrollTop=el.offsetTop-off;
+  el.classList.add('pd-revealed'); /* 칩으로 바로 점프한 섹션은 스크롤 이벤트를 기다리지 않고 즉시 표시(뜸들이지 않게) */
   pdSetActiveChip(id);
 };
 function pdSetActiveChip(id){
@@ -1874,6 +1875,36 @@ function pdBindJumpObserver(){
     });
     pdSetActiveChip(current);
   },{passive:true});
+}
+/* [2026-09-20 고급 디자인 스킬 점검] 상세창 안의 섹션(재배 정보·조경 스펙 등)이
+   스크롤해서 처음 보일 때 뚝 나타나던 걸 살짝 떠오르며 나타나게 한다(카드
+   첫 등장 때와 같은 원리). IntersectionObserver를 쓰지 않는다 - 예전에
+   "화면에 보이는 카드만" IntersectionObserver로 지연 로딩했다가 탭이
+   백그라운드로 인식되는 상황 등에서 콜백이 아예 안 불려 영영 안 채워지는
+   실사용 버그가 있었다(위 카드 로딩 부분 주석 참고) - 이미 이 파일에서
+   검증된 순수 scroll 이벤트 방식(바로 위 pdBindJumpObserver와 같은 패턴)을
+   그대로 쓴다. 리스너는 한 번만 걸되(#pdpanel은 상세창마다 새로 안 만들어짐),
+   "지금 보이는 섹션 표시"는 상세창을 열 때마다(=매번) 다시 실행한다 -
+   overviewSkeleton()이 매번 섹션 div를 새로 만들어서(pd-revealed 클래스
+   없는 새 노드) 이전 식물을 보던 표시가 남아있을 걱정은 없다. */
+function pdBindSectionReveal(){
+  var scroller=document.getElementById('pdpanel');
+  if(!scroller)return;
+  var ids=['pdsummary','pdcore','pdenv','pdplanting','pdbody','pdlandscape','pdnsgarden','pdnslandscape','pdbookgarden','pdbooklandscape','pdacademic','pdtourspots','pdstory'];
+  function reveal(){
+    var top=scroller.getBoundingClientRect().top,bottom=scroller.getBoundingClientRect().bottom;
+    ids.forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el||el.classList.contains('pd-revealed'))return;
+      var r=el.getBoundingClientRect();
+      if(r.top<bottom-40&&r.bottom>top)el.classList.add('pd-revealed');
+    });
+  }
+  if(!scroller.dataset.revealScrollBound){
+    scroller.dataset.revealScrollBound='1';
+    scroller.addEventListener('scroll',reveal,{passive:true});
+  }
+  reveal(); /* 지금 이미 화면에 걸쳐 있는 섹션은 스크롤 없이도 바로 보여야 한다 */
 }
 function envTripleHtml(p){
   var monthCells='';
@@ -3536,7 +3567,7 @@ function renderCompareBar(){
     var src=img?img.src:'';
     return '<div style="position:relative;flex-shrink:0" title="'+esc(rec.it.nm)+'">'
       +(src?'<img src="'+src+'" style="width:40px;height:40px;object-fit:cover;display:block">':'<div style="width:40px;height:40px;background:#333;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#787878" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg></div>')
-      +'<span onclick="pRemoveCompare(\''+uid+'\')" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#fff;color:#121212;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">&#10005;</span>'
+      +'<span onclick="pRemoveCompare(\''+uid+'\')" role="button" tabindex="0" aria-label="비교에서 '+esc(rec.it.nm)+' 빼기" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#fff;color:#121212;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">&#10005;</span>'
       +'</div>';
   }).join('');
 }
@@ -3996,27 +4027,61 @@ function pdFillOverviewExtras(profile,match,sc,nm,nsData,extraAcademicHtml){
    범위에서 뺌 - 배지·학명 숨기고 이름만 작게). 그립은 "창 옮기기" 대신
    "아래로 끌어서 닫기" 제스처로 의미를 바꿔 계속 쓴다(initDrag 참고). */
 var POV_ANIM_MS=200;
+/* [2026-09-20 고급 디자인 스킬 점검] 전환 속도 곡선이 전부 기본값(ease)이라
+   밋밋했다 - "빠르게 시작해서 부드럽게 멈추는" 곡선(오버슈트 없음, 튀어
+   보이지 않아 데이터 도구엔 이쪽이 안전)으로 바꾼다. 시간(ms)은 그대로 두고
+   곡선만 바꾼 것 - CSS 트랜지션은 곡선이 뭐든 선언된 시간이 지나면 똑같이
+   끝나므로, 이 시간과 맞춰 둔 JS setTimeout(POV_ANIM_MS 등)은 그대로 맞는다. */
+var EASE_CURVE='cubic-bezier(.16,1,.3,1)';
 function pEnsurePovAnimStyle(){
   if(document.getElementById('pov-anim-style'))return;
   var s=document.createElement('style');
   s.id='pov-anim-style';
   s.textContent=
-    '#pov{transition:opacity '+POV_ANIM_MS+'ms ease}'
+    '#pov{transition:opacity '+POV_ANIM_MS+'ms '+EASE_CURVE+'}'
     +'#pov.p-anim-hidden{opacity:0;pointer-events:none}' /* 닫히는 중엔 뒤로 겹쳐 보이는 검색결과 클릭을 막지 않는다 */
-    +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms ease-out,opacity '+POV_ANIM_MS+'ms ease-out}'
+    +'#pdpanel{transition:transform '+POV_ANIM_MS+'ms '+EASE_CURVE+',opacity '+POV_ANIM_MS+'ms '+EASE_CURVE+'}'
     +'#pdpanel.p-anim-hidden{opacity:0;transform:translateY(24px)}'
-    +'#pdhead{transition:padding .2s ease;z-index:2}' /* sticky 헤더가 뒤의 #pdimg에 덮이던 문제(z-index:auto) 수정 - 비즈니스 세션 390 실측 지적 */
+    +'#pdhead{transition:padding .2s '+EASE_CURVE+';z-index:2}' /* sticky 헤더가 뒤의 #pdimg에 덮이던 문제(z-index:auto) 수정 - 비즈니스 세션 390 실측 지적 */
     +'#pdcompact{display:none;touch-action:none}' /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A(구조)] 큰 헤더 자체를 컴팩트로 줄이던 방식(패딩·폰트 전환)은 스크롤 경계(60px)를 넘나들 때마다 높이가 122↔56으로 출렁이고 떨렸다. 헤더를 sticky에서 풀어 콘텐츠와 함께 스크롤되게 하고, 높이가 전혀 안 바뀌는 별도의 56px 바를 opacity로만 나타나게 한다(모바일 전용, 아래 media 블록) - 원리적으로 튐·떨림이 없다. 데스크톱에선 계속 display:none */
     +'#pdcompact button{width:44px!important;height:44px!important;font-size:15px!important;position:absolute;top:6px;right:6px;display:flex!important;align-items:center;justify-content:center;touch-action:auto}'
-    +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
+    +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s '+EASE_CURVE+'}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:160px}' /* [백로그 38 P2-D 후속] 점프해도 섹션 첫 줄이 sticky 헤더(데스크톱 146px) 뒤로 들어가던 문제 - 비즈니스 세션 지적 */
-    +'#pcmpbar{transform:translateY(100%);transition:transform .2s ease-out}' /* [UX 미세점검 C4] display:none↔flex 뚝 전환 대신 슬라이드 인/아웃 - display는 JS(renderCompareBar)가 계속 토글, 위치만 애니메이션 */
+    +'#pcmpbar{transform:translateY(100%);transition:transform .2s '+EASE_CURVE+'}' /* [UX 미세점검 C4] display:none↔flex 뚝 전환 대신 슬라이드 인/아웃 - display는 JS(renderCompareBar)가 계속 토글, 위치만 애니메이션 */
     +'#pcmpbar.pcmpbar-visible{transform:translateY(0)}'
     +'#pcmpcount{display:inline-block}'
     +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
     +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
+    /* [2026-09-20 고급 디자인 스킬 점검] "눌렀을 때 반응"이 사이트 전체에 하나도
+       없었다(호버만 일부 있음) - 마우스 호버가 안 먹히는 휴대폰에서는 눌러도
+       아무 반응이 없었다는 뜻. 누르는 순간 살짝 눌리는 느낌을 준다. 인라인
+       style로 transform을 이미 쓰는 요소(.pd-slide-arrow의 translateY(-50%)
+       가운데 정렬)는 인라인이 항상 이기므로 !important로 눌러야 먹는다. */
+    +'#pgrid .pc{transition:transform .15s '+EASE_CURVE+',box-shadow .15s}' /* 임베드 쪽 카드 :hover 규칙이 #pgrid .pc 로 더 구체적이라(호버+눌림 동시 상태일 때 눌림이 묻히지 않도록) 같은 구체성으로 맞춘다 - box-shadow 시간은 임베드 규칙(.15s)과 맞춤 */
+    +'#pgrid .pc:active{transform:scale(.98)}'
+    +'.pc-cmpbtn{transition:transform .15s '+EASE_CURVE+'}'
+    +'.pc-cmpbtn:active{transform:scale(.94)}'
+    +'.pdjump-chip:active{opacity:.6}'
+    +'.ui-clamp-btn{transition:opacity .15s '+EASE_CURVE+'}'
+    +'.ui-clamp-btn:active{opacity:.6}'
+    +'.pd-slide-arrow{transition:transform .15s '+EASE_CURVE+'}'
+    +'.pd-slide-arrow:active{transform:translateY(-50%) scale(.85)!important}' /* 인라인 translateY(-50%)를 지키면서 눌림만 더한다 */
+    +'#pdhead button,#pdcompact button{transition:transform .15s '+EASE_CURVE+'}'
+    +'#pdhead button:active,#pdcompact button:active{transform:scale(.88)}'
+    +'[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"]{transition:transform .15s '+EASE_CURVE+',opacity .15s '+EASE_CURVE+'}'
+    +'[onclick^="pSearch"]:active,[onclick^="pMore"]:active,[onclick^="pCD"]:active,[onclick^="pClearCompare"]:active,[onclick^="pOpenCompare"]:active,[onclick^="pCloseCompare"]:active,[onclick^="pExportCompare"]:active,[onclick^="pExportResults"]:active,[onclick^="pResetFilters"]:active{transform:scale(.96);opacity:.85}'
+    /* [2026-09-20] 상세창을 스크롤해 내려갈 때 재배·조경 정보 같은 섹션이
+       뚝 나타나는 대신 살짝 떠오르며 나타난다(카드 첫 등장 효과와 같은 원리).
+       opacity/transform은 레이아웃 크기에 영향을 안 줘서 setEl의 스크롤
+       보정·pApplyClamps의 높이 측정과 안 부딪힌다(사전 확인함). pdBindSectionReveal
+       이 실제 동작을 맡는다 - 스크롤을 IntersectionObserver로 감시하는 방식은
+       예전에 "탭이 백그라운드로 인식되면 콜백이 아예 안 불리는" 실사용 버그로
+       되돌린 전례가 있어(위 주석 참고) 이미 검증된 순수 scroll 이벤트 방식을
+       그대로 재사용한다. */
+    +'#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory{opacity:0;transform:translateY(10px);transition:opacity .4s '+EASE_CURVE+',transform .4s '+EASE_CURVE+'}'
+    +'#pdsummary.pd-revealed,#pdcore.pd-revealed,#pdenv.pd-revealed,#pdplanting.pd-revealed,#pdbody.pd-revealed,#pdlandscape.pd-revealed,#pdnsgarden.pd-revealed,#pdnslandscape.pd-revealed,#pdbookgarden.pd-revealed,#pdbooklandscape.pd-revealed,#pdacademic.pd-revealed,#pdtourspots.pd-revealed,#pdstory.pd-revealed{opacity:1;transform:none}'
     +'@media (max-width:640px){'
     +'.pd-slide-arrow{display:none!important}' /* [UX 미세점검 C3] 모바일은 스와이프로 충분하니 화살표는 숨긴다 - 카운터 칩이 "여러 장" 단서를 대신한다. 버튼 자체에 인라인 display:flex가 있어(renderImageSlider) !important 없이는 안 이겼다(비즈니스 세션 390 실측 지적) */
     +'#pdtabbar{position:sticky;top:56px;background:#fff;z-index:1}' /* 컴팩트 헤더(56px) 바로 아래 고정 */
@@ -4040,7 +4105,7 @@ function pEnsurePovAnimStyle(){
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;transition:max-height .2s ease-out}' /* [UX 미세점검 C2] 펼침/접힘 애니메이션 - max-height를 pToggleClamp가 조작한다 */
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp,#pgrid .pc,.pc-cmpbtn,.pdjump-chip,.ui-clamp-btn,.pd-slide-arrow,#pdhead button,#pdcompact button,#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory,[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"]{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
   document.head.appendChild(s);
 }
 /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A] #pdhead 자체의 높이를 바꾸던
@@ -4063,7 +4128,7 @@ function pdEnsureCompactBar(){
   bar.innerHTML=
     '<div id="pdcompactgrip" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px"></div>'
     +'<span id="pdcompactname" style="font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>'
-    +'<button onclick="pCD()">&#10005;</button>';
+    +'<button onclick="pCD()" aria-label="상세창 닫기">&#10005;</button>';
   head.parentNode.insertBefore(bar,head);
   return bar;
 }
@@ -4131,6 +4196,7 @@ window.pDetail=function(it){
   else{sciEl.textContent='';sciEl.style.display='none';}
   document.getElementById('pdbadge').textContent=no?'식물도감':(specsId?'식물표본':(ORIGIN_BADGE_TXT[origin]||'커뮤니티 데이터'));
   pdSet(overviewSkeleton());
+  pdBindSectionReveal();
   setPdCore(sc,'','');
   var tabbarEl=pdEnsureTabbar();
   if(tabbarEl){tabbarEl.innerHTML=pdJumpChipsHtml();pdBindJumpObserver();}
@@ -4486,6 +4552,18 @@ updateFilterBadge();
     '#psi{font-size:16px!important;min-height:44px!important;box-sizing:border-box}'
     +'.pc-cmpbtn{min-height:32px!important;font-size:12px!important;padding:8px 12px!important;box-sizing:border-box}';
   document.head.appendChild(s);
+})();
+/* [2026-09-20 고급 디자인 스킬 점검] 아이콘만 있고 글자가 없는 버튼(✕)에
+   스크린리더용 이름표(aria-label)가 하나도 없었다 - 눈이 안 보이는 방문자는
+   이 버튼이 뭘 하는 버튼인지 전혀 알 수 없었다. 이 버튼들은 Webflow
+   임베드에 원문 그대로 박혀 있어(#psi/.pc-cmpbtn과 같은 이유로 GitHub Pages
+   배포만으론 못 고침) 페이지 로드 시 한 번 속성만 덧붙인다 - 텍스트("더 보기"
+   같은)가 이미 있는 버튼은 그 자체로 이름이 되니 건드리지 않는다. */
+(function(){
+  var head=document.querySelector('#pdhead > button');
+  if(head)head.setAttribute('aria-label','상세창 닫기');
+  var closeCmp=document.querySelector('[onclick="pCloseCompare()"]');
+  if(closeCmp)closeCmp.setAttribute('aria-label','비교창 닫기');
 })();
 
 /* 뒤로가기 히스토리 기준점 - 이 페이지에 들어온 시점(검색어 없음)을
