@@ -2234,6 +2234,34 @@ function updateFilterBadge(){
   var n=pFilter.usecat.length+pFilter.origin.length+pFilter.color.length+pFilter.form.length+pFilter.texture.length+pFilter.cycle.length+pFilter.light.length+pFilter.story.length;
   badge.textContent=n;
   reset.style.display=n?'inline-block':'none';
+  renderFilterSummary();
+}
+var FILTER_KIND_KEYS=['usecat','origin','color','form','texture','cycle','light','story']; /* pFilter의 initial은 배열이 아니라 제외 */
+/* [2026-09-21 UX 진단] 필터 패널이 평소엔 접혀 있고(디자인 세션이 최근에
+   추가한 아코디언, Webflow 임베드 쪽 pToggleFilterAcc) 화살표를 눌러야
+   펼쳐지는데, 접힌 상태에서는 "초기화 (3)"처럼 개수만 보이고 정확히 뭘
+   골랐는지는 안 보였다 - 다시 펼쳐서 8개 구간을 하나하나 훑어야 했다.
+   접었다 펴도 항상 보이는 자리(.pfilter-header 바로 다음, #pfilterbody
+   앞)에 고른 값들을 작은 칩으로 늘어놓고, 칩을 누르면 그 값만 바로 뺀다
+   (기존 pToggleFilterVal을 el 없이 불러 재사용 - 이미 검증된 제거 경로). */
+function renderFilterSummary(){
+  var bar=document.getElementById('pfilterbar'),body=document.getElementById('pfilterbody');
+  if(!bar||!body)return;
+  var sum=document.getElementById('pfiltersummary');
+  if(!sum){
+    sum=document.createElement('div');
+    sum.id='pfiltersummary';
+    sum.style.cssText='display:none;flex-wrap:wrap;gap:6px;margin-top:12px';
+    bar.insertBefore(sum,body);
+  }
+  var chips=[];
+  FILTER_KIND_KEYS.forEach(function(kind){
+    (pFilter[kind]||[]).forEach(function(v){
+      chips.push('<span class="pfsum-chip" onclick="event.stopPropagation();pToggleFilterVal(\''+kind+'\',\''+v.replace(/'/g,"\\'")+'\')">'+esc(v)+'<b aria-hidden="true">&#10005;</b></span>');
+    });
+  });
+  sum.innerHTML=chips.join('');
+  sum.style.display=chips.length?'flex':'none';
 }
 /* 종의 '출처 분류'(자생/특산/적색/외래/민속)는 배지 출처(origin)로 즉시 판정
    가능하지만, '자생식물'만은 별도 배지가 없어 dstrb 텍스트에서 추출한
@@ -3610,11 +3638,20 @@ function compareRowsSpec(){
     ['관리 난이도(농사로)',function(it){var g=nongsaroGardenByName(it.nm);return (g&&g.managelevelCodeNm)||'-';}]
   ];
 }
+/* [2026-09-21 UX 진단] 비교표가 값이 같든 다르든 전부 똑같이 보여서 어느
+   항목이 차이 나는지 한눈에 안 들어왔다 - 항목(행) 안에서 값이 하나라도
+   다르면 그 행 데이터 칸 전체를 옅게 강조한다(칸 하나하나 다수결로 판정하면
+   "2개만 비교해서 값이 둘 다 다른" 가장 흔한 경우에 아무것도 강조 안 되는
+   허점이 있어 - 행 전체를 "이 항목은 서로 다르다" 기준으로 단순하게 판정).
+   또 항목 이름(맨 왼쪽 칸)이 옆으로 스크롤해도 계속 보이게 고정(sticky)한다
+   - 비교 대상이 3~4개면 표가 넓어져 오른쪽을 보는 동안 지금 보는 게 무슨
+   항목인지 알 수 없었다. #pcmpbody가 overflow-x:auto라 sticky의 기준
+   스크롤 컨테이너로 이미 맞다(사전 확인). */
 function buildCompareTableHtml(resolved){
   var rows=compareRowsSpec();
   var html='<table style="width:100%;border-collapse:collapse;min-width:'+(150+resolved.length*220)+'px">';
   html+='<tr>'
-    +'<th style="width:150px"></th>'
+    +'<th style="width:150px;position:sticky;left:0;background:#fff;z-index:1"></th>'
     +resolved.map(function(r){
       return '<th style="padding:12px;text-align:left;border-bottom:2px solid #121212;vertical-align:bottom">'
         +(r.imgSrc?'<img src="'+r.imgSrc+'" style="width:100%;aspect-ratio:1/1;object-fit:cover;margin-bottom:8px;display:block">':'')
@@ -3624,9 +3661,12 @@ function buildCompareTableHtml(resolved){
     }).join('')
     +'</tr>';
   rows.forEach(function(rowSpec){
+    var values=resolved.map(function(r){return rowSpec[1](r.it,r.attrs,r.match);});
+    var differs=values.some(function(v){return v!==values[0];});
+    var dataBg=differs?'background:#FAFAFA;':''; /* 새 색 값을 안 만들고 사이트 기존 옅은 배경 토큰 재사용 */
     html+='<tr style="border-bottom:1px solid #E6E6E6">'
-      +'<td style="padding:10px 12px;font-size:11px;letter-spacing:.5px;color:#ABABAB;font-weight:600;vertical-align:top;white-space:nowrap">'+esc(rowSpec[0])+'</td>'
-      +resolved.map(function(r){return '<td style="padding:10px 12px;font-size:13px;color:#121212;vertical-align:top">'+esc(rowSpec[1](r.it,r.attrs,r.match))+'</td>';}).join('')
+      +'<td style="padding:10px 12px;font-size:11px;letter-spacing:.5px;color:#ABABAB;font-weight:600;vertical-align:top;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1">'+esc(rowSpec[0])+(differs?' <span title="비교 대상끼리 이 항목 값이 다릅니다" style="color:'+ACCENT+'">&#9679;</span>':'')+'</td>'
+      +values.map(function(v){return '<td style="padding:10px 12px;font-size:13px;color:#121212;vertical-align:top;'+dataBg+'">'+esc(v)+'</td>';}).join('')
       +'</tr>';
   });
   html+='</table>';
@@ -4070,8 +4110,14 @@ function pEnsurePovAnimStyle(){
     +'.pd-slide-arrow:active{transform:translateY(-50%) scale(.85)!important}' /* 인라인 translateY(-50%)를 지키면서 눌림만 더한다 */
     +'#pdhead button,#pdcompact button{transition:transform .15s '+EASE_CURVE+'}'
     +'#pdhead button:active,#pdcompact button:active{transform:scale(.88)}'
-    +'[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"]{transition:transform .15s '+EASE_CURVE+',opacity .15s '+EASE_CURVE+'}'
-    +'[onclick^="pSearch"]:active,[onclick^="pMore"]:active,[onclick^="pCD"]:active,[onclick^="pClearCompare"]:active,[onclick^="pOpenCompare"]:active,[onclick^="pCloseCompare"]:active,[onclick^="pExportCompare"]:active,[onclick^="pExportResults"]:active,[onclick^="pResetFilters"]:active{transform:scale(.96);opacity:.85}'
+    /* [2026-09-21 UX 진단] 필터 패널이 접혀 있어도(디자인 세션의 아코디언)
+       고른 값이 뭔지 바로 보이게 하는 요약 칩(renderFilterSummary가 채움) */
+    +'.pfsum-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+ACCENT+';background:#fff;border:1px solid '+ACCENT+';border-radius:12px;padding:4px 8px 4px 12px;cursor:pointer;transition:transform .15s '+EASE_CURVE+',background .15s}'
+    +'.pfsum-chip:hover{background:#F2F2F2}' /* 새 색 값을 만들지 않고 사이트 기존 배경 토큰(#F2F2F2) 재사용 */
+    +'.pfsum-chip:active{transform:scale(.94)}'
+    +'.pfsum-chip b{font-weight:400;font-size:9px;opacity:.7}'
+    +'[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"]{transition:transform .15s '+EASE_CURVE+',opacity .15s '+EASE_CURVE+'}' /* [2026-09-21] 어제 목록에 필터 칩(.fchip/.cchip)·비교 항목 빼기(✕)가 빠져있었다 - 같은 원리로 같이 추가 */
+    +'[onclick^="pSearch"]:active,[onclick^="pMore"]:active,[onclick^="pCD"]:active,[onclick^="pClearCompare"]:active,[onclick^="pOpenCompare"]:active,[onclick^="pCloseCompare"]:active,[onclick^="pExportCompare"]:active,[onclick^="pExportResults"]:active,[onclick^="pResetFilters"]:active,[onclick^="pToggleFilterVal"]:active,[onclick^="pRemoveCompare"]:active{transform:scale(.96);opacity:.85}'
     /* [2026-09-20] 상세창을 스크롤해 내려갈 때 재배·조경 정보 같은 섹션이
        뚝 나타나는 대신 살짝 떠오르며 나타난다(카드 첫 등장 효과와 같은 원리).
        opacity/transform은 레이아웃 크기에 영향을 안 줘서 setEl의 스크롤
@@ -4105,7 +4151,7 @@ function pEnsurePovAnimStyle(){
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;transition:max-height .2s ease-out}' /* [UX 미세점검 C2] 펼침/접힘 애니메이션 - max-height를 pToggleClamp가 조작한다 */
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp,#pgrid .pc,.pc-cmpbtn,.pdjump-chip,.ui-clamp-btn,.pd-slide-arrow,#pdhead button,#pdcompact button,#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory,[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"]{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp,#pgrid .pc,.pc-cmpbtn,.pdjump-chip,.ui-clamp-btn,.pd-slide-arrow,#pdhead button,#pdcompact button,#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory,[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"]{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
   document.head.appendChild(s);
 }
 /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A] #pdhead 자체의 높이를 바꾸던

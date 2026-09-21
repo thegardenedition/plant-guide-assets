@@ -46,37 +46,61 @@
   </div>
   <div style="flex:1;min-width:320px">
     <div id="pfilterbar" style="border:1px solid #E6E6E6;background:#FAFAFA;padding:28px 28px 24px">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-        <p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0">정원 정보로 찾기</p>
-        <div style="display:flex;align-items:center;gap:16px">
+      <div class="pfilter-header" onclick="pToggleFilterAcc()">
+        <div style="display:flex;align-items:center;gap:6px">
+          <p style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#121212;margin:0">정원 정보로 찾기</p>
+          <svg id="pfacc-arrow" class="pfacc-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px" onclick="event.stopPropagation()">
           <p id="pfilterprogress" style="font-size:11px;color:#ABABAB;margin:0"></p>
-          <button id="pfilterreset" onclick="pResetFilters()" style="display:none;background:none;border:none;font-size:11px;color:#787878;text-decoration:underline;cursor:pointer;font-family:inherit;padding:0">초기화 (<span id="pfilterbadge">0</span>)</button>
+          <button id="pfilterreset" onclick="pResetFilters()" style="display:none;background:#fff;border:1px solid #121212;border-radius:12px;font-size:11px;font-weight:600;letter-spacing:.3px;color:#121212;cursor:pointer;font-family:inherit;padding:5px 12px">초기화 (<span id="pfilterbadge">0</span>)</button>
         </div>
       </div>
-      <div style="margin-bottom:18px">
-        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">식물 유형</p>
-        <div id="pfusecat" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      </div>
-      <div style="margin-bottom:18px">
-        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">출처 분류</p>
-        <div id="pforigin" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      </div>
-      <div style="margin-bottom:18px">
-        <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">꽃 색상</p>
-        <div id="pfcolor" style="display:flex;flex-wrap:wrap;gap:14px"></div>
-      </div>
-      <div style="display:flex;gap:32px;flex-wrap:wrap">
-        <div>
-          <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">생활형</p>
-          <div id="pfcycle" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <div id="pfilterbody" class="pfilterbody-collapsed">
+        <div style="margin-bottom:18px">
+          <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">식물 유형</p>
+          <div id="pfusecat" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
-        <div>
-          <p style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">광조건</p>
-          <div id="pflight" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div style="margin-bottom:18px">
+          <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">출처 분류</p>
+          <div id="pforigin" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div style="margin-bottom:18px;padding:14px 16px;background:#fff;border:1px solid #E6E6E6">
+          <p style="font-size:10px;letter-spacing:.3px;color:#ABABAB;margin:0 0 14px;line-height:1.6"><span style="font-weight:600;color:#121212">형태·질감·색</span> · 국립수목원 발간 「형태로·질감으로·색으로 찾는 우리꽃 정원식물」 수록종 기준</p>
+          <div style="margin-bottom:14px">
+            <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">식물 형태</p>
+            <div id="pfform" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">질감</p>
+            <div id="pftexture" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+          <div>
+            <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">꽃 색상</p>
+            <div id="pfcolor" style="display:flex;flex-wrap:wrap;gap:14px"></div>
+          </div>
+        </div>
+        <div style="margin-bottom:18px">
+          <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">스토리</p>
+          <div id="pfstory" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div style="display:flex;gap:32px;flex-wrap:wrap">
+          <div>
+            <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">생활형</p>
+            <div id="pfcycle" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+          <div>
+            <p class="pflabel" style="font-size:10px;letter-spacing:1px;color:#ABABAB;margin:0 0 10px">광조건</p>
+            <div id="pflight" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
+  <script>function pToggleFilterAcc(){var b=document.getElementById('pfilterbody');var arrow=document.getElementById('pfacc-arrow');var collapsed=b.classList.toggle('pfilterbody-collapsed');if(arrow)arrow.style.transform=collapsed?'rotate(0deg)':'rotate(180deg)';}</script>
+  <!-- [2026-09-21] 위 아코디언(pfilter-header/pfilterbody/pToggleFilterAcc)은 디자인 세션이
+       Webflow 쪽에 직접 추가한 것으로 실제 라이브에서 그대로 가져왔다(참고용 사본이 실제
+       라이브와 어긋나 있던 걸 바로잡음, project-magazinegreen-coordination 메모리 참고) -->
 </div>
 
 <div style="background:#FAFAFA;border-top:1px solid #E6E6E6;padding:48px 32px 96px">
@@ -188,6 +212,12 @@
 .pc-rolebadge{font-size:10px;color:#787878;border:1px solid #E6E6E6;padding:2px 7px;border-radius:10px;display:inline-block}
 .pc-rolebadge.native{color:#3F6B4A;border-color:#B9D6C2;background:#F2F8F4}
 .pc-rolebadge.caution{color:#B1584F;border-color:#E6C4C0;background:#FBF1F0}
+.pfilter-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;cursor:pointer}
+.pfacc-arrow{transition:transform .2s;flex-shrink:0}
+.pflabel{line-height:1.5;font-weight:600}
+.pfilterbody-collapsed{display:none}
+#pfilterbody{display:block!important}
+#pfilterbody>div{margin-bottom:12px!important}
 .fchip{font-size:12px;color:#121212;border:1px solid #DCDCDC;padding:6px 14px;border-radius:14px;cursor:pointer;background:#fff;user-select:none}
 .fchip:hover{border-color:#121212}
 .fchip.active{background:#121212;color:#fff;border-color:#121212}
