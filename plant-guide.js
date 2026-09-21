@@ -4073,6 +4073,16 @@ var POV_ANIM_MS=200;
    곡선만 바꾼 것 - CSS 트랜지션은 곡선이 뭐든 선언된 시간이 지나면 똑같이
    끝나므로, 이 시간과 맞춰 둔 JS setTimeout(POV_ANIM_MS 등)은 그대로 맞는다. */
 var EASE_CURVE='cubic-bezier(.16,1,.3,1)';
+/* [재발 방지, 총괄 세션 제안 2026-09-21] 이 함수는 상세창을 열 때만
+   실행된다(pShowPov 등에서 호출) - #pgrid .pc·.pc-cmpbtn·#pcmpbar·
+   .pfsum-chip 등 "검색 결과 화면"에서 상세창과 무관하게 항상 필요한
+   스타일을 여기 넣으면, 상세창을 한 번도 안 연 방문자에게는 그 스타일이
+   영영 안 먹는다(실제로 있었던 버그, B3 카드 2열·오늘 mgpguidecolor/
+   motion 병합 때 둘 다 이 함정에 걸렸었음 - 커밋 6e5d57d 참고). 여기엔
+   #pov/#pdpanel/#pdhead/#pdcompact/.pdjump-chip/.ui-clamp 등 상세창을
+   열어야만 화면에 존재하는 요소의 스타일만 넣는다 - 검색결과 화면
+   요소는 페이지 로드 시 즉시 실행되는 블록(아래, #psi 스타일과 같은
+   자리)에 넣을 것. */
 function pEnsurePovAnimStyle(){
   if(document.getElementById('pov-anim-style'))return;
   var s=document.createElement('style');
@@ -4089,20 +4099,6 @@ function pEnsurePovAnimStyle(){
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:160px}' /* [백로그 38 P2-D 후속] 점프해도 섹션 첫 줄이 sticky 헤더(데스크톱 146px) 뒤로 들어가던 문제 - 비즈니스 세션 지적 */
-    +'#pcmpbar{transform:translateY(100%);transition:transform .2s '+EASE_CURVE+'}' /* [UX 미세점검 C4] display:none↔flex 뚝 전환 대신 슬라이드 인/아웃 - display는 JS(renderCompareBar)가 계속 토글, 위치만 애니메이션 */
-    +'#pcmpbar.pcmpbar-visible{transform:translateY(0)}'
-    +'#pcmpcount{display:inline-block}'
-    +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
-    +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
-    /* [2026-09-20 고급 디자인 스킬 점검] "눌렀을 때 반응"이 사이트 전체에 하나도
-       없었다(호버만 일부 있음) - 마우스 호버가 안 먹히는 휴대폰에서는 눌러도
-       아무 반응이 없었다는 뜻. 누르는 순간 살짝 눌리는 느낌을 준다. 인라인
-       style로 transform을 이미 쓰는 요소(.pd-slide-arrow의 translateY(-50%)
-       가운데 정렬)는 인라인이 항상 이기므로 !important로 눌러야 먹는다. */
-    +'#pgrid .pc{transition:transform .15s '+EASE_CURVE+',box-shadow .15s}' /* 임베드 쪽 카드 :hover 규칙이 #pgrid .pc 로 더 구체적이라(호버+눌림 동시 상태일 때 눌림이 묻히지 않도록) 같은 구체성으로 맞춘다 - box-shadow 시간은 임베드 규칙(.15s)과 맞춤 */
-    +'#pgrid .pc:active{transform:scale(.98)}'
-    +'.pc-cmpbtn{transition:transform .15s '+EASE_CURVE+'}'
-    +'.pc-cmpbtn:active{transform:scale(.94)}'
     +'.pdjump-chip:active{opacity:.6}'
     +'.ui-clamp-btn{transition:opacity .15s '+EASE_CURVE+'}'
     +'.ui-clamp-btn:active{opacity:.6}'
@@ -4110,14 +4106,6 @@ function pEnsurePovAnimStyle(){
     +'.pd-slide-arrow:active{transform:translateY(-50%) scale(.85)!important}' /* 인라인 translateY(-50%)를 지키면서 눌림만 더한다 */
     +'#pdhead button,#pdcompact button{transition:transform .15s '+EASE_CURVE+'}'
     +'#pdhead button:active,#pdcompact button:active{transform:scale(.88)}'
-    /* [2026-09-21 UX 진단] 필터 패널이 접혀 있어도(디자인 세션의 아코디언)
-       고른 값이 뭔지 바로 보이게 하는 요약 칩(renderFilterSummary가 채움) */
-    +'.pfsum-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+ACCENT+';background:#fff;border:1px solid '+ACCENT+';border-radius:12px;padding:4px 8px 4px 12px;cursor:pointer;transition:transform .15s '+EASE_CURVE+',background .15s}'
-    +'.pfsum-chip:hover{background:#F2F2F2}' /* 새 색 값을 만들지 않고 사이트 기존 배경 토큰(#F2F2F2) 재사용 */
-    +'.pfsum-chip:active{transform:scale(.94)}'
-    +'.pfsum-chip b{font-weight:400;font-size:9px;opacity:.7}'
-    +'[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"]{transition:transform .15s '+EASE_CURVE+',opacity .15s '+EASE_CURVE+'}' /* [2026-09-21] 어제 목록에 필터 칩(.fchip/.cchip)·비교 항목 빼기(✕)가 빠져있었다 - 같은 원리로 같이 추가 */
-    +'[onclick^="pSearch"]:active,[onclick^="pMore"]:active,[onclick^="pCD"]:active,[onclick^="pClearCompare"]:active,[onclick^="pOpenCompare"]:active,[onclick^="pCloseCompare"]:active,[onclick^="pExportCompare"]:active,[onclick^="pExportResults"]:active,[onclick^="pResetFilters"]:active,[onclick^="pToggleFilterVal"]:active,[onclick^="pRemoveCompare"]:active{transform:scale(.96);opacity:.85}'
     /* [2026-09-20] 상세창을 스크롤해 내려갈 때 재배·조경 정보 같은 섹션이
        뚝 나타나는 대신 살짝 떠오르며 나타난다(카드 첫 등장 효과와 같은 원리).
        opacity/transform은 레이아웃 크기에 영향을 안 줘서 setEl의 스크롤
@@ -4151,7 +4139,7 @@ function pEnsurePovAnimStyle(){
     +'.ui-clamp{-webkit-line-clamp:4;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;transition:max-height .2s ease-out}' /* [UX 미세점검 C2] 펼침/접힘 애니메이션 - max-height를 pToggleClamp가 조작한다 */
     +'.ui-clamp-btn{padding:12px 0}' /* 탭 영역 44px 확보 - 비즈니스 세션 지적. display는 JS(pApplyClamps)가 인라인으로 토글하므로 여기선 안 건드린다 */
     +'}'
-    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,#pcmpbar,.ui-clamp,#pgrid .pc,.pc-cmpbtn,.pdjump-chip,.ui-clamp-btn,.pd-slide-arrow,#pdhead button,#pdcompact button,#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory,[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"]{transition:none}#pcmpcount.pcmpcount-pulse{animation:none}}';
+    +'@media (prefers-reduced-motion:reduce){#pov,#pdpanel,#pdhead,#pdcompact,.ui-clamp,.pdjump-chip,.ui-clamp-btn,.pd-slide-arrow,#pdhead button,#pdcompact button,#pdsummary,#pdcore,#pdenv,#pdplanting,#pdbody,#pdlandscape,#pdnsgarden,#pdnslandscape,#pdbookgarden,#pdbooklandscape,#pdacademic,#pdtourspots,#pdstory{transition:none}}'; /* #pgrid .pc·.pc-cmpbtn·#pcmpbar 등 검색결과 화면 요소의 reduced-motion은 페이지 로드 시 즉시 실행되는 별도 블록(아래)에서 같이 처리 - 이 함수 자체가 상세창을 열 때만 실행돼 그쪽엔 안 맞다 */
   document.head.appendChild(s);
 }
 /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A] #pdhead 자체의 높이를 바꾸던
@@ -4661,38 +4649,76 @@ updateFilterBadge();
    background를 갖고 있어(#fff) 임베드의 기존 :hover 규칙도 !important가
    없으면 원래도 안 먹혔을 가능성이 있고, 추정만으로 손대기보다는 실측
    없이는 보류. */
-/* [총괄 세션 피드백 2026-09-21] :hover를 그냥 붙이면 터치 기기에서
-   "탭한 뒤에도 눌린 색이 안 지워지는" 문제가 생길 수 있다(터치는 진짜
-   호버가 없어 탭을 hover로 흉내내고, 손을 떼도 다음 탭 전까지 그 상태가
-   남는 기종이 있음) - 마우스 등 실제 호버가 되는 기기에서만 이 규칙이
-   먹게 `@media (hover:hover)`로 감싼다. 터치 기기는 이미 있는 :active
-   반응(어제 작업)으로 충분히 커버된다. 포커스(.psearchbar:focus-within)
-   는 터치에서도 탭-포커스로 정상 동작해야 하는 것이라 이 감싸기 밖에
-   그대로 둔다 - outline은 .psearch-input에 이미 none이라 겹칠 default
-   파란 테두리 자체가 없다(border-color만 바뀌므로 이중 테두리 위험 없음,
-   확인함). */
+/* [2026-09-21 통합] 이 블록은 페이지 로드 시 즉시 실행돼(위 #psi 블록과
+   같은 자리) 검색결과 화면(카드그리드·검색창·비교함·필터)의 스타일을
+   담당한다. 원래 #pgrid .pc/.pc-cmpbtn/.pfsum-chip/#pcmpbar 등 눌림
+   반응은 pEnsurePovAnimStyle()(상세창을 열 때만 실행) 안에 잘못 들어가
+   있었다 - 상세창을 한 번도 안 연 첫 화면에서는 이 스타일 자체가 DOM에
+   없어 카드 눌림·비교함 슬라이드가 전혀 안 먹었다(이번에 검색창 작업을
+   하다가 우연히 발견해 옮김).
+
+   [총괄+디자인 세션 조율 2026-09-21] 도감 화면 스타일을 관리하던 곳이
+   plant-guide.js 말고 Webflow에 등록된 디자인 세션 스크립트 2개
+   (mgpguidecolor-1.0.0.js·mgpguidemotion-1.1.0.js)에도 있어 같은
+   셀렉터(#pgrid .pc:hover, .psearch-submit:hover 등)가 서로 다른 값으로
+   충돌했다. 디자인 세션이 그 두 스크립트를 사이트에서 완전히 내리기로
+   하고 내용을 여기 합쳐 보내줬다 - 값은 그쪽이 정한 그대로 쓰고(포인트
+   그린 accent·카드 사진 확대·포커스 링), 터치 탭-고착 방지(@media
+   (hover:hover))와 전환 곡선(EASE_CURVE)만 이 파일의 기존 원칙에 맞춘다.
+   :hover를 그냥 붙이면 터치 기기에서 "탭한 뒤에도 눌린 색이 안 지워지는"
+   문제가 생길 수 있어(터치는 진짜 호버가 없어 탭을 hover로 흉내내고,
+   손을 떼도 다음 탭 전까지 그 상태가 남는 기종이 있음) 마우스 등 실제
+   호버가 되는 기기에서만 먹게 감싼다 - 터치는 :active로 충분히 커버.
+   포커스(:focus-within, :focus-visible)는 터치에서도 탭-포커스로 정상
+   동작해야 하므로 감싸지 않는다. */
 (function(){
   var s=document.createElement('style');
   s.textContent=
     '.psearchbar{transition:border-color .15s '+EASE_CURVE+'!important}'
     +'.psearchbar:focus-within{border-color:'+ACCENT+'!important}'
-    +'.psearch-submit{transition:background .15s '+EASE_CURVE+'!important}'
+    +'.psearch-submit{background:'+ACCENT+'!important;transition:background .15s '+EASE_CURVE+'!important}' /* 디자인 세션 결정 - 검색 버튼 기본색을 검정에서 포인트 그린으로 */
     +'.picon-btn{transition:background .15s '+EASE_CURVE+',border-radius .15s}'
     +'#pfilterreset{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pClearCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pOpenCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pExportCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pExportResults"]{transition:background .15s '+EASE_CURVE+'}'
+    +'[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pCloseCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"]{transition:transform .15s '+EASE_CURVE+',opacity .15s '+EASE_CURVE+'}'
+    +'[onclick^="pSearch"]:active,[onclick^="pMore"]:active,[onclick^="pCD"]:active,[onclick^="pClearCompare"]:active,[onclick^="pOpenCompare"]:active,[onclick^="pCloseCompare"]:active,[onclick^="pExportCompare"]:active,[onclick^="pExportResults"]:active,[onclick^="pResetFilters"]:active,[onclick^="pToggleFilterVal"]:active,[onclick^="pRemoveCompare"]:active{transform:scale(.96);opacity:.85}'
+    +'#pgrid .pc{transition:transform .15s '+EASE_CURVE+',box-shadow .15s,border-color .15s}'
+    +'#pgrid .pc:active{transform:scale(.98)}'
+    +'#pgrid .pc.pc-cmp-active{outline-color:'+ACCENT+'!important}'
+    +'#pgrid .pc-img img{transition:transform .4s ease}' /* 디자인 세션 결정 - 카드 호버 시 사진 살짝 확대 */
+    +'.pc-cmpbtn{transition:transform .15s '+EASE_CURVE+',background .15s '+EASE_CURVE+'}'
+    +'.pc-cmpbtn:active{transform:scale(.94)}'
+    +'.pc-cmpbtn.active{background:'+ACCENT+'!important;border-color:'+ACCENT+'!important}' /* 디자인 세션 결정 - 비교중 버튼 포인트 그린 */
+    +'.fchip{transition:background .15s '+EASE_CURVE+',border-color .15s '+EASE_CURVE+',color .15s '+EASE_CURVE+'}'
+    +'.fchip.active{background:'+ACCENT+'!important;border-color:'+ACCENT+'!important}' /* 디자인 세션 결정 - 선택된 필터 칩 검정→포인트 그린 */
+    +'.cchip.active .cdot{box-shadow:0 0 0 2px #FAFAFA,0 0 0 3px '+ACCENT+'!important}'
+    +'.cchip.active .clabel{color:'+ACCENT+'!important}'
+    +'.pfsum-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+ACCENT+';background:#fff;border:1px solid '+ACCENT+';border-radius:12px;padding:4px 8px 4px 12px;cursor:pointer;transition:transform .15s '+EASE_CURVE+',background .15s}'
+    +'.pfsum-chip:active{transform:scale(.94)}'
+    +'.pfsum-chip b{font-weight:400;font-size:9px;opacity:.7}'
+    +'#pcmpbar{transform:translateY(100%);transition:transform .2s '+EASE_CURVE+'}' /* [UX 미세점검 C4] display:none↔flex 뚝 전환 대신 슬라이드 인/아웃 - display는 JS(renderCompareBar)가 계속 토글, 위치만 애니메이션 */
+    +'#pcmpbar.pcmpbar-visible{transform:translateY(0)}'
+    +'#pcmpcount{display:inline-block}'
+    +'@keyframes pcmpcount-pulse{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}'
+    +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
+    +'.fchip:focus-visible,.cchip:focus-visible,#pgrid .pc:focus-visible,.psearch-submit:focus-visible,.picon-btn:focus-visible{outline:2px solid '+ACCENT+';outline-offset:2px}' /* 디자인 세션 결정 - 키보드 포커스 링 */
     +'@media (hover:hover){'
-    +'.psearch-submit:hover{background:rgba(18,18,18,.85)!important}'
+    +'.psearch-submit:hover{background:#083D33!important}' /* 디자인 세션 결정 - 포인트 그린보다 더 짙게 */
     +'.picon-btn:hover{background:#F2F2F2;border-radius:50%}' /* 검색어 지우기(✕)·사진으로 찾기 아이콘 버튼 - 인라인 배경 없어 !important 불필요 */
     +'#pfilterreset:hover{background:#F2F2F2!important}'
     +'[onclick^="pClearCompare"]:hover{background:rgba(255,255,255,.1)!important}'
     +'[onclick^="pOpenCompare"]:hover{background:#F2F2F2!important}'
     +'[onclick^="pExportCompare"]:hover{background:rgba(255,255,255,.18)!important}'
     +'[onclick^="pExportResults"]:hover{background:#F2F2F2!important}'
+    +'#pgrid .pc:hover{border-color:'+ACCENT+'!important;transform:translateY(-3px);box-shadow:0 12px 28px rgba(18,18,18,.12)}' /* 디자인 세션 결정 - translateY -2px→-3px, 테두리 포인트색 추가 */
+    +'#pgrid .pc:hover .pc-img img{transform:scale(1.045)}'
+    +'.fchip:hover{border-color:'+ACCENT+'!important}' /* 디자인 세션 결정 - 검정→포인트 그린 */
+    +'#psugg .pchip:hover{border-color:'+ACCENT+'!important}'
     +'}'
-    +'@media (prefers-reduced-motion:reduce){.psearchbar,.psearch-submit,.picon-btn,#pfilterreset,[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"]{transition:none!important}}';
+    +'@media (prefers-reduced-motion:reduce){.psearchbar,.psearch-submit,.picon-btn,#pfilterreset,[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"],[onclick^="pSearch"],[onclick^="pMore"],[onclick^="pCD"],[onclick^="pResetFilters"],[onclick^="pToggleFilterVal"],[onclick^="pRemoveCompare"],#pgrid .pc,#pgrid .pc-img img,.pc-cmpbtn,.fchip,.pfsum-chip,#pcmpbar{transition:none!important}#pcmpcount.pcmpcount-pulse{animation:none!important}}';
   document.head.appendChild(s);
 })();
 /* [2026-09-20 고급 디자인 스킬 점검] 아이콘만 있고 글자가 없는 버튼(✕)에
