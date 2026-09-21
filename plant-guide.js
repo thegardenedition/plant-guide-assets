@@ -4675,7 +4675,8 @@ updateFilterBadge();
   var s=document.createElement('style');
   s.textContent=
     '.psearchbar{transition:border-color .15s '+EASE_CURVE+'!important}'
-    +'.psearchbar:focus-within{border-color:'+ACCENT+'!important}'
+    +'.psearchbar:focus-within{border-color:'+ACCENT+'!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(11,83,69,.18)!important}' /* [2026-09-21 대표 실기기 재보고] 테두리 색만 바꾸니 1.5px 검정→진초록이 눈으로는 거의 같은 검은 선이었다(WCAG 2.4.11 포커스 대비 기준 미달, 총괄 세션이 실측) - 테두리를 2px로 살짝 굵게 하고, 바깥에 옅은 초록 링(box-shadow)을 더해 색만으로는 안 보이던 걸 "형태"로도 보이게 한다. radius 0 원칙은 그대로(box-shadow는 각진 링으로 나온다) */
+    +'.picon-btn:focus-visible{box-shadow:0 0 0 3px rgba(11,83,69,.18)!important}' /* 아이콘 버튼도 같은 링 - 기존 outline:2px는 유지, 덧붙이는 것뿐이라 서로 안 부딪힘 */
     +'.psearch-submit{background:'+ACCENT+'!important;transition:background .15s '+EASE_CURVE+'!important}' /* 디자인 세션 결정 - 검색 버튼 기본색을 검정에서 포인트 그린으로 */
     +'.picon-btn{transition:background .15s '+EASE_CURVE+',border-radius .15s}'
     +'#pfilterreset{transition:background .15s '+EASE_CURVE+'}'
