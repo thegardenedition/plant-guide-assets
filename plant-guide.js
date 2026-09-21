@@ -4599,26 +4599,34 @@ updateFilterBadge();
     +'.pc-cmpbtn{min-height:32px!important;font-size:12px!important;padding:8px 12px!important;box-sizing:border-box}';
   document.head.appendChild(s);
 })();
-/* [2026-09-21 UX 진단 B3 - 초안, 디자인 검토 전] 실측(390px): 카드 한 장
-   560px(사진 1:1 356px)라 화면당 1.5장만 보여 11건에 6,000px씩 스크롤해야
-   했다. 라이브 CSS를 직접 확인해보니 #pgrid는 이미 ≤768px에서 2열인데,
-   ≤480px(대부분의 실제 휴대폰 폭)에서만 다시 1열로 되돌리는 규칙이
-   Webflow 임베드에 따로 있었다(의도적 결정으로 보임 - 실측 결과 재검토
-   필요). 같은 선택자(#pgrid)·같은 !important로 같은 ≤480px 구간에 2열을
-   다시 적용하고, 카드 절반 폭에 맞춰 사진 비율을 1:1→4:3(세로 압축)로,
-   본문 패딩·글자 크기를 비례해 줄인다. **여기 두는 이유**: 위 #psi 블록과
+/* [2026-09-21 UX 진단 B3] 실측(390px): 카드 한 장 560px(사진 1:1 356px)라
+   화면당 1.5장만 보여 11건에 6,000px씩 스크롤해야 했다. 라이브 CSS를 직접
+   확인해보니 #pgrid는 이미 ≤768px에서 2열인데, ≤480px(대부분의 실제
+   휴대폰 폭)에서만 다시 1열로 되돌리는 규칙이 Webflow 임베드에 따로
+   있었다. 카드 절반 폭에 맞춰 사진 비율을 1:1→4:3(세로 압축)로, 본문
+   패딩·글자 크기를 비례해 줄인다. **여기 두는 이유**: 위 #psi 블록과
    똑같이 카드 그리드는 검색 결과가 처음 뜰 때부터 바로 적용돼야 하는데,
    pEnsurePovAnimStyle()은 상세창을 열 때(pDetail)만 불려서 처음엔 이
-   스타일 자체가 DOM에 없다 - 거기 넣었다면 상세창을 한 번도 안 연 첫
-   화면에서는 2열이 전혀 안 먹고, 나중에 상세창을 처음 열 때 갑자기
-   레이아웃이 바뀌는 문제가 있었을 것(직접 확인 후 옮김). 시안 없이 만든
-   초안이라 실제 화면은 이 브라우저 도구로 확인 못 함(≤480px 폭 에뮬레이션
-   불가, memory 기록) - 배포 전 디자인 세션 검토 필요. */
+   스타일 자체가 DOM에 없다 - 거기 넣었다면 첫 화면에서는 2열이 전혀 안
+   먹고, 나중에 상세창을 처음 열 때 갑자기 레이아웃이 바뀌는 문제가
+   있었을 것(직접 확인 후 옮김).
+   [배포 뒤 실기기 실측으로 드러난 버그, 총괄 세션이 잡아줌] #pgrid
+   부분만 라이브에서 1열 그대로였다 - Webflow 임베드의 같은 규칙
+   (`#pgrid{grid-template-columns:1fr!important}`)이 body 안 <style>에
+   있고, 이 스타일은 head에 넣는데 CSS 우선순위는 실행 시점이 아니라
+   "문서 안에서 더 뒤에 오는 쪽"이 이긴다 - head는 항상 body보다 문서상
+   앞이라, 선택자 구체성과 !important가 완전히 같으면 body 쪽(임베드)이
+   항상 이겼다(.pc-img/.pc-body 등 다른 줄은 임베드 쪽에 !important가
+   없어 문제 없었음 - #pgrid만 유일하게 !important끼리 부딪혔다). 고쳐서
+   `html body #pgrid`로 구체성 자체를 올려(아이디 1개 vs 아이디+태그
+   2개) 순서와 무관하게 이기게 한다. 검증은 스크린샷이 아니라
+   getComputedStyle(#pgrid).gridTemplateColumns가 "174px 174px"처럼 두
+   값인지로 한다(문자열 "repeat(2,1fr)"이 아니라 실제 계산된 px 두 개). */
 (function(){
   var s=document.createElement('style');
   s.textContent=
     '@media (max-width:480px){'
-    +'#pgrid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}'
+    +'html body #pgrid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}'
     +'.pc-img{aspect-ratio:4/3!important}'
     +'.pc-body{padding:12px!important}'
     +'.pc-name{font-size:13px!important;margin:0 0 2px!important}'
