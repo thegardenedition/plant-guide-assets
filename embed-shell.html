@@ -37,9 +37,12 @@
         <span style="font-size:14px;color:#121212;font-weight:500">형태·분포·이용법 등 상세정보 확인</span>
       </div>
     </div>
-    <div style="display:flex;border:1.5px solid #121212;max-width:480px">
-      <input id="psi" type="text" placeholder="예: 소나무, 장미, Pinus densiflora" style="flex:1;padding:14px 20px;border:none;font-size:15px;outline:none;color:#121212;font-family:inherit;background:transparent" onkeypress="if(event.key==='Enter')pSearch()" oninput="if(!this.value.trim())pClearedSearch()">
-      <button onclick="pSearch()" style="padding:14px 28px;background:#121212;border:none;cursor:pointer;font-size:11px;font-weight:600;color:#fff;letter-spacing:2px;font-family:inherit">검색</button>
+    <div class="psearchbar">
+      <input id="psi" class="psearch-input" type="text" placeholder="예: 구절초, 미선나무, Hydrangea serrata" onkeypress="if(event.key==='Enter')pSearch()" oninput="pOnSearchInput()">
+      <button type="button" id="pclearbtn" class="picon-btn" onclick="pClearSearchBox()" title="검색어 지우기" style="display:none;color:#ABABAB;font-size:15px">&#10005;</button>
+      <button type="button" class="picon-btn" onclick="pPhotoTrigger()" title="사진으로 식물 찾기" style="border-left:1px solid #E6E6E6;color:#121212"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3.2l1.4-2h6.8l1.4 2H20a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.4"/></svg></button>
+      <input type="file" id="pphotoinput" accept="image/*" multiple style="display:none" onchange="pOnPhotoSelected(this)">
+      <button onclick="pSearch()" class="psearch-submit">검색</button>
     </div>
     <div id="pnote" style="display:none;max-width:480px;margin-top:10px;font-size:12px;color:#ABABAB"></div>
     <div id="psugg" style="display:none;max-width:480px;margin-top:10px;flex-wrap:wrap;gap:8px"></div>
@@ -212,6 +215,10 @@
 .pc-rolebadge{font-size:10px;color:#787878;border:1px solid #E6E6E6;padding:2px 7px;border-radius:10px;display:inline-block}
 .pc-rolebadge.native{color:#3F6B4A;border-color:#B9D6C2;background:#F2F8F4}
 .pc-rolebadge.caution{color:#B1584F;border-color:#E6C4C0;background:#FBF1F0}
+.psearchbar{display:flex;align-items:center;border:1.5px solid #121212;max-width:480px;width:100%}
+.psearch-input{flex:1;min-width:0;padding:14px 20px;border:none;font-size:15px;outline:none;color:#121212;font-family:inherit;background:transparent}
+.psearch-submit{padding:14px 24px;min-height:44px;background:#121212;border:none;cursor:pointer;font-size:11px;font-weight:600;color:#fff;letter-spacing:2px;font-family:inherit;flex-shrink:0;white-space:nowrap}
+.picon-btn{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;flex-shrink:0;background:transparent;border:none;cursor:pointer;padding:0 12px}
 .pfilter-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;cursor:pointer}
 .pfacc-arrow{transition:transform .2s;flex-shrink:0}
 .pflabel{line-height:1.5;font-weight:600}

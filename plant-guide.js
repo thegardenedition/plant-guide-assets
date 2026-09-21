@@ -4635,6 +4635,66 @@ updateFilterBadge();
     +'}';
   document.head.appendChild(s);
 })();
+/* [2026-09-21 UX 진단 - 히어로/검색창/버튼 느낌] 라이브를 직접 확인해
+   찾은 것들:
+   1) 검색창(.psearch-input)에 outline:none만 있고 포커스 표시가 전혀
+      없었다 - 키보드(Tab)로 온 사용자는 지금 커서가 검색창에 있는지
+      알 방법이 없었다(접근성 문제). 감싸는 .psearchbar에 focus-within으로
+      테두리를 포인트색으로 바꾼다(실제 "활성 상태"이므로 accent 사용
+      원칙에 맞음, 새 색 값 안 만들고 기존 accent 재사용).
+   2) 검색 버튼·필터 초기화·비교함 버튼들(비우기/비교하기/CSV 내보내기)·
+      결과 CSV 내보내기 - 이 버튼들은 마우스를 올려도 반응이 없었다("더
+      보기"·필터칩·비교버튼엔 이미 호버가 있었음). 새 색을 만들지 않고
+      기존에 쓰이던 값만 재사용(#F2F2F2 배경 옅게, rgba(255,255,255,..)
+      흰 배경 위 버튼은 투명도만 살짝 올림 - 비교 바 안의 다른 버튼들이
+      이미 이 방식을 쓰고 있어 그대로 맞춤).
+   **사전 검증**: 이 버튼들은 전부 Webflow 임베드 쪽 <button> 태그에
+   background가 인라인 style로 박혀 있다(예: pfilterreset·pClearCompare·
+   pOpenCompare·pExportCompare·pExportResults) - 인라인 스타일은
+   !important 없는 외부 CSS로는 절대 못 이긴다(어제 #pgrid 사고와는
+   다른 종류의 함정 - 그건 문서 순서 동점, 이건 인라인 자체가 항상
+   이김). 그래서 이 다섯 개는 전부 !important를 붙였다. 반대로
+   .psearch-submit(검색 버튼)과 .psearchbar(검색창 감싸개)는 인라인이
+   없고 클래스로만 스타일이 걸려 있어(확인함) !important 없이도 원래
+   이긴다 - 그래도 방어적으로 같이 붙여둔다. "더 보기" 버튼 호버 색
+   (#1B4D3E, accent와 다른 값)은 이번엔 안 건드린다 - 버튼 자체가 인라인
+   background를 갖고 있어(#fff) 임베드의 기존 :hover 규칙도 !important가
+   없으면 원래도 안 먹혔을 가능성이 있고, 추정만으로 손대기보다는 실측
+   없이는 보류. */
+/* [총괄 세션 피드백 2026-09-21] :hover를 그냥 붙이면 터치 기기에서
+   "탭한 뒤에도 눌린 색이 안 지워지는" 문제가 생길 수 있다(터치는 진짜
+   호버가 없어 탭을 hover로 흉내내고, 손을 떼도 다음 탭 전까지 그 상태가
+   남는 기종이 있음) - 마우스 등 실제 호버가 되는 기기에서만 이 규칙이
+   먹게 `@media (hover:hover)`로 감싼다. 터치 기기는 이미 있는 :active
+   반응(어제 작업)으로 충분히 커버된다. 포커스(.psearchbar:focus-within)
+   는 터치에서도 탭-포커스로 정상 동작해야 하는 것이라 이 감싸기 밖에
+   그대로 둔다 - outline은 .psearch-input에 이미 none이라 겹칠 default
+   파란 테두리 자체가 없다(border-color만 바뀌므로 이중 테두리 위험 없음,
+   확인함). */
+(function(){
+  var s=document.createElement('style');
+  s.textContent=
+    '.psearchbar{transition:border-color .15s '+EASE_CURVE+'!important}'
+    +'.psearchbar:focus-within{border-color:'+ACCENT+'!important}'
+    +'.psearch-submit{transition:background .15s '+EASE_CURVE+'!important}'
+    +'.picon-btn{transition:background .15s '+EASE_CURVE+',border-radius .15s}'
+    +'#pfilterreset{transition:background .15s '+EASE_CURVE+'}'
+    +'[onclick^="pClearCompare"]{transition:background .15s '+EASE_CURVE+'}'
+    +'[onclick^="pOpenCompare"]{transition:background .15s '+EASE_CURVE+'}'
+    +'[onclick^="pExportCompare"]{transition:background .15s '+EASE_CURVE+'}'
+    +'[onclick^="pExportResults"]{transition:background .15s '+EASE_CURVE+'}'
+    +'@media (hover:hover){'
+    +'.psearch-submit:hover{background:rgba(18,18,18,.85)!important}'
+    +'.picon-btn:hover{background:#F2F2F2;border-radius:50%}' /* 검색어 지우기(✕)·사진으로 찾기 아이콘 버튼 - 인라인 배경 없어 !important 불필요 */
+    +'#pfilterreset:hover{background:#F2F2F2!important}'
+    +'[onclick^="pClearCompare"]:hover{background:rgba(255,255,255,.1)!important}'
+    +'[onclick^="pOpenCompare"]:hover{background:#F2F2F2!important}'
+    +'[onclick^="pExportCompare"]:hover{background:rgba(255,255,255,.18)!important}'
+    +'[onclick^="pExportResults"]:hover{background:#F2F2F2!important}'
+    +'}'
+    +'@media (prefers-reduced-motion:reduce){.psearchbar,.psearch-submit,.picon-btn,#pfilterreset,[onclick^="pClearCompare"],[onclick^="pOpenCompare"],[onclick^="pExportCompare"],[onclick^="pExportResults"]{transition:none!important}}';
+  document.head.appendChild(s);
+})();
 /* [2026-09-20 고급 디자인 스킬 점검] 아이콘만 있고 글자가 없는 버튼(✕)에
    스크린리더용 이름표(aria-label)가 하나도 없었다 - 눈이 안 보이는 방문자는
    이 버튼이 뭘 하는 버튼인지 전혀 알 수 없었다. 이 버튼들은 Webflow
