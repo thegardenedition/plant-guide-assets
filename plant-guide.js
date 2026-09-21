@@ -49,8 +49,8 @@ var PAGE_SIZE=Infinity;
    14px*1.75=24.5px)과 줄간격이 어긋나 라벨·값이 미묘하게 다른 높이로
    보였다(글자 강약이 흐트러져 보이는 원인 중 하나) - 값 칸과 같은 비율로
    맞춘다. */
-var UI_ROW_LABEL='padding:16px 0;color:#ABABAB;width:30%;font-size:12px;letter-spacing:.2px;vertical-align:top;font-weight:500;line-height:1.75';
-var UI_ROW_VALUE='padding:16px 0;color:#121212;font-size:14px;line-height:1.75';
+var UI_ROW_LABEL='padding:16px 0;color:#ABABAB;width:30%;font-size:11px;letter-spacing:.2px;vertical-align:top;font-weight:500;line-height:1.75';
+var UI_ROW_VALUE='padding:16px 0;color:#121212;font-size:13px;line-height:1.75';
 /* [백로그 38 P1-E] 형태·분포·생육환경처럼 원문이 그대로 오는 값(최장 420자
    실측)은 모바일 한 화면의 6배 가까이 늘어져 스캔이 안 된다는 지적 대응.
    60자보다 긴 값만 4줄 클램프+"더 보기"로 감싼다(짧은 라벨-값, 예: 학명·
@@ -67,7 +67,7 @@ function uiRows(rows){
   return '<table class="ui-rowtable" style="width:100%;border-collapse:collapse">'+rows.map(function(r){
     var val=esc(r[1]);
     var valHtml=(r[1]&&r[1].length>UI_CLAMP_THRESHOLD)
-      ?'<div class="ui-clamp">'+val+'</div><span class="ui-clamp-btn" onclick="pToggleClamp(this)" style="display:none;color:#0B5345;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px">더 보기</span>'
+      ?'<div class="ui-clamp">'+val+'</div><span class="ui-clamp-btn" onclick="pToggleClamp(this)" style="display:none;color:#0B5345;font-size:11px;font-weight:600;cursor:pointer;margin-top:6px">더 보기</span>'
       :val;
     return '<tr style="border-bottom:1px solid #E6E6E6"><td style="'+UI_ROW_LABEL+'">'+esc(r[0])+'</td><td style="'+UI_ROW_VALUE+'">'+valHtml+'</td></tr>';
   }).join('')+'</table>';
@@ -120,11 +120,11 @@ window.pToggleClamp=function(btn){
 function uiSection(title,inner){
   if(!inner)return'';
   return '<div style="border-top:1px solid #E6E6E6;padding-top:32px;margin-top:32px">'
-    +(title?'<p style="font-size:12px;font-weight:600;letter-spacing:1px;color:#121212;margin:0 0 16px">'+esc(title)+'</p>':'')
+    +(title?'<p style="font-size:11px;font-weight:600;letter-spacing:1px;color:#121212;margin:0 0 16px">'+esc(title)+'</p>':'')
     +inner+'</div>';
 }
-function uiBody(text){return text?'<p style="color:#121212;font-size:14px;line-height:1.8;margin:0 0 16px;white-space:pre-line">'+esc(text)+'</p>':'';}
-function uiLabeledText(label,text){return text?'<p style="color:#121212;font-size:14px;line-height:1.8;margin:0 0 14px"><b style="font-weight:600">'+esc(label)+'</b> — '+esc(text)+'</p>':'';}
+function uiBody(text){return text?'<p style="color:#121212;font-size:13px;line-height:1.8;margin:0 0 16px;white-space:pre-line">'+esc(text)+'</p>':'';}
+function uiLabeledText(label,text){return text?'<p style="color:#121212;font-size:13px;line-height:1.8;margin:0 0 14px"><b style="font-weight:600">'+esc(label)+'</b> — '+esc(text)+'</p>':'';}
 function uiEmpty(msg){return '<p style="color:#ABABAB;text-align:center;padding:28px 0;font-size:13px;line-height:1.7">'+esc(msg||'정보가 없습니다.')+'</p>';}
 /* [백로그 38 P2-H] 태그가 정보 표시만 하고 아무 동작이 없다는 지적 - 탭하면
    같은 말로 검색한다(기존 pSuggest 재사용). 상세창을 그대로 둔 채 뒤에서
@@ -341,13 +341,13 @@ function tourSpotsHtml(nm){
       return '<a href="'+esc(href)+'" style="display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 0;border-bottom:1px solid #E6E6E6;text-decoration:none;color:inherit;box-sizing:border-box">'
         +thumb
         +'<span style="flex:1;min-width:0">'
-        +'<span style="display:block;font-size:15px;font-weight:600;color:#121212;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+'</span>'
-        +(addr?'<span style="display:block;font-size:12px;color:#6E6E6E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(addr)+'</span>':'')
+        +'<span style="display:block;font-size:15px;line-height:1.4;font-weight:600;color:#121212;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+'</span>'
+        +(addr?'<span style="display:block;font-size:11px;line-height:1.4;color:#6E6E6E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(addr)+'</span>':'')
         +'</span>'
-        +'<span style="color:#ABABAB;font-size:16px;flex-shrink:0">›</span>'
+        +'<span style="color:#ABABAB;font-size:16px;flex-shrink:0">›</span>' /* 아이콘 글자(화살표) - 텍스트 위계와 무관해 4단계 체계 밖에 둔다 */
         +'</a>';
     }).join('');
-    var mapAll='<a href="/garden-map?q='+encodeURIComponent(nm)+'" style="display:block;text-align:center;padding:14px 0 0;font-size:12px;color:#0B5345;font-weight:600;text-decoration:none">지도에서 모두 보기 ›</a>';
+    var mapAll='<a href="/garden-map?q='+encodeURIComponent(nm)+'" style="display:block;text-align:center;padding:14px 0 0;font-size:11px;color:#0B5345;font-weight:600;text-decoration:none">지도에서 모두 보기 ›</a>';
     return uiSection('이 식물을 만날 수 있는 곳 · 대한민국 구석구석(한국관광공사)',rows+mapAll);
   }).catch(function(){return'';});
 }
@@ -429,11 +429,11 @@ function pgcCard(it,kind){
     +playBadge
     +'</div>';
   var label=it.cntntsSj||'';
-  return '<div>'+img+'<p style="font-size:12px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
+  return '<div>'+img+'<p style="font-size:11px;color:#121212;margin:0;line-height:1.6">'+esc(label)+'</p></div>';
 }
 function pgcGroup(title,items,kind){
   if(!items.length)return'';
-  return (title?'<p style="font-size:12px;font-weight:600;color:#787878;margin:0 0 10px">'+esc(title)+'</p>':'')
+  return (title?'<p style="font-size:11px;font-weight:600;color:#787878;margin:0 0 10px">'+esc(title)+'</p>':'')
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px">'
     +items.map(function(it){return pgcCard(it,kind);}).join('')+'</div>';
 }
@@ -1424,7 +1424,7 @@ function renderImageSlider(wrap,creditEl,photos){
        CSS) 사진이 여러 장이라는 단서가 카운터 텍스트뿐이라 - 반투명 칩으로 눈에
        띄게 하고, 사진 오른쪽 아래에 둔다. */
     counterEl=document.createElement('div');
-    counterEl.style.cssText='position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.45);color:#fff;font-size:12px;font-weight:600;letter-spacing:.3px;padding:3px 9px;border-radius:10px;pointer-events:none';
+    counterEl.style.cssText='position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.45);color:#fff;font-size:11px;font-weight:600;letter-spacing:.3px;padding:3px 9px;border-radius:10px;pointer-events:none';
     wrap.appendChild(counterEl);
     var startX=null;
     wrap.addEventListener('touchstart',function(e){startX=e.touches[0].clientX;},{passive:true});
@@ -1768,7 +1768,7 @@ function envBarHtml(label,options,active){
   return '<div class="env-bar" style="margin-bottom:20px">'
     +'<p style="font-size:11px;letter-spacing:1px;color:#ABABAB;margin:0 0 8px">'+esc(label)+'</p>'
     +'<div style="display:flex;gap:6px">'
-    +options.map(function(o){var on=(o===active);return '<span class="'+(on?'env-opt env-opt-active':'env-opt')+'" style="flex:1;text-align:center;padding:8px 0;font-size:12px;letter-spacing:.2px;border:1px solid '+(on?ACCENT:'#E6E6E6')+';background:'+(on?ACCENT:'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
+    +options.map(function(o){var on=(o===active);return '<span class="'+(on?'env-opt env-opt-active':'env-opt')+'" style="flex:1;text-align:center;padding:8px 0;font-size:11px;letter-spacing:.2px;border:1px solid '+(on?ACCENT:'#E6E6E6')+';background:'+(on?ACCENT:'#fff')+';color:'+(on?'#fff':'#ABABAB')+'">'+esc(o)+'</span>';}).join('')
     +'</div></div>';
 }
 /* [백로그 38 P2-C] 헤더 바로 아래 "스크롤 없이 보이는 첫 화면" 요약 카드 -
@@ -1790,8 +1790,8 @@ function pdSummaryHtml(values){
   return '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px">'
     +items.map(function(it){
       return '<div style="flex:0 0 auto;min-width:74px;text-align:center;background:#F8F8F8;border:1px solid #E6E6E6;padding:10px 8px">'
-        +'<div style="font-size:16px;margin-bottom:4px;line-height:1">'+it.icon+'</div>'
-        +'<div style="font-size:10px;color:#ABABAB;letter-spacing:.3px;margin-bottom:2px">'+esc(it.label)+'</div>'
+        +'<div style="font-size:16px;margin-bottom:4px;line-height:1">'+it.icon+'</div>' /* 아이콘 글자 - 4단계 체계 밖 */
+        +'<div style="font-size:11px;color:#ABABAB;letter-spacing:.3px;margin-bottom:2px">'+esc(it.label)+'</div>'
         +'<div style="font-size:13px;font-weight:600;color:#121212;white-space:nowrap">'+esc(values[it.key])+'</div>'
         +'</div>';
     }).join('')+'</div>';
@@ -1924,7 +1924,7 @@ function curatedLandscapeHtml(p){
   return ''
     +(tagsHtml?'<div style="margin:20px 0">'+tagsHtml+'</div>':'')
     +envBarHtml('내한성',['전국 노지','제한적 노지','실내 구성'],p.hardiness)
-    +(p.story?'<p style="font-size:14px;color:#787878;line-height:1.8;margin:20px 0 0">'+esc(p.story)+'</p>':'');
+    +(p.story?'<p style="font-size:13px;color:#787878;line-height:1.8;margin:20px 0 0">'+esc(p.story)+'</p>':'');
 }
 /* "정원 가이드 탭을 개요에 포함, 학명/과명/영명/광조건/수분/개화시기 순으로"
    요청에 따라 개요 탭을 이름이 고정된 슬롯(div id)들의 나열로 만든다 -
@@ -1977,7 +1977,7 @@ function setPdCore(sc,family,engNm){
    overviewSkeleton에서 없앴으므로 여기서도 채우지 않는다(식재 팁은 유지). */
 function applyCuratedProfile(p){
   setEl('pdenv',p?envTripleHtml(p):'');
-  setEl('pdplanting',(p&&p.plantingTip)?'<p style="font-size:14px;color:#121212;line-height:1.8;margin:0 0 20px"><span style="font-weight:600">식재 팁</span> · '+esc(p.plantingTip)+'</p>':'');
+  setEl('pdplanting',(p&&p.plantingTip)?'<p style="font-size:13px;color:#121212;line-height:1.8;margin:0 0 20px"><span style="font-weight:600">식재 팁</span> · '+esc(p.plantingTip)+'</p>':'');
   setEl('pdlandscape',p?curatedLandscapeHtml(p):'');
 }
 var pAttrCache={};
@@ -3655,8 +3655,8 @@ function buildCompareTableHtml(resolved){
     +resolved.map(function(r){
       return '<th style="padding:12px;text-align:left;border-bottom:2px solid #121212;vertical-align:bottom">'
         +(r.imgSrc?'<img src="'+r.imgSrc+'" style="width:100%;aspect-ratio:1/1;object-fit:cover;margin-bottom:8px;display:block">':'')
-        +'<span style="font-size:14px;font-weight:600;color:#121212;display:block">'+esc(r.it.nm)+'</span>'
-        +'<span style="font-size:11px;color:#ABABAB">'+sciNameHtml(r.it.sc)+'</span>'
+        +'<span style="font-size:15px;line-height:1.4;font-weight:600;color:#121212;display:block">'+esc(r.it.nm)+'</span>' /* 카드 이름(.pc-name)과 같은 위계로 맞춤 */
+        +'<span style="font-size:11px;line-height:1.4;color:#ABABAB">'+sciNameHtml(r.it.sc)+'</span>'
         +'</th>';
     }).join('')
     +'</tr>';
@@ -4095,7 +4095,7 @@ function pEnsurePovAnimStyle(){
     +'#pdhead{transition:padding .2s '+EASE_CURVE+';z-index:2}' /* sticky 헤더가 뒤의 #pdimg에 덮이던 문제(z-index:auto) 수정 - 비즈니스 세션 390 실측 지적 */
     +'#pdcompact{display:none;touch-action:none}' /* [2026-09-19 대표 2차 실기기 피드백 - 옵션 A(구조)] 큰 헤더 자체를 컴팩트로 줄이던 방식(패딩·폰트 전환)은 스크롤 경계(60px)를 넘나들 때마다 높이가 122↔56으로 출렁이고 떨렸다. 헤더를 sticky에서 풀어 콘텐츠와 함께 스크롤되게 하고, 높이가 전혀 안 바뀌는 별도의 56px 바를 opacity로만 나타나게 한다(모바일 전용, 아래 media 블록) - 원리적으로 튐·떨림이 없다. 데스크톱에선 계속 display:none */
     +'#pdcompact button{width:44px!important;height:44px!important;font-size:15px!important;position:absolute;top:6px;right:6px;display:flex!important;align-items:center;justify-content:center;touch-action:auto}'
-    +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s '+EASE_CURVE+'}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
+    +'.pdjump-chip{flex:0 0 auto;padding:14px 12px;font-size:11px;font-weight:600;letter-spacing:.3px;color:#ABABAB;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s '+EASE_CURVE+'}' /* [백로그 38 P2-D] 섹션 점프 칩 - #pdtabbar(기존 빈 슬롯) 되살림 */
     +'.pdjump-chip:hover{color:#121212}'
     +'.pdjump-chip.pdjump-active{color:'+ACCENT+';border-bottom-color:'+ACCENT+'}' /* 선택 상태에만 포인트 그린(원칙 유지) */
     +'#pdsummary,#pdbody,#pdenv,#pdtourspots,#pdacademic{scroll-margin-top:160px}' /* [백로그 38 P2-D 후속] 점프해도 섹션 첫 줄이 sticky 헤더(데스크톱 146px) 뒤로 들어가던 문제 - 비즈니스 세션 지적 */
@@ -4123,7 +4123,7 @@ function pEnsurePovAnimStyle(){
     +'.ui-rowtable,.ui-rowtable tbody,.ui-rowtable tr,.ui-rowtable td{display:block;width:auto}' /* [백로그 38 P2-F] 라벨 30%/값 70% 2열 표가 좁아 값이 줄바꿈되던 문제 - 1열로 쌓는다 */
     +'.ui-rowtable tr{border-bottom:1px solid #E6E6E6;padding:12px 0}'
     +'.ui-rowtable td{padding:0!important}'
-    +'.ui-rowtable td:first-child{color:#6E6E6E;font-size:12px;margin-bottom:4px}' /* 사이트 기존 회색 토큰(새 회색 추가 금지, 디자인 세션 09-19 확인) */
+    +'.ui-rowtable td:first-child{color:#6E6E6E;font-size:11px;margin-bottom:4px}' /* 사이트 기존 회색 토큰(새 회색 추가 금지, 디자인 세션 09-19 확인) */
     +'.ui-rowtable td:last-child{font-size:15px;padding-top:4px!important}'
     +'.env-bar .env-opt:not(.env-opt-active){display:none}' /* [백로그 38 P2-G] 흰 테두리 버튼 3개가 눌러도 되는 것처럼 보인다는 지적 - 선택 안 된 옵션은 숨기고 선택값 하나만 칩으로 */
     +'.env-bar .env-opt-active{flex:none!important;padding:6px 14px!important;border-radius:14px!important;font-weight:600}'
@@ -4161,7 +4161,7 @@ function pdEnsureCompactBar(){
   bar.id='pdcompact';
   bar.innerHTML=
     '<div id="pdcompactgrip" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:36px;height:4px;background:rgba(255,255,255,.3);border-radius:2px"></div>'
-    +'<span id="pdcompactname" style="font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>'
+    +'<span id="pdcompactname" style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>'
     +'<button onclick="pCD()" aria-label="상세창 닫기">&#10005;</button>';
   head.parentNode.insertBefore(bar,head);
   return bar;
@@ -4584,7 +4584,8 @@ updateFilterBadge();
   var s=document.createElement('style');
   s.textContent=
     '#psi{font-size:16px!important;min-height:44px!important;box-sizing:border-box}'
-    +'.pc-cmpbtn{min-height:32px!important;font-size:12px!important;padding:8px 12px!important;box-sizing:border-box}';
+    +'.pc-cmpbtn{min-height:32px!important;font-size:11px!important;padding:8px 12px!important;box-sizing:border-box}'
+    +'.pc-name,.pc-sci,.pc-fam{line-height:1.4}'; /* [2026-09-21 타이포그래피 리듬] 카드 이름·학명·과명(임베드 쪽 정적 스타일)에 줄 간격이 아예 없어 상세창 본문(1.7~1.8)과 리듬이 달랐다 - 카드 텍스트는 한 줄로 잘리는(nowrap+ellipsis) 짧은 제목류라 1.4로 */
   document.head.appendChild(s);
 })();
 /* [2026-09-21 UX 진단 B3] 실측(390px): 카드 한 장 560px(사진 1:1 356px)라
