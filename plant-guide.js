@@ -4937,25 +4937,37 @@ window.addEventListener('popstate',pOnPopState);
         sheetEl.classList.add('tge-sheet-open');
       });
     });
-    sheetEl.querySelector('.tge-sheet-close').focus();
-    fetchAllPhotos(it.nm,it.sc,function(photos){
+    /* [모바일 375px 실측 버그 수정 2026-09-23] 여는 애니메이션(opacity·transform
+       .25s) 도중에 사진 슬라이드(renderImageSlider)가 새 <img>를 끼워 넣거나
+       body를 스크롤 잠그면(position:fixed, 긴 기사일수록 리플로우가 큼) 그
+       DOM 변경이 같은 프레임에 겹쳐 트랜지션이 중간값(실측: opacity
+       .903/translateY 78.77px)에서 그대로 멈춰버렸다 - 데스크톱(1440)에선
+       재현 안 되고 모바일 바텀시트에서만 났다(총괄 기획 실측). 사진·정보
+       로딩와 포커스 이동을 여는 애니메이션이 끝난 뒤로 미뤄 겹치지 않게
+       한다(체감 지연은 없음 - 어차피 네트워크 조회라 300ms보다 오래 걸린다). */
+    setTimeout(function(){
       if(myToken!==sheetOpenToken)return;
-      if(photos.length)renderImageSlider(imgWrap,null,photos);
-    });
-    if(it.no){
-      Promise.all([fetchPilbkItem(it.no),staticDataReady,bookSummaryFields(it.sc)]).then(function(res){
+      var closeBtn=sheetEl.querySelector('.tge-sheet-close');
+      if(closeBtn)closeBtn.focus();
+      fetchAllPhotos(it.nm,it.sc,function(photos){
         if(myToken!==sheetOpenToken)return;
-        var item=res[0],bk=res[2]||{};
-        var match=getStaticMatch(it.sc);
-        var profile=item?deriveCuratedProfile(item,match,it.sc):null;
-        sheetEl.querySelector('.tge-sheet-summary').innerHTML=pdSummaryHtml({
-          sunlight:profile&&profile.sunlight,
-          moisture:profile&&profile.moisture,
-          height:bk.height,
-          bloom:bk.bloom
-        });
-      }).catch(function(){});
-    }
+        if(photos.length)renderImageSlider(imgWrap,null,photos);
+      });
+      if(it.no){
+        Promise.all([fetchPilbkItem(it.no),staticDataReady,bookSummaryFields(it.sc)]).then(function(res){
+          if(myToken!==sheetOpenToken)return;
+          var item=res[0],bk=res[2]||{};
+          var match=getStaticMatch(it.sc);
+          var profile=item?deriveCuratedProfile(item,match,it.sc):null;
+          sheetEl.querySelector('.tge-sheet-summary').innerHTML=pdSummaryHtml({
+            sunlight:profile&&profile.sunlight,
+            moisture:profile&&profile.moisture,
+            height:bk.height,
+            bloom:bk.bloom
+          });
+        }).catch(function(){});
+      }
+    },300);
   }
   function closeSheet(){
     sheetOpenToken++; /* 진행 중이던 사진·정보 로딩 응답을 무시시킨다 */
