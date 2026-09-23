@@ -16,11 +16,22 @@ var pQ='',pST=null,pAll=[],pShown=0;
    요청을 큐에 쌓아두고 그 완료 콜백마다 다시 화면 전체를 정렬/필터링한다.
    자음을 빠르게 여러 번 바꾸면 이전에 누른 자음들의 카드·요청이 아직 다
    끝나지 않은 채로 새 렌더가 계속 쌓여, 결국 브라우저가 수십 초간 멈추고
-   그 사이엔 아무 결과도 안 보여 "사라졌다"로 느껴진다. 렌더할 때마다 세대
-   번호를 올리고, 각 카드에 그 번호를 붙여둔 뒤, 완료 콜백이 도착했을 때
-   이미 최신 세대가 아니면(=그새 다른 자음/필터를 눌러 낡은 렌더가 됐으면)
-   조용히 아무 일도 하지 않고 빠진다 - 새 렌더가 자원을 즉시 넘겨받는다. */
-var pRenderGen=0;
+   그 사이엔 아무 결과도 안 보여 "사라졌다"로 느껴진다.
+   [2026-09-23 정밀진단으로 대체] 예전엔 "렌더 세대 번호"(pRenderGen)를 두어
+   해결했었다 - 렌더할 때마다 번호를 올리고 각 카드에 붙여둔 뒤, 완료 콜백이
+   최신 세대가 아니면 조용히 빠지는 방식. 그런데 renderPage()는 한 번의 검색
+   안에서도 소스(최대 9개)가 도착할 때마다 다시 불려서 세대 번호가 계속
+   올라갔다 - 자음/필터를 안 바꿨는데도 이미 대기열에 들어간(아직 실행 전)
+   같은 검색의 카드 요청이 "낡았다"고 오판돼 통째로 버려졌다(사진 카드 다수가
+   빈 채로 남거나 "분석 중"에 멈추는 실제 원인 중 하나 - loadAndRenderAttrs는
+   2026-09-19 A1에서 먼저 이 문제를 겪고 고쳐졌었는데, 카드 사진(imgTask)과
+   정원등급(loadGardenTier)엔 같은 수정이 빠져 있었다). 진짜 "낡았다"의 기준은
+   세대 숫자가 아니라 그 카드 DOM이 실제로 화면에서 떨어져 나갔는지
+   (d.isConnected)다 - 완전히 새 검색/필터면 renderPage가 g.innerHTML=''로
+   옛 카드를 실제로 떼어내 isConnected가 자연히 false가 되고, 같은 검색 안의
+   소스 도착만으로는 카드가 안 떨어지므로 계속 유효하다고 본다. 이제 imgTask·
+   loadGardenTier 모두 d.isConnected 기준으로 통일했다(자세한 내용은 각 함수
+   참고). */
 /* 상세창 사진을 fast/all 두 단계로 나눠 렌더링하면서 생기는 경쟁 상태 방지용
    토큰 - 상세창을 열자마자 다른 식물을 다시 클릭하면, 먼저 연 상세창의 느린
    단계(all) 응답이 나중에 도착해 지금 보고 있는 다른 식물의 슬라이드를
@@ -2083,8 +2094,10 @@ function loadAndRenderAttrs(d,it){
    테이블(NONGSARO_HERB/WEED)이라 nongsaroDataReady 이후로는 즉시 판정된다.
    결과는 attrs 캐시와 같은 키로 캐시해 재계산을 막는다. */
 var pGardenTierCache={};
-function loadGardenTier(it){
-  var myGen=it._gen;
+/* d(카드 DOM)를 넘기면 "낡음" 판정을 d.isConnected로 한다(파일 위쪽 주석
+   [2026-09-23 정밀진단] 참고) - renderPage/refreshCard 모두 카드 엘리먼트를
+   들고 있으므로 항상 넘긴다. */
+function loadGardenTier(it,d){
   var key=attrsCacheKeyFor(it);
   var cached=pGardenTierCache[key];
   if(cached){
@@ -2094,19 +2107,19 @@ function loadGardenTier(it){
     return;
   }
   nongsaroDataReady.then(function(){
-    if(myGen!=null&&myGen!==pRenderGen)return null; /* 낡은 렌더면 매칭 조회(fetchGardenMatch) 자체를 건너뛴다 */
+    if(d&&!d.isConnected)return null; /* 카드가 실제로 화면에서 떨어져 나간 경우에만 매칭 조회(fetchGardenMatch) 자체를 건너뛴다 */
     var clean=cleanSciName(it.sc||'').toLowerCase();
     var hasRda=!!(clean&&(NONGSARO_HERB[clean]||NONGSARO_WEED[clean]));
     it._bothAgencies=!!it.no&&hasRda;
     reflowGrid();
     return fetchGardenMatch(it.nm,it.sc);
   }).then(function(m){
-    if(myGen!=null&&myGen!==pRenderGen)return;
+    if(d&&!d.isConnected)return;
     it._indoorGarden=!!m;
     pGardenTierCache[key]={indoor:it._indoorGarden,both:it._bothAgencies};
     reflowGrid();
   }).catch(function(){
-    if(myGen!=null&&myGen!==pRenderGen)return;
+    if(d&&!d.isConnected)return;
     it._indoorGarden=false;
     if(it._bothAgencies===undefined)it._bothAgencies=false;
     reflowGrid();
@@ -3525,7 +3538,7 @@ function refreshCard(it){
     });});
   }
   loadAndRenderAttrs(d,it);
-  loadGardenTier(it);
+  loadGardenTier(it,d);
   reflowGrid();
 }
 
@@ -3809,13 +3822,17 @@ function renderPage(){
   g.style.display='grid';
   showFilterBarIfNeeded();
   renderFilterPanel();
-  var isFirstBatch=(pShown===0); /* 최초 화면(스크롤 없이 바로 보이는 카드들)은 이미지 우선순위를 높여 "최대한 빠르게" 노출한다 */
-  pRenderGen++;
-  var myGen=pRenderGen;
+  /* [2026-09-23 정밀진단] "화면 첫 8장"을 예전엔 isFirstBatch(=이 renderPage
+     호출이 이 검색의 첫 호출인지)로만 판정했다 - 같은 검색 안에서 소스가
+     여러 번(최대 9개) 나눠 도착하면, 화면 첫 8장 자리를 실제로 채우는 카드가
+     두 번째 이후 배치로 도착해도 eager를 못 받고 8개 동시제한 대기열
+     (limitCard)로 밀렸다. 배치 경계가 아니라 "전체 결과에서 몇 번째 카드인가"
+     (startIdx+idx)로 판정해, 어느 소스에서 왔든 화면 첫 8장은 항상 대기 없이
+     바로 요청되게 한다. */
+  var startIdx=pShown;
   var next=pAll.slice(pShown,pShown+PAGE_SIZE);
   next.forEach(function(it,idx){
-    var eager=isFirstBatch&&idx<8;
-    it._gen=myGen;
+    var eager=(startIdx+idx)<8;
     var d=document.createElement('div');
     d.className='pc';
     d.style.opacity='0';
@@ -3833,16 +3850,16 @@ function renderPage(){
     pRevealCard(d,idx);
     pCardEls[it._uid]={el:d};
     var imgTask=function(){
-      if(it._gen!==pRenderGen)return Promise.resolve(); /* 그 사이 다른 자음/필터를 눌러 낡은 요청이 됐으면 아예 요청하지 않는다 */
+      if(!d.isConnected)return Promise.resolve(); /* 카드가 실제로 화면에서 떨어져 나간 경우에만(=진짜 새 검색/필터) 건너뛴다 - 같은 검색의 다음 배치로는 절대 취소되지 않는다 */
       return loadCardImage(it.nm,it.sc,d.querySelector('.pc-img'),function(credit){
-        if(it._gen!==pRenderGen)return;
+        if(!d.isConnected)return;
         it._hasPhoto=!!credit;
         reflowGrid();
       },eager);
     };
     if(eager)imgTask(); else limitCard(imgTask); /* 첫 화면 카드는 동시요청 제한을 건너뛰어 대기 없이 바로 요청한다 */
     loadAndRenderAttrs(d,it);
-    loadGardenTier(it);
+    loadGardenTier(it,d);
   });
   pShown+=next.length;
   document.getElementById('pcnt').style.display='flex';
