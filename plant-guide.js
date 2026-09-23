@@ -4782,6 +4782,96 @@ window.addEventListener('popstate',pOnPopState);
    담아 이 페이지로 넘어온 경우("배너 클릭 -> 카메라 -> 자동 이동"),
    페이지가 열리자마자 그 사진으로 바로 식별을 시작한다 - 사용자 입장에서는
    배너를 누른 것 자체가 곧 "사진으로 찾기"가 되도록 하기 위함. */
+/* ---- 기사 안 "이 기사에 나온 식물" 카드 (2026-09-23 진단·구현) ----
+   기사(Blog Posts) CMS의 "관련식물명"(gwanryeonsigmulmyeong) 필드에 관리자가
+   쉼표로 이름을 입력하면 도감 데이터로 카드가 자동으로 만들어진다고 CMS
+   필드 설명에 적혀 있었지만, 실제로는 "이 기사에 나온 식물" 제목만 뜨고 그
+   아래가 항상 비어 있었다(대표 확인). 원인: 기사 템플릿(HtmlEmbed, 디자인
+   쪽 담당)엔 #plant-names-source(원문 텍스트, 정적 렌더)와 빈 #tge-plant-cards
+   그릇, 그리고 그 그릇의 표시를 토글하는 초기화 스크립트까지는 이미 있었는데,
+   이름을 실제 종으로 바꿔 카드를 "그리는" 코드 자체가 어디에도 없었다 - 이
+   세션이 만드는 게 자연스러운 부분(도감 검색·사진 로딩 함수를 그대로 재사용)
+   인데 빠져 있었던 것.
+   기사 페이지엔 검색창(#psi)이 없어 파일 위쪽 PG_PAGE 가드에 걸리지만, 여기서
+   쓰는 함수(fetchSourceItemsWithVariant·toObj·loadCardImage·sciNameHtml)는
+   정적 전체 데이터셋 프리로딩과 무관하게 항상 정의돼 있어 그대로 쓸 수 있다.
+   이름 하나당 도감 검색(plantPilbkSearch) 1회만 부르고(전형적으로 기사 하나에
+   1~3개), 정확히 같은 국명으로 매칭되는 항목을 우선 채택한다 - "정확한 데이터만
+   신뢰" 원칙과 같게, 매칭되는 종이 없는 이름은 오류로 보여주지 않고 조용히
+   뺀다(편집자 오탈자·희귀종 등은 독자에게 빈 카드보다 그냥 없는 편이 낫다).
+   카드는 /plant-guide?q=<이름>으로 이어진다(이미 있는 자동검색 딥링크, 위
+   bindEnterAndDeepLink 참고). */
+(function(){
+  var wrap=document.getElementById('tge-plant-cards');
+  if(!wrap)return; /* 이 위젯이 없는 페이지(도감 자체 등)에서는 아무 일도 하지 않는다 */
+  var srcEl=document.getElementById('plant-names-source');
+  var heading=document.getElementById('plants-mentioned-heading');
+  var guideBase=wrap.getAttribute('data-guide')||'/plant-guide';
+  function pickBest(items,name){
+    for(var i=0;i<items.length;i++)if(items[i].nm===name)return items[i];
+    return items[0]||null;
+  }
+  function cardEl(it){
+    var a=document.createElement('a');
+    a.className='tge-pcard';
+    a.href=guideBase+'?q='+encodeURIComponent(it.nm);
+    a.innerHTML='<span class="tge-pcard-img">'+PLACEHOLDER_ICON+'</span>'
+      +'<span class="tge-pcard-txt"><span class="tge-pcard-nm"></span>'
+      +(it.sc?'<span class="tge-pcard-sc">'+sciNameHtml(it.sc)+'</span>':'')
+      +'</span>';
+    a.querySelector('.tge-pcard-nm').textContent=it.nm; /* esc() 대신 textContent로 안전하게 채운다 */
+    return a;
+  }
+  function injectStyleOnce(){
+    if(document.getElementById('tge-pcards-style'))return;
+    var s=document.createElement('style');
+    s.id='tge-pcards-style';
+    s.textContent=
+      '.tge-pcards{display:flex;flex-wrap:wrap;gap:10px;margin:0;padding:0;list-style:none}'
+      +'.tge-pcard{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #E6E6E6;background:#fff;text-decoration:none;flex:1 1 220px;max-width:280px;transition:border-color .15s '+EASE_CURVE+',transform .15s '+EASE_CURVE+'}'
+      +'.tge-pcard-img{width:44px;height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:center;background:#F2F2F2;overflow:hidden}'
+      +'.tge-pcard-img img{width:100%;height:100%;object-fit:cover;display:block}'
+      +'.tge-pcard-txt{display:flex;flex-direction:column;gap:2px;min-width:0}'
+      +'.tge-pcard-nm{font-size:13px;line-height:1.3;color:#121212;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+      +'.tge-pcard-sc{font-size:11px;line-height:1.3;color:#6E6E6E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+      +'.tge-pcard:active{transform:scale(.98)}'
+      +'.tge-pcard:focus-visible{outline:2px solid '+ACCENT+';outline-offset:2px}'
+      +'@media (hover:hover){.tge-pcard:hover{border-color:'+ACCENT+'}}'
+      +'@media (prefers-reduced-motion:reduce){.tge-pcard{transition:none!important}}';
+    document.head.appendChild(s);
+  }
+  function hide(){wrap.style.display='none';if(heading)heading.style.display='none';}
+  function render(){
+    var raw=(srcEl?srcEl.textContent:wrap.getAttribute('data-plants'))||'';
+    var names=raw.split(/[,，、]/).map(function(s){return s.trim();}).filter(Boolean).slice(0,6);
+    if(!names.length){hide();return;}
+    injectStyleOnce();
+    wrap.innerHTML='';
+    wrap.classList.add('tge-pcards');
+    var pending=names.length,shown=0;
+    names.forEach(function(name){
+      fetchSourceItemsWithVariant('/plantPilbkSearch',name).then(function(rawItems){
+        return Array.isArray(rawItems)?rawItems.map(function(r){return toObj(r,'gov');}):[];
+      }).catch(function(){return [];}).then(function(items){
+        var best=pickBest(items,name);
+        pending--;
+        if(best){
+          shown++;
+          var el=cardEl(best);
+          wrap.appendChild(el);
+          loadCardImage(best.nm,best.sc,el.querySelector('.tge-pcard-img'),null,true);
+        }
+        if(pending===0){
+          if(shown)wrap.style.display='flex';
+          else hide();
+        }
+      });
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render);
+  else render();
+})();
+
 (function autoPhotoFromHome(){
   try{
     if(!/[?&]autoPhoto=1(&|$)/.test(location.search))return;
