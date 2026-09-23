@@ -4799,8 +4799,11 @@ window.addEventListener('popstate',pOnPopState);
    1~3개), 정확히 같은 국명으로 매칭되는 항목을 우선 채택한다 - "정확한 데이터만
    신뢰" 원칙과 같게, 매칭되는 종이 없는 이름은 오류로 보여주지 않고 조용히
    뺀다(편집자 오탈자·희귀종 등은 독자에게 빈 카드보다 그냥 없는 편이 낫다).
-   카드는 /plant-guide?q=<이름>으로 이어진다(이미 있는 자동검색 딥링크, 위
-   bindEnterAndDeepLink 참고). */
+   카드 클릭 시 페이지 이동 없이 그 자리에 경량 상세 시트가 열린다(대표 지시
+   2026-09-23 "카드를 클릭하면 카드가 나와야지, 도감 페이지로 이동하면 안
+   됨" - 시트 안의 "도감에서 더 보기"만 /plant-guide?q=<이름>으로 이어진다,
+   이미 있는 자동검색 딥링크·bindEnterAndDeepLink 참고). href 자체는 그대로
+   남겨둬 중클릭/새 탭 등은 여전히 도감 검색으로 정상 동작한다. */
 (function(){
   var wrap=document.getElementById('tge-plant-cards');
   if(!wrap)return; /* 이 위젯이 없는 페이지(도감 자체 등)에서는 아무 일도 하지 않는다 */
@@ -4820,6 +4823,15 @@ window.addEventListener('popstate',pOnPopState);
       +(it.sc?'<span class="tge-pcard-sc">'+sciNameHtml(it.sc)+'</span>':'')
       +'</span>';
     a.querySelector('.tge-pcard-nm').textContent=it.nm; /* esc() 대신 textContent로 안전하게 채운다 */
+    /* [대표 지시 2026-09-23] "카드를 클릭하면 카드가 나와야지, 도감 페이지로
+       이동하면 안 됨" - 페이지 이동 대신 그 자리에 경량 상세 시트를 연다.
+       href는 그대로 남겨 중클릭/Ctrl+클릭(새 탭)·우클릭·JS 실패 시 폴백은
+       기존대로 도감 검색으로 동작한다(점진적 향상). */
+    a.addEventListener('click',function(e){
+      if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+      e.preventDefault();
+      openSheet(it,a);
+    });
     return a;
   }
   function injectStyleOnce(){
@@ -4828,7 +4840,7 @@ window.addEventListener('popstate',pOnPopState);
     s.id='tge-pcards-style';
     s.textContent=
       '.tge-pcards{display:flex;flex-wrap:wrap;gap:10px;margin:0;padding:0;list-style:none}'
-      +'.tge-pcard{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #E6E6E6;background:#fff;text-decoration:none;flex:1 1 220px;max-width:280px;transition:border-color .15s '+EASE_CURVE+',transform .15s '+EASE_CURVE+'}'
+      +'.tge-pcard{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #E6E6E6;background:#fff;text-decoration:none;flex:1 1 220px;max-width:280px;transition:border-color .15s '+EASE_CURVE+',transform .15s '+EASE_CURVE+';cursor:pointer}'
       +'.tge-pcard-img{width:44px;height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:center;background:#F2F2F2;overflow:hidden}'
       +'.tge-pcard-img img{width:100%;height:100%;object-fit:cover;display:block}'
       +'.tge-pcard-txt{display:flex;flex-direction:column;gap:2px;min-width:0}'
@@ -4837,8 +4849,123 @@ window.addEventListener('popstate',pOnPopState);
       +'.tge-pcard:active{transform:scale(.98)}'
       +'.tge-pcard:focus-visible{outline:2px solid '+ACCENT+';outline-offset:2px}'
       +'@media (hover:hover){.tge-pcard:hover{border-color:'+ACCENT+'}}'
-      +'@media (prefers-reduced-motion:reduce){.tge-pcard{transition:none!important}}';
+      +'@media (prefers-reduced-motion:reduce){.tge-pcard{transition:none!important}}'
+      /* ---- 경량 상세 시트: 데스크톱 중앙 모달, ≤640px 전체화면 바텀시트
+         (09-19 팝업 UX 진단서 기준 - 상세창 pDetail과 같은 열림 방식:
+         데스크톱 페이드업/모바일 바텀시트, 컴팩트 헤더 56px·닫기 44px) ---- */
+      +'.tge-sheet-backdrop{position:fixed;inset:0;background:rgba(18,18,18,.5);z-index:9998;opacity:0;transition:opacity .25s '+EASE_CURVE+'}'
+      +'.tge-sheet-backdrop.tge-sheet-open{opacity:1}'
+      +'.tge-sheet{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%);width:min(520px,calc(100vw - 32px));max-height:85vh;background:#fff;z-index:9999;display:flex;flex-direction:column;opacity:0;transition:opacity .25s '+EASE_CURVE+',transform .25s '+EASE_CURVE+';box-shadow:0 24px 64px rgba(18,18,18,.28)}'
+      +'.tge-sheet.tge-sheet-open{opacity:1;transform:translate(-50%,-50%)}'
+      +'.tge-sheet-head{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 8px 0 20px;height:56px;border-bottom:1px solid #E6E6E6}'
+      +'.tge-sheet-head-nm{flex:1;min-width:0;font-size:15px;font-weight:600;color:#121212;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+      +'.tge-sheet-close{flex:0 0 44px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:#6E6E6E;font-size:20px;line-height:1}'
+      +'.tge-sheet-close:focus-visible{outline:2px solid '+ACCENT+';outline-offset:-2px}'
+      +'@media (hover:hover){.tge-sheet-close:hover{background:#F2F2F2}}'
+      +'.tge-sheet-body{flex:1 1 auto;overflow-y:auto;padding:20px}'
+      +'.tge-sheet-img{width:100%;aspect-ratio:4/3;background:#F2F2F2;margin-bottom:16px;display:flex;align-items:center;justify-content:center;overflow:hidden}'
+      +'.tge-sheet-sc{font-size:13px;color:#6E6E6E;margin:2px 0 6px}'
+      +'.tge-sheet-fam{display:inline-block;font-size:11px;color:'+ACCENT+';border:1px solid '+ACCENT+';padding:2px 8px;margin-bottom:16px}'
+      +'.tge-sheet-more{display:block;text-align:center;font-size:13px;font-weight:600;color:#fff;background:'+ACCENT+';padding:13px;text-decoration:none;margin-top:4px}'
+      +'@media (hover:hover){.tge-sheet-more:hover{background:#083D33}}'
+      +'body.tge-sheet-locked{position:fixed;left:0;right:0;width:100%}'
+      +'@media (max-width:640px){'
+      +'.tge-sheet{left:0;top:auto;bottom:0;right:0;width:100%;max-width:none;max-height:100vh;height:100%;transform:translateY(100%)}'
+      +'.tge-sheet.tge-sheet-open{transform:translateY(0)}'
+      +'.tge-sheet-img{aspect-ratio:1/1}'
+      +'}'
+      +'@media (prefers-reduced-motion:reduce){.tge-sheet,.tge-sheet-backdrop{transition:none!important}}';
     document.head.appendChild(s);
+  }
+  /* ---- 경량 상세 시트 본체 ----
+     기존 pDetail()의 상세창은 #pdpanel·#pdimg·#pdbody 등 도감 페이지(Webflow
+     HtmlEmbed, 디자인 쪽 담당)에만 있는 수십 개 고정 요소에 강하게 의존해
+     기사 페이지에 그대로 옮길 수 없다(그 마크업을 기사 템플릿에도 복제하면
+     이번 세션에 실제로 겪은 것과 같은 종류의 dual-ownership 충돌 위험이
+     생긴다). 그 대신 이 함수가 처음 열릴 때 DOM을 직접 만들어 완전히
+     독립적으로 동작한다 - 사진 슬라이드·핵심 정보 요약은 도감과 같은
+     데이터 함수(fetchAllPhotos·deriveCuratedProfile·pdSummaryHtml)를
+     재사용하되, 탭·비교 등은 넣지 않은 경량판이다(대표 승인 범위:
+     "사진·국명·학명·과명·핵심 3~4줄 + 도감에서 더 보기"). */
+  var sheetEl=null,backdropEl=null,sheetScrollY=0,sheetOpenToken=0,sheetReturnFocus=null;
+  function ensureSheet(){
+    if(sheetEl)return;
+    backdropEl=document.createElement('div');
+    backdropEl.className='tge-sheet-backdrop';
+    backdropEl.addEventListener('click',closeSheet);
+    sheetEl=document.createElement('div');
+    sheetEl.className='tge-sheet';
+    sheetEl.setAttribute('role','dialog');
+    sheetEl.setAttribute('aria-modal','true');
+    sheetEl.innerHTML='<div class="tge-sheet-head"><span class="tge-sheet-head-nm"></span>'
+      +'<button type="button" class="tge-sheet-close" aria-label="닫기">&#10005;</button></div>'
+      +'<div class="tge-sheet-body"><div class="tge-sheet-img"></div>'
+      +'<div class="tge-sheet-nm" style="font-size:18px;font-weight:700;color:#121212"></div>'
+      +'<div class="tge-sheet-sc"></div><div class="tge-sheet-fam-wrap"></div>'
+      +'<div class="tge-sheet-summary"></div>'
+      +'<a class="tge-sheet-more" target="_self">도감에서 더 보기 →</a></div>';
+    sheetEl.querySelector('.tge-sheet-close').addEventListener('click',closeSheet);
+    document.body.appendChild(backdropEl);
+    document.body.appendChild(sheetEl);
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Escape'&&sheetEl.classList.contains('tge-sheet-open'))closeSheet();
+    });
+  }
+  function openSheet(it,triggerEl){
+    injectStyleOnce();
+    ensureSheet();
+    var myToken=++sheetOpenToken;
+    sheetReturnFocus=triggerEl||null;
+    sheetEl.querySelector('.tge-sheet-head-nm').textContent=it.nm;
+    sheetEl.querySelector('.tge-sheet-nm').textContent=it.nm;
+    var scEl=sheetEl.querySelector('.tge-sheet-sc');
+    scEl.innerHTML=it.sc?sciNameHtml(it.sc):'';
+    sheetEl.querySelector('.tge-sheet-fam-wrap').innerHTML=it.fam?'<span class="tge-sheet-fam">'+esc(it.fam)+'</span>':'';
+    var imgWrap=sheetEl.querySelector('.tge-sheet-img');
+    imgWrap.innerHTML=PLACEHOLDER_ICON;
+    sheetEl.querySelector('.tge-sheet-summary').innerHTML='';
+    var moreLink=sheetEl.querySelector('.tge-sheet-more');
+    moreLink.href=guideBase+'?q='+encodeURIComponent(it.nm);
+    sheetScrollY=window.scrollY||document.documentElement.scrollTop||0;
+    document.body.classList.add('tge-sheet-locked');
+    document.body.style.top='-'+sheetScrollY+'px';
+    backdropEl.style.display='block';
+    sheetEl.style.display='flex';
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        backdropEl.classList.add('tge-sheet-open');
+        sheetEl.classList.add('tge-sheet-open');
+      });
+    });
+    sheetEl.querySelector('.tge-sheet-close').focus();
+    fetchAllPhotos(it.nm,it.sc,function(photos){
+      if(myToken!==sheetOpenToken)return;
+      if(photos.length)renderImageSlider(imgWrap,null,photos);
+    });
+    if(it.no){
+      Promise.all([fetchPilbkItem(it.no),staticDataReady,bookSummaryFields(it.sc)]).then(function(res){
+        if(myToken!==sheetOpenToken)return;
+        var item=res[0],bk=res[2]||{};
+        var match=getStaticMatch(it.sc);
+        var profile=item?deriveCuratedProfile(item,match,it.sc):null;
+        sheetEl.querySelector('.tge-sheet-summary').innerHTML=pdSummaryHtml({
+          sunlight:profile&&profile.sunlight,
+          moisture:profile&&profile.moisture,
+          height:bk.height,
+          bloom:bk.bloom
+        });
+      }).catch(function(){});
+    }
+  }
+  function closeSheet(){
+    sheetOpenToken++; /* 진행 중이던 사진·정보 로딩 응답을 무시시킨다 */
+    backdropEl.classList.remove('tge-sheet-open');
+    sheetEl.classList.remove('tge-sheet-open');
+    document.body.classList.remove('tge-sheet-locked');
+    document.body.style.top='';
+    window.scrollTo(0,sheetScrollY);
+    setTimeout(function(){backdropEl.style.display='none';sheetEl.style.display='none';},260);
+    if(sheetReturnFocus&&sheetReturnFocus.focus)sheetReturnFocus.focus();
   }
   function hide(){wrap.style.display='none';if(heading)heading.style.display='none';}
   function render(){
