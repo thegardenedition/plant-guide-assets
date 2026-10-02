@@ -9,7 +9,7 @@ var PB='https://nongsaro-proxy.chgreena.workers.dev/gov/plant';
    16절 D4). 검색창(#psi)이 없는 페이지에서는 상단 선로딩을 하지 않는다. (스크립트는 defer 라
    이 시점에 DOM 은 이미 파싱돼 있다.) */
 var PG_PAGE=!!document.getElementById('psi');
-var pQ='',pST=null,pAll=[],pShown=0;
+var pQ='',pAll=[],pShown=0;
 /* "색인(초성)을 좌우로 왔다갔다 하면 결과값이 사라진다" 버그 대응 - 초성
    색인은 usecat 필터보다 훨씬 큰 결과(한 자음이 전체 3.6만종의 1/14 가량,
    수천 건)를 만들어내는데, renderPage()가 카드마다 사진/정원정보/정원등급
@@ -648,11 +648,19 @@ function sciNameHtml(sc){
   }).join(' ');
 }
 
+/* [2026-10-01 로딩 체감 진단] 예전엔 pSpin이 setInterval(30ms)로 직접
+   transform:rotate(...)를 매겨 돌렸다 - 사진 압축처럼 메인 스레드가 바쁜
+   구간에는 이 interval이 밀려 스피너가 멈춘 것처럼 보였고(실측 사례:
+   "사진 고른 뒤 아무 반응 없어 멈춘 줄 알았다"), 탭이 백그라운드면
+   requestAnimationFrame과 마찬가지로 더 느려지거나 멈췄다. CSS
+   @keyframes(pEnsureSpinStyle에서 한 번만 주입)로 바꿔 컴포지터가 돌리게
+   하면 메인 스레드가 바빠도 계속 돈다 - 호출부(pSpin(true/false))는 그대로
+   둬서 showLoading/hideLoading 쪽을 고칠 필요가 없다. */
 function pSpin(on){
-  var a=0,el=document.getElementById('pspin');
-  if(pST)clearInterval(pST);
-  if(on)pST=setInterval(function(){a+=8;if(el)el.style.transform='rotate('+a+'deg)';},30);
-  else if(el)el.style.transform='';
+  var el=document.getElementById('pspin');
+  if(!el)return;
+  if(on)el.classList.add('pspin-css-active');
+  else el.classList.remove('pspin-css-active');
 }
 
 function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});}
@@ -668,30 +676,61 @@ function pEnsureSpinStyle(){
   el.dataset.styled='1';
   el.style.width='28px';el.style.height='28px';el.style.borderWidth='2px';
   el.style.borderColor='#E6E6E6';el.style.borderTopColor='#0B5345';
+  if(!document.getElementById('pspin-css-style')){
+    var s=document.createElement('style');
+    s.id='pspin-css-style';
+    s.textContent='@keyframes pspin-css-rotate{to{transform:rotate(360deg)}}'
+      +'.pspin-css-active{animation:pspin-css-rotate .8s linear infinite}'
+      +'@media (prefers-reduced-motion:reduce){.pspin-css-active{animation:none}}';
+    document.head.appendChild(s);
+  }
+}
+/* [2026-10-01] 로딩 영역(#pld)이 뷰포트 밖(문서 y≈1,170+)에 있어, 사진
+   인식처럼 오래 걸리는 작업은 사용자가 아무 변화도 못 보고 "멈췄다"고
+   오해했다(대표 지적 10-01, 총괄 기획 실측). 고정 헤더(실측 110px)에
+   가려지지 않도록 scroll-margin-top을 주고 그 영역으로 스크롤한다 -
+   prefers-reduced-motion이면 즉시 이동(인스턴트), 아니면 부드럽게. */
+function pScrollResultAreaIntoView(el){
+  if(!el)return;
+  try{
+    var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    el.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'});
+  }catch(e){}
 }
 /* [2026-09-19 UX 미세점검 B6] 캐시 적중 검색은 66~80ms 안에 끝나는데 그
    짧은 순간에도 "검색 중…" 스피너가 뜨자마자 사라져 번쩍였다(실측). 150ms
    이상 걸릴 때만 보이게 지연 표시한다 - hideAll()로 이전 화면(결과·오류
    등)을 지우는 건 그대로 즉시 하고, 스피너/문구만 늦춘다. hideLoading이
-   150ms 안에 불리면 아예 안 뜬 채로 취소된다. */
+   150ms 안에 불리면 아예 안 뜬 채로 취소된다.
+   [2026-10-01] 사진 인식 경로는 이 150ms 지연조차 "아무 반응 없음"으로
+   느껴질 수 있어(총괄 기획 요청 R3), showLoading(true)로 부르면 지연 없이
+   즉시 뜨고 그 자리로 스크롤도 한다. 텍스트 검색(showLoading() 그대로
+   호출하는 기존 자리, l.2506·3403 부근)은 인자 없이 그대로 불러 이 즉시
+   표시·스크롤 추가를 타지 않는다 - 회귀 금지(R3) 그대로 지킨다. */
 var pShowLoadingTimer=null;
-function showLoading(){
+function showLoading(immediate){
   hideAll();
   clearTimeout(pShowLoadingTimer);
-  pShowLoadingTimer=setTimeout(function(){
+  function reveal(){
     var pld=document.getElementById('pld');
     if(pld){
       pEnsureSpinStyle();
+      var msgEl=pld.querySelector('p');
+      if(msgEl)msgEl.textContent='검색 중...';
       pld.style.transition='opacity .25s ease';
       pld.style.opacity='0';
       pld.style.display='block';
       requestAnimationFrame(function(){pld.style.opacity='1';});
+      if(immediate)pScrollResultAreaIntoView(pld);
     }
     pSpin(true);
-  },150);
+  }
+  if(immediate)reveal();
+  else pShowLoadingTimer=setTimeout(reveal,150);
 }
 function hideLoading(){
   clearTimeout(pShowLoadingTimer);
+  pClearPhotoMsgTimers();
   pSpin(false);
   var pld=document.getElementById('pld');
   if(pld){pld.style.display='none';pld.style.opacity='';}
@@ -2880,6 +2919,28 @@ function updatePhotoIdCardName(it){
   var nmEl=rec.el.querySelector('.pc-name');
   if(nmEl)nmEl.textContent=it.nm;
 }
+/* [2026-10-01] 사진 인식 중 버튼을 다시 눌러 겹쳐 고르면(연속 선택) 먼저
+   보낸 요청이 늦게 돌아와 나중 선택의 결과를 덮어쓸 수 있었다(대표 지적
+   R2) - 분석 중엔 버튼을 비활성화해 애초에 겹치지 않게 막고, 그래도 다른
+   경로(개발자도구 등)로 겹치면 시퀀스 번호(pIdentifySeq)로 낡은 응답을
+   버린다. 버튼 마크업은 아이콘뿐이라(실측: 라이브 DOM에 텍스트 라벨 없음,
+   title 속성만 있음) 폭이 흔들리지 않게 라벨은 그대로 두고 title·
+   aria-busy·disabled만 바꾼다. */
+var pIdentifySeq=0;
+var pIdentifyAbortCtrl=null;
+function pPhotoBtnEl(){return document.querySelector('[onclick="pPhotoTrigger()"]');}
+function pSetPhotoBtnBusy(busy){
+  var btn=pPhotoBtnEl();
+  if(!btn)return;
+  btn.disabled=!!busy;
+  btn.setAttribute('aria-busy',busy?'true':'false');
+  if(busy){
+    if(btn.dataset.origTitle===undefined)btn.dataset.origTitle=btn.getAttribute('title')||'';
+    btn.setAttribute('title','사진 분석 중…');
+  } else if(btn.dataset.origTitle!==undefined){
+    btn.setAttribute('title',btn.dataset.origTitle);
+  }
+}
 window.pPhotoTrigger=function(){
   var el=document.getElementById('pphotoinput');
   if(el)el.click();
@@ -2928,14 +2989,43 @@ function compressImageFile(file,maxDim,quality){
     img.src=url;
   });
 }
+/* [2026-10-01] #pld 안내문을 사진 인식 단계별로 바꾼다(대표 지적 R8) -
+   텍스트 검색은 이 함수를 안 쓰고 showLoading()의 기본 "검색 중..." 문구를
+   그대로 쓰므로 영향 없다(회귀 금지 R3). 타이머는 어떤 경로로 끝나든
+   hideLoading()이 한 곳에서 정리한다(완료·오류·타임아웃 전부 showError→
+   hideLoading을 거친다 - R8 "타이머가 남지 않게"). */
+function pSetPhotoMsg(text){
+  var p=document.querySelector('#pld p');
+  if(p)p.textContent=text;
+}
+var pPhotoMsgTimers=[];
+function pClearPhotoMsgTimers(){
+  pPhotoMsgTimers.forEach(clearTimeout);
+  pPhotoMsgTimers=[];
+}
 window.pOnPhotoSelected=function(input){
   var files=input&&input.files;
   if(!files||!files.length)return;
   var picked=Array.prototype.slice.call(files,0,5);
   input.value=''; /* 같은 사진을 다시 골라도 change 이벤트가 다시 일어나도록 비워둔다 */
-  showLoading(); /* 압축 중에도 바로 로딩 표시를 띄워 사용자가 멈춘 것으로 오해하지 않게 한다 */
+  var mySeq=++pIdentifySeq; /* 이 선택 전체(압축→인식)를 하나의 시퀀스로 묶는다 */
+  if(pIdentifyAbortCtrl){try{pIdentifyAbortCtrl.abort();}catch(e){}pIdentifyAbortCtrl=null;} /* 이전 선택이 아직 서버 응답을 기다리는 중이면 버린다(R2) */
+  pSetPhotoBtnBusy(true);
+  /* [2026-10-01 R13 추가 안전망] try/finally·return으로 정상 경로는 다
+     막았지만, 혹시 몰라 PLANTID_TIMEOUT(25초)보다 5초 더 뒤에 강제로
+     한 번 더 풀어준다 - 이 시퀀스가 여전히 "최신"인데 버튼이 아직도
+     disabled라면(=위 두 안전장치마저 못 잡은 경우) 여기서 마지막으로
+     풀린다. 이미 정상 종료됐으면(mySeq!==pIdentifySeq거나 버튼이 이미
+     풀려있으면) 아무 효과 없는 안전한 호출이다. */
+  setTimeout(function(){
+    if(mySeq!==pIdentifySeq)return;
+    pSetPhotoBtnBusy(false);
+  },PLANTID_TIMEOUT+5000);
+  showLoading(true); /* 압축 중에도 지연 없이 바로 로딩 표시를 띄우고 그 자리로 스크롤해, 사용자가 멈춘 것으로 오해하지 않게 한다(R1·R3) */
+  pSetPhotoMsg('사진을 압축하는 중…');
   Promise.all(picked.map(function(f){return compressImageFile(f,PLANTID_MAX_DIM,PLANTID_JPEG_QUALITY);})).then(function(compressed){
-    pIdentifyPhoto(compressed);
+    if(mySeq!==pIdentifySeq)return; /* 압축하는 동안 더 최신 선택이 들어왔으면 이 결과는 버린다(R2) */
+    pIdentifyPhoto(compressed,mySeq);
   });
 };
 /* Pl@ntNet이 한 번에 돌려주는 후보를 5개만 보던 것을 10개로 늘려(nb-results),
@@ -2948,12 +3038,20 @@ var PLANTID_NB_RESULTS=10;
 var PLANTID_MIN_SCORE=0.01;
 var PLANTID_TIMEOUT=25000; /* 사진 인식 요청이 이 시간(ms) 안에 끝나지 않으면
    중단하고 안내 메시지를 보여준다(무한 로딩 방지) */
-function pIdentifyPhoto(files){
+function pIdentifyPhoto(files,mySeq){
+  if(mySeq===undefined)mySeq=++pIdentifySeq; /* 직접 호출 등 대비 안전망 - 보통은 pOnPhotoSelected가 넘겨준 값을 그대로 쓴다 */
   if(!NONGSARO_PROXY){
     showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
+    pSetPhotoBtnBusy(false);
     return;
   }
-  showLoading();
+  showLoading(true);
+  pSetPhotoMsg('식물을 찾고 있어요 (보통 5~15초)');
+  pClearPhotoMsgTimers();
+  pPhotoMsgTimers.push(setTimeout(function(){
+    if(mySeq!==pIdentifySeq)return;
+    pSetPhotoMsg('조금 더 걸리고 있어요…');
+  },15000)); /* R8: 15초 넘으면 문구만 바꾼다 - 취소 기능은 없음(R8 범위 밖) */
   var fd=new FormData();
   files.forEach(function(file){
     fd.append('images',file,file.name||'photo.jpg');
@@ -2961,22 +3059,34 @@ function pIdentifyPhoto(files){
   });
   var url=NONGSARO_PROXY.replace(/\/$/,'')+'/plantid?lang=en&nb-results='+PLANTID_NB_RESULTS;
   var pidCtrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  pIdentifyAbortCtrl=pidCtrl;
   var pidTimedOut=false;
   var pidTimer=pidCtrl?setTimeout(function(){pidTimedOut=true;pidCtrl.abort();},PLANTID_TIMEOUT):null;
   fetch(url,{method:'POST',body:fd,signal:pidCtrl?pidCtrl.signal:undefined}).then(function(r){
     if(pidTimer)clearTimeout(pidTimer);
     return r.json().catch(function(){return null;}).then(function(j){return {ok:r.ok,body:j};});
   }).then(function(res){
+    if(mySeq!==pIdentifySeq)return; /* 그사이 더 최신 선택이 들어왔으면 이 응답은 버린다(R2) */
     if(!res.ok||!res.body){
       showError('사진에서 식물을 인식하지 못했습니다. 선명한 잎·꽃 사진으로 다시 시도해보세요.');
+      pSetPhotoBtnBusy(false);
       return;
     }
     var results=(res.body&&res.body.results)||[];
     if(!results.length){
       showError('사진에서 식물을 찾지 못했습니다. 다른 각도의 사진으로 다시 시도해보세요.');
+      pSetPhotoBtnBusy(false);
       return;
     }
-    staticDataReady.then(function(){
+    /* [2026-10-01 R13, 총괄 기획 지적] 이 체인을 return하지 않고 바깥
+       .then에 안 엮으면, 안(렌더링 중 예외)이나 staticDataReady 자체가
+       거부됐을 때 바깥 .catch로 안 넘어가 버튼이 disabled로 영구히 남을
+       수 있었다(실제로 버그였음 - try/finally 없이는 renderPage 등에서
+       던진 예외가 pSetPhotoBtnBusy(false)를 건너뛰었다). return으로
+       바깥에 엮고, 버튼 해제는 try/finally로 "무슨 일이 있어도" 실행되게
+       하고, staticDataReady 거부·예외는 뒤에 붙인 .catch가 받는다. */
+    return staticDataReady.then(function(){
+      try{
       var matched=[],seen={},toTranslate=[];
       results.slice(0,PLANTID_NB_RESULTS).forEach(function(r){
         if((r.score||0)<PLANTID_MIN_SCORE)return; /* 사실상 0에 가까운 점수는 노이즈로 취급 */
@@ -3025,6 +3135,14 @@ function pIdentifyPhoto(files){
         noteEl.style.display='block';
         pAll=matched;pShown=0;
         renderPage();
+        /* [2026-10-01] 텍스트 검색(l.3482 부근)과 같은 이유로 - 결과 카드
+           영역(#pcnt)도 문서 아래쪽이라 인식이 끝나도 화면에 아무 변화가
+           안 보일 수 있었다(R1). */
+        /* [2026-10-01 총괄 기획 확인요청②] #pcnt가 아니라 바로 위 형제인
+           #pnote(Pl@ntNet 안내문, 이 분기에서 항상 채워짐)로 스크롤한다 -
+           #pnote가 #pcnt보다 문서상 앞이라 block:'start'로 #pcnt를 바로
+           맨 위에 붙이면 안내문이 뷰포트 위로 밀려 안 보였다. */
+        pScrollResultAreaIntoView(noteEl);
         toTranslate.forEach(function(card){
           translateEnToKo(card.engNm).then(function(ko){
             if(ko&&ko.trim()&&ko.trim().toLowerCase()!==card.engNm.trim().toLowerCase()){
@@ -3038,11 +3156,15 @@ function pIdentifyPhoto(files){
         noteEl.style.display='block';
         document.getElementById('pemp').style.display='block';
         document.getElementById('pcnt').style.display='none';
+        pScrollResultAreaIntoView(document.getElementById('pemp'));
       }
       pUpdateClearBtn(); /* note/psugg 표시가 최종 확정된 뒤에 호출해야 "×" 버튼이 올바르게 나타난다 */
+      }finally{pSetPhotoBtnBusy(false);} /* R13: 렌더링 중 뭐가 터져도(renderPage·pMatchLocalByName 등) 버튼은 반드시 풀린다 */
     });
   }).catch(function(){
     if(pidTimer)clearTimeout(pidTimer);
+    if(mySeq!==pIdentifySeq)return; /* 더 최신 선택 때문에 이 요청을 직접 abort()한 경우 - 조용히 넘어간다(오류 아님, R2) */
+    pSetPhotoBtnBusy(false); /* try/finally와 중복이지만 비용이 없고, staticDataReady 자체가 거부된 경우(try 블록 진입 전)에는 이 경로가 유일한 해제 지점이라 남겨둔다 */
     if(pidTimedOut){
       showError('사진 분석이 너무 오래 걸려 중단했습니다. 사진 용량을 줄이거나 Wi-Fi 환경에서 다시 시도해주세요.');
     } else {
@@ -5009,6 +5131,16 @@ window.addEventListener('popstate',pOnPopState);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render);
   else render();
+})();
+
+/* [2026-10-01 R7] 고정 헤더(라이브 실측 110px, sticky) 아래로 scrollIntoView
+   목표가 파고들지 않게 여유를 준다 - pScrollResultAreaIntoView가 쓰는
+   #pld·#pcnt·#pemp 세 자리 전부. 기사 페이지 등 이 요소가 없는 곳에서는
+   셀렉터가 그냥 안 걸릴 뿐 아무 영향이 없다. */
+(function(){
+  var s=document.createElement('style');
+  s.textContent='#pld,#pcnt,#pemp,#pnote{scroll-margin-top:120px}';
+  document.head.appendChild(s);
 })();
 
 (function autoPhotoFromHome(){
