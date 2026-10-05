@@ -242,11 +242,27 @@ function fetchNongsaroItems(path,params){
    두 소스(농사로, 발간도서 3종)까지 화면에 못 나오고 "정보 불러오는 중..."
    상태로 발이 묶인다("로딩이 너무 느려" 지적의 원인). AbortController로 3초
    타임아웃을 걸어 이 소스만 조용히 포기하고 나머지는 제때 뜨도록 한다. */
-function fetchWithTimeout(url,ms){
+function fetchWithTimeout(url,ms,lowPriority){
   if(typeof AbortController==='undefined')return fetch(url);
   var ctrl=new AbortController();
   var timer=setTimeout(function(){ctrl.abort();},ms);
-  return fetch(url,{signal:ctrl.signal}).then(function(r){clearTimeout(timer);return r;},function(e){clearTimeout(timer);throw e;});
+  var opt={signal:ctrl.signal};
+  if(lowPriority)opt.priority='low'; /* 첫 화면 자원을 앞세우기 위해 유휴 선로딩 때만 낮은 우선순위(지원 안 하는 브라우저는 무시) */
+  return fetch(url,opt).then(function(r){clearTimeout(timer);return r;},function(e){clearTimeout(timer);throw e;});
+}
+/* [2026-10-06 백로그 48 ①] 큰 데이터(정적 JSON 12.9MB·농사로 목록·국립수목원 사진 색인)는 처음엔 가져오지 않고, 아래 셋 중 먼저 오는 때에 시작한다:
+   ⓐ 이 데이터를 쓰는 기능이 처음 .then 을 거는 순간(검색·필터·상세창·비교) — 기능은 예전과 똑같이 그 시점의 결과를 기다린다 ⓑ 검색창 포커스/사진 버튼 누름(곧 쓸 것이므로 미리) ⓒ 페이지 로드가 끝나고 한가해진 뒤(낮은 우선순위).
+   예전처럼 열자마자 받으면 모바일 첫 3~5초의 망·메인 스레드를 점령한다(속도 세부진단 10-06). pLazy 는 Promise 처럼 then/catch/finally 를 갖고 첫 호출 때만 실제 작업을 시작한다. */
+var pDataLow=false; /* 유휴 선로딩 중에만 true — loadStaticTable 이 낮은 우선순위로 받는다 */
+function pLazy(fn){
+  var p=null;
+  function run(){return p||(p=fn());}
+  return {
+    then:function(a,b){return run().then(a,b);},
+    'catch':function(b){return run()['catch'](b);},
+    'finally':function(f){return run()['finally'](f);},
+    _kick:run
+  };
 }
 /* ---- 로딩 단축: 모든 외부 호출에 시간 제한 ----
    "검색·노출·상세 사진 로딩이 너무 길다"는 지적을 실측해보니, 위 산림청
@@ -391,8 +407,8 @@ function loadNongsaroGardenList(){
     NONGSARO_GARDEN_CANDIDATES=items;
   });
 }
-var nongsaroDataReady=Promise.all([loadNongsaroHerb(),loadNongsaroWeed(),loadNongsaroGardenList()])
-  .catch(function(){/* 농사로 쪽이 실패해도(키 만료 등) 나머지 기능은 정상 동작해야 한다 */});
+var nongsaroDataReady=pLazy(function(){return Promise.all([loadNongsaroHerb(),loadNongsaroWeed(),loadNongsaroGardenList()])
+  .catch(function(){/* 농사로 쪽이 실패해도(키 만료 등) 나머지 기능은 정상 동작해야 한다 */});});
 
 /* 농사로 오픈API 중 남은 4종(꽃장식과 정원 꾸미기/실내정원 만들기/실내정원
    동영상강좌/좋아하는 꽃)은 위 3종과 달리 특정 학명에 매이지 않는 콘텐츠다
@@ -888,7 +904,7 @@ var STATIC_SPECIES_URL='https://cdn.jsdelivr.net/gh/thegardenedition/plant-guide
 var STATIC_NAME={},STATIC_SPECIES={};
 function loadStaticTable(url,dest){
   if(!url)return Promise.resolve();
-  return fetchWithTimeout(url,TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(t){
+  return fetchWithTimeout(url,TIMEOUT_STATIC,pDataLow).then(function(r){return r.ok?r.json():null;}).then(function(t){
     if(!t||!t.fields||!t.rows)return;
     var fields=t.fields,keys=t.keys||[];
     t.rows.forEach(function(row,i){
@@ -898,10 +914,10 @@ function loadStaticTable(url,dest){
     });
   }).catch(function(){/* 정적 데이터는 있으면 좋은 보강재료일 뿐, 실패해도 무시 */});
 }
-var staticDataReady=Promise.all([
+var staticDataReady=pLazy(function(){return Promise.all([
   loadStaticTable(STATIC_NAME_URL,STATIC_NAME),
   loadStaticTable(STATIC_SPECIES_URL,STATIC_SPECIES)
-]);
+]);});
 function getStaticMatch(sciNm){
   var key=cleanSciName(sciNm);
   if(!key)return null;
@@ -994,7 +1010,35 @@ var bookDataReady=Promise.all([
    도서 데이터(특히 스토리 유무 판정용 BOOK_FTC)도 함께 봐야 하므로, 두 로딩을
    합친 공용 준비 신호를 둔다 - staticDataReady만 기다리던 기존 호출부들은
    BOOK_FTC가 아직 비어있는 상태에서 hasStory를 항상 false로 오판할 수 있었다. */
-var curationDataReady=Promise.all([staticDataReady,bookDataReady]);
+var curationDataReady=pLazy(function(){return Promise.all([staticDataReady,bookDataReady]);});
+/* 큰 데이터 선로딩 트리거(백로그 48 ①). 끄려면 주소에 ?pgdata=eager (예전처럼 즉시) — 시험·롤백용. */
+function pKickData(low){
+  pDataLow=!!low;
+  try{ /* 이 블록은 natureImgReady 등이 정의되기 전 위치라, 실행 시점(로드 이후)에 존재하는 것만 깨운다 */
+    staticDataReady._kick(); /* 정적 JSON 요청은 이 줄에서 동기로 나가므로 낮은 우선순위 표시가 적용된다(아래 Promise.all 안에서 then 이 걸리는 건 한 틱 뒤라 표시가 이미 꺼진 뒤) */
+    [curationDataReady,nongsaroDataReady,natureImgReady].forEach(function(l){if(l&&l._kick)l._kick();});
+  }finally{pDataLow=false;}
+}
+(function(){
+  var eager=false;try{eager=/[?&]pgdata=eager(&|$)/.test(location.search);}catch(e){}
+  if(eager){setTimeout(function(){pKickData(false);},0);return;}
+  var done=false;
+  function once(low){if(done)return;done=true;pKickData(low);}
+  function arm(){
+    var si=document.getElementById('psi'),cta=document.getElementById('pphotocta'),btns=document.querySelectorAll('[onclick*="pPhotoTrigger"]');
+    if(si)si.addEventListener('focus',function(){once(false);},{once:true});
+    if(cta)cta.addEventListener('pointerdown',function(){once(false);},{once:true});
+    for(var i=0;i<btns.length;i++)btns[i].addEventListener('pointerdown',function(){once(false);},{once:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',arm);else arm();
+  function idle(){ /* 로드 직후 1.5초 뒤, 한가해지면(최대 4초 대기) 낮은 우선순위로 */
+    setTimeout(function(){
+      if(window.requestIdleCallback)window.requestIdleCallback(function(){once(true);},{timeout:4000});
+      else setTimeout(function(){once(true);},2000);
+    },1500);
+  }
+  if(document.readyState==='complete')idle();else window.addEventListener('load',idle);
+})();
 var BOOK_AXIS_LABEL={form:'형태',texture:'질감',color:'색'};
 function bookFtcHtml(r){
   var rows=[];
@@ -1138,7 +1182,7 @@ function loadNatureImageIndex(){
     });
   }).catch(function(){/* 실패해도 나머지 사진 소스로 정상 동작 */});
 }
-var natureImgReady=loadNatureImageIndex();
+var natureImgReady=pLazy(loadNatureImageIndex);
 function fetchNatureImagePhotos(sciNm){
   var clean=cleanSciName(sciNm).toLowerCase();
   return natureImgReady.then(function(){return (NATURE_IMG[clean]||[]).slice();});
@@ -2858,7 +2902,17 @@ function pFillRail(host,month,all,stat){
       sec.parentNode.removeChild(sec);
     }else{sec.classList.remove('pg-loading');}
   }
-  batch();
+  /* [백로그 48 ⑤] 줄은 대개 첫 화면 아래라, 사진 약 330~550KB 를 로드 중 한꺼번에 받지 않고 로드 후 한가할 때 시작한다. 이미 화면 안(또는 곧 보일 위치)이면 바로. 스켈레톤이 높이를 잡고 있어 CLS 없음. ?pgrail=eager 로 즉시(시험용). */
+  var nearView=false,eagerRail=false;
+  try{var rt=sec.getBoundingClientRect().top;nearView=rt<(window.innerHeight||800);eagerRail=/[?&]pgrail=eager(&|$)/.test(location.search);}catch(e){}
+  if(nearView||eagerRail)batch();
+  else{
+    var started=false;function go(){if(started)return;started=true;batch();}
+    function later(){setTimeout(function(){if(window.requestIdleCallback)window.requestIdleCallback(go,{timeout:2500});else go();},300);}
+    if(document.readyState==='complete')later();else window.addEventListener('load',later);
+    setTimeout(go,6000); /* 로드 이벤트가 늦어도 6초 뒤엔 시작 */
+    window.addEventListener('scroll',function(){try{if(sec.getBoundingClientRect().top<(window.innerHeight||800)*1.3)go();}catch(e){}},{passive:true});
+  }
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){bookDataReady.then(pRenderExplore);});}
 else bookDataReady.then(pRenderExplore);
