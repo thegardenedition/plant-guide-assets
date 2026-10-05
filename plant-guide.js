@@ -1473,7 +1473,7 @@ function pAddCardCredit(imgWrap,result){
   pEnsureCreditStyle();
   var old=imgWrap.querySelector('.pc-credit');if(old)old.remove();
   var t=String(result.credit).replace(/^사진\s*·\s*/,'').replace(/\s*\(iNaturalist\)$/,'');
-  var src=t,lic='',m=/^(.*?)(?:\s*[·,]\s*)((?:CC[ 0]|공공누리).*)$/.exec(t); /* 마지막 「· CC …」/「, CC …」를 라이선스 칸으로 분리 */
+  var src=t,lic='',m=/^(.*?)(?:\s*[·,]\s*)((?:CC[ 0]|공공누리|KOGL).*)$/.exec(t); /* 마지막 「· CC …」/「, CC …」를 라이선스 칸으로 분리 */
   if(m){src=m[1];lic=m[2];}
   var sp=document.createElement('span');sp.className='pc-credit';sp.title=result.credit;
   var a=document.createElement('span');a.className='pc-credit-src';a.textContent='사진 · '+src;sp.appendChild(a);
