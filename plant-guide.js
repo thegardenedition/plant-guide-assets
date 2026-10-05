@@ -4820,6 +4820,10 @@ updateFilterBadge();
     +'.psearch-submit{background:'+ACCENT+'!important;transition:background .15s '+EASE_CURVE+'!important}' /* 디자인 세션 결정 - 검색 버튼 기본색을 검정에서 포인트 그린으로 */
     +'.picon-btn{transition:background .15s '+EASE_CURVE+',border-radius .15s}'
     +'#pfilterreset{transition:background .15s '+EASE_CURVE+'}'
+    /* [2026-10-05 대표 요청 "초기화 버튼을 크게"] 실측 73×29px·11px 글자라 탭하기 작았다 -
+       높이 44px(터치 최소)·글자 14px. 임베드 인라인 style 이 font-size·border 를 쥐고 있어 !important 필요.
+       알약 모양(radius)은 44px 높이에 맞춰 22px. */
+    +'#pfilterreset{min-height:44px!important;padding:0 20px!important;font-size:14px!important;border-radius:22px!important;border-width:1.5px!important}'
     +'[onclick^="pClearCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pOpenCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pExportCompare"]{transition:background .15s '+EASE_CURVE+'}'
