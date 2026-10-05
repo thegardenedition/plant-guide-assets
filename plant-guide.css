@@ -105,3 +105,10 @@ button.pg-cta[aria-busy="true"]:before{content:"";flex:0 0 22px;width:22px;heigh
 .pg-or{display:flex;align-items:center;gap:12px;max-width:480px;margin:0 0 12px;font-size:12px;letter-spacing:.06em;color:#6E6E6E}
 .pg-or:before,.pg-or:after{content:"";flex:1;height:1px;background:var(--pg-line)}
 @media (prefers-reduced-motion:reduce){button.pg-cta{transition:none}button.pg-cta:hover{transform:none}button.pg-cta[aria-busy="true"]:before{animation:none}}
+
+/* 필터 패널 칩 컨테이너 높이 예약 — #pf* 8개는 임베드에 빈 div 로 있고 JS(renderFilterPanel)가 늦게 칩을 채운다. 채워질 때 패널이 335→766px(폭별 최대 1109)로 커져 아래 내용이 밀려
+   (어떻게 사용하나요 블록 삭제 뒤 왼쪽 열이 짧아지며 드러남) 로드 CLS 가 0.09~0.24 로 올랐다. 비어 있는 동안(:empty)만 폭별 실측 높이(하한값, 채워진 높이를 넘지 않게)를 예약한다. 769px 미만은 패널이 접혀 있어 해당 없음. */
+@media (min-width:769px) and (max-width:839px){#pfusecat:empty{min-height:225px}#pforigin:empty,#pfform:empty{min-height:70px}#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfcolor:empty{min-height:42px}}
+@media (min-width:840px) and (max-width:999px){#pfusecat:empty{min-height:186px}#pforigin:empty,#pfform:empty{min-height:70px}#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfcolor:empty{min-height:42px}}
+@media (min-width:1000px) and (max-width:1049px){#pfusecat:empty{min-height:147px}#pforigin:empty,#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfform:empty{min-height:70px}#pfcolor:empty{min-height:42px}}
+@media (min-width:1050px){#pfusecat:empty{min-height:147px}#pforigin:empty,#pfform:empty,#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfcolor:empty{min-height:42px}}
