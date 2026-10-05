@@ -16,7 +16,7 @@
 @media (prefers-reduced-motion:reduce){.pg-sk{animation:none}}
 
 /* ②③ 검색 전 둘러보기(#pexplore) — 이달에 피는 꽃 줄 · 바로가기 · 초성 색인. 새 요소는 radius 0, 글자 12px 이상. 칩·초성은 라이브 .fchip 컴포넌트를 그대로 재사용(토큰 예외). */
-.pg-explore,#pexplore{margin:0}
+.pg-explore,#pexplore{margin:0;text-align:left} /* 임베드 #pinit 에 인라인 text-align:center 가 있어(옛 한 줄 안내문용) 제목·출처 목록이 가운데로 나오던 것을 시안 v1 대로 왼쪽 정렬로 */
 .pg-rail-sec{margin:0 0 28px}
 .pg-eh h2{font-size:18px;font-weight:700;margin:0 0 12px;color:#121212}
 .pg-mo{display:inline-block;font-size:12px;font-weight:600;color:#0B5345;border:1px solid #0B5345;padding:1px 7px;margin-left:8px;vertical-align:2px}
