@@ -1075,6 +1075,30 @@ function fetchNatureImagePhotos(sciNm){
 function fetchNatureImagePhoto(sciNm){
   return fetchNatureImagePhotos(sciNm).then(function(list){return list[0]||null;});
 }
+/* [2026-10-05 백로그 46 · 총괄 승인] 외부 사진 라이선스 허용 목록 — 상업 이용이 허용되는 것만 쓴다: CC0·CC BY·CC BY-SA(+공공누리 등 공공 이용허락은 해당 소스에서).
+   NC(비영리)·ND(변경 금지)·무표기는 쓰지 않는다(광고·유료 기능이 있는 매거진, 축소·잘라내기도 변형). 못 거르면 그 사진은 건너뛰고 다음 소스로 폴백한다. */
+var PG_INAT_OK={'cc0':1,'cc-by':1,'cc-by-sa':1};
+function pInatPhotoOk(p){return !!(p&&p.license_code&&PG_INAT_OK[p.license_code]);}
+function pInatCredit(p){
+  return {url:toHttps(p.medium_url||p.url),
+    credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)',
+    link:p.id?('https://www.inaturalist.org/photos/'+p.id):''};
+}
+function pGbifLicenseLabel(lic){ /* 허용 목록(CC0·CC BY·CC BY-SA)이면 표기용 이름, 아니면 '' */
+  var l=String(lic||'');
+  if(/creativecommons\.org\/publicdomain\/zero\//i.test(l)||/^CC0/i.test(l))return 'CC0';
+  var m=/creativecommons\.org\/licenses\/(by-sa|by)\/([\d.]+)/i.exec(l);
+  if(m)return 'CC '+m[1].toUpperCase()+' '+m[2];
+  m=/^CC[_ -](BY[_ -]SA|BY)[_ -](\d)[_.]?(\d)?/i.exec(l);
+  if(m)return 'CC '+m[1].toUpperCase().replace(/[_ ]/g,'-')+' '+m[2]+(m[3]?'.'+m[3]:'.0');
+  return '';
+}
+function pGbifCredit(m,rec){
+  var lic=pGbifLicenseLabel(m.license||rec.license);
+  if(!lic)return null; /* 라이선스가 없거나 NC·ND 등 허용 목록 밖 → 사용하지 않는다 */
+  var holder=m.rightsHolder||rec.rightsHolder||rec.recordedBy;
+  return {url:toHttps(m.identifier),credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')+' · '+lic,link:rec.key?('https://www.gbif.org/occurrence/'+rec.key):''};
+}
 /* iNaturalist 학명 매칭: 정확히 일치(대소문자 무시)하는 '식물계' 항목이고,
    라이선스가 명시된(CC 계열) 사진만 신뢰할 수 있는 것으로 채택한다.
    그래야 다른 계(동물·곤충·균류 등)로 잘못 매칭되거나 저작권 미표시 사진이
@@ -1088,9 +1112,9 @@ function fetchINatPhoto(sciNm){
     if(!t)return null;
     if(t.iconic_taxon_name!=='Plantae')return null;
     if(String(t.name).toLowerCase()!==clean.toLowerCase())return null;
-    var p=t.default_photo;
-    if(!p||!p.license_code)return null;
-    return {url:toHttps(p.medium_url||p.url),credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
+    var cands=[t.default_photo].concat((t.taxon_photos||[]).map(function(tp){return tp.photo;}));
+    for(var i=0;i<cands.length;i++){if(pInatPhotoOk(cands[i]))return pInatCredit(cands[i]);} /* 허용 라이선스 사진만(NC·ND·무표기 제외) */
+    return null;
   }).catch(function(){return null;});
 }
 /* "갓(식물)"으로 검색했더니 전통 갓(모자) 사진이 나온 사고의 원인 - 한국어
@@ -1117,6 +1141,25 @@ function wikidataTaxonMatches(qid,clean){
     });
   }).catch(function(){return false;});
 }
+/* 위키백과 대표 이미지는 위키미디어 공용(Commons) 호스팅 파일만 쓴다 — 공용은 자유 라이선스(CC BY·CC BY-SA·PD·공공누리)만 받는다.
+   한국어 위키 자체 업로드(/wikipedia/ko/, 공정이용 가능)는 쓰지 않는다. 출처는 「Wikimedia Commons · 라이선스명」+파일 페이지 링크. */
+function pCommonsFileName(src){
+  var m=/\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^\/]+)/.exec(String(src||''));
+  return m?decodeURIComponent(m[1]):'';
+}
+function pCommonsLicense(fileName){
+  var ck='cmlic|'+fileName,hit=cacheGet(ck,DETAIL_CACHE_TTL);
+  if(hit!==undefined)return Promise.resolve(hit);
+  var url='https://commons.wikimedia.org/w/api.php?action=query&titles='+encodeURIComponent('File:'+fileName)+'&prop=imageinfo&iiprop=extmetadata&format=json&origin=*';
+  var lookup=fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    var pg=j&&j.query&&j.query.pages&&Object.keys(j.query.pages).map(function(k){return j.query.pages[k];})[0];
+    var em=pg&&pg.imageinfo&&pg.imageinfo[0]&&pg.imageinfo[0].extmetadata;
+    var name=(em&&em.LicenseShortName&&em.LicenseShortName.value)||'';
+    if(name)cacheSet(ck,name);
+    return name;
+  }).catch(function(){return '';});
+  return Promise.race([lookup,new Promise(function(res){setTimeout(function(){res('');},1500);})]); /* 1.5초 안에 못 받으면 라이선스명 없이 링크만(사진 표시는 지연시키지 않는다) */
+}
 function fetchWikiThumb(lang,title,sciNm){
   if(!title)return Promise.resolve(null);
   var clean=cleanSciName(sciNm);
@@ -1125,7 +1168,12 @@ function fetchWikiThumb(lang,title,sciNm){
   return fetchWithTimeout(url,TIMEOUT_PHOTO).then(function(r){return r.ok?r.json():null;}).then(function(j){
     if(!j||!j.thumbnail||!j.thumbnail.source)return null;
     return wikidataTaxonMatches(j.wikibase_item,clean).then(function(ok){
-      return ok?{url:j.thumbnail.source,credit:'Wikipedia'}:null;
+      if(!ok)return null;
+      var fn=pCommonsFileName(j.thumbnail.source);
+      if(!fn)return null; /* 공용 호스팅 파일이 아니면(한국어 위키 자체 업로드 등) 쓰지 않는다 */
+      return pCommonsLicense(fn).then(function(lic){
+        return {url:j.thumbnail.source,credit:'Wikimedia Commons'+(lic?' · '+lic:''),link:'https://commons.wikimedia.org/wiki/File:'+encodeURIComponent(fn)};
+      });
     });
   }).catch(function(){return null;});
 }
@@ -1168,8 +1216,8 @@ function fetchGbifPhoto(sciNm){
       for(var j=0;j<media.length;j++){
         var m=media[j];
         if(m.type==='StillImage'&&m.identifier){
-          var holder=m.rightsHolder||list[i].rightsHolder||list[i].recordedBy;
-          return {url:toHttps(m.identifier),credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')};
+          var gc=pGbifCredit(m,list[i]);
+          if(gc)return gc; /* 허용 라이선스 사진만 — 아니면 같은 기록의 다음 사진·다음 기록으로 */
         }
       }
     }
@@ -1210,10 +1258,8 @@ function fetchINatPhotos(sciNm){
     var t=j&&j.results&&j.results[0];
     if(!t||t.iconic_taxon_name!=='Plantae')return [];
     if(String(t.name).toLowerCase()!==clean.toLowerCase())return [];
-    var photos=(t.taxon_photos||[]).map(function(tp){return tp.photo;}).filter(function(p){return p&&p.license_code;});
-    return photos.slice(0,8).map(function(p){
-      return {url:toHttps(p.medium_url||p.url),credit:(p.attribution_name?p.attribution_name+', ':'')+'CC '+p.license_code.replace('cc-','').toUpperCase()+' (iNaturalist)'};
-    });
+    var photos=(t.taxon_photos||[]).map(function(tp){return tp.photo;}).filter(pInatPhotoOk); /* 허용 라이선스만 */
+    return photos.slice(0,8).map(pInatCredit);
   }).catch(function(){return [];});
 }
 function fetchGbifPhotos(sciNm){
@@ -1231,8 +1277,8 @@ function fetchGbifPhotos(sciNm){
       media.forEach(function(m){
         if(m.type==='StillImage'&&m.identifier&&!seen[m.identifier]){
           seen[m.identifier]=true;
-          var holder=m.rightsHolder||rec.rightsHolder||rec.recordedBy;
-          out.push({url:toHttps(m.identifier),credit:'사진 · GBIF'+(holder?(' ('+holder+')'):'')});
+          var gc=pGbifCredit(m,rec);
+          if(gc)out.push(gc); /* 허용 라이선스 사진만 */
         }
       });
     });
@@ -1410,9 +1456,25 @@ function applyThumb(imgWrap,result,eager){
     imgWrap.innerHTML='';
     imgWrap.appendChild(img);
     if(result.credit)imgWrap.setAttribute('data-credit',result.credit);
+    pAddCardCredit(imgWrap,result);
   } else {
     imgWrap.innerHTML=PLACEHOLDER_ICON;
   }
+}
+/* [백로그 46] 결과 카드(.pc-img)에 짧은 출처 한 줄 — CC BY·BY-SA 표기 의무(저작자·라이선스). 자세한 출처·원본 링크는 상세창 슬라이드에 있다. */
+function pEnsureCreditStyle(){
+  if(document.getElementById('pg-credit-style'))return;
+  var st=document.createElement('style');st.id='pg-credit-style';
+  st.textContent='.pc-img{position:relative}.pc-credit{position:absolute;left:0;right:0;bottom:0;padding:3px 8px;font-size:12px;line-height:1.4;color:#fff;background:rgba(18,18,18,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}';
+  document.head.appendChild(st);
+}
+function pAddCardCredit(imgWrap,result){
+  if(!imgWrap||!imgWrap.classList||!imgWrap.classList.contains('pc-img')||!result||!result.credit)return;
+  pEnsureCreditStyle();
+  var old=imgWrap.querySelector('.pc-credit');if(old)old.remove();
+  var t=String(result.credit).replace(/^사진\s*·\s*/,'').replace(/\s*\(iNaturalist\)$/,'');
+  var sp=document.createElement('span');sp.className='pc-credit';sp.textContent='사진 · '+t;sp.title=result.credit;
+  imgWrap.appendChild(sp);
 }
 
 /* 상세창 상단 이미지 영역을 여러 장짜리 슬라이드로 그린다(라이브러리 없이
@@ -1452,6 +1514,11 @@ function renderImageSlider(wrap,creditEl,photos){
     if(creditEl){
       var c=photos[idx]&&photos[idx].credit;
       creditEl.textContent=c?'사진: '+c+' ('+(idx+1)+'/'+photos.length+')':'';
+      var lk=photos[idx]&&photos[idx].link;
+      if(c&&lk&&/^https:\/\//.test(lk)){ /* 원본(파일·관측 기록) 페이지 링크 — 저작자 표기 의무 */
+        var a=document.createElement('a');a.href=lk;a.target='_blank';a.rel='noopener noreferrer';a.textContent=' 원본 보기';a.style.cssText='color:inherit;text-decoration:underline';
+        creditEl.appendChild(a);
+      }
       creditEl.style.display=c?'block':'none';
     }
     if(counterEl)counterEl.textContent=(idx+1)+' / '+photos.length;
