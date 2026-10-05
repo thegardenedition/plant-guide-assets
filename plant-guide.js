@@ -1465,7 +1465,7 @@ function applyThumb(imgWrap,result,eager){
 function pEnsureCreditStyle(){
   if(document.getElementById('pg-credit-style'))return;
   var st=document.createElement('style');st.id='pg-credit-style';
-  st.textContent='.pc-img{position:relative}.pc-credit{position:absolute;left:0;right:0;bottom:0;padding:3px 8px;font-size:12px;line-height:1.4;color:#fff;background:rgba(18,18,18,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}';
+  st.textContent='.pc-img{position:relative}.pc-credit{position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:3px 8px;font-size:12px;line-height:1.4;color:#fff;background:rgba(18,18,18,.7);pointer-events:none}.pc-credit-src{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc-credit-lic{flex:0 0 auto;white-space:nowrap}'; /* 흰 사진 최악 프레임에서도 대비 약 6.9:1(알파 .70) · 좁은 카드에서는 출처명만 말줄임하고 라이선스명은 줄이지 않는다(표기 의무) — 디자인 세션 검토 10-05 */
   document.head.appendChild(st);
 }
 function pAddCardCredit(imgWrap,result){
@@ -1473,7 +1473,11 @@ function pAddCardCredit(imgWrap,result){
   pEnsureCreditStyle();
   var old=imgWrap.querySelector('.pc-credit');if(old)old.remove();
   var t=String(result.credit).replace(/^사진\s*·\s*/,'').replace(/\s*\(iNaturalist\)$/,'');
-  var sp=document.createElement('span');sp.className='pc-credit';sp.textContent='사진 · '+t;sp.title=result.credit;
+  var src=t,lic='',m=/^(.*?)(?:\s*[·,]\s*)((?:CC[ 0]|공공누리).*)$/.exec(t); /* 마지막 「· CC …」/「, CC …」를 라이선스 칸으로 분리 */
+  if(m){src=m[1];lic=m[2];}
+  var sp=document.createElement('span');sp.className='pc-credit';sp.title=result.credit;
+  var a=document.createElement('span');a.className='pc-credit-src';a.textContent='사진 · '+src;sp.appendChild(a);
+  if(lic){var b=document.createElement('span');b.className='pc-credit-lic';b.textContent='· '+lic;sp.appendChild(b);}
   imgWrap.appendChild(sp);
 }
 
