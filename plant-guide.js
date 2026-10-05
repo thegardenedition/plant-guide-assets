@@ -663,7 +663,7 @@ function pSpin(on){
   else el.classList.remove('pspin-css-active');
 }
 
-function hideAll(){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});}
+function hideAll(keepStatus){['pinit','pld','perr','pemp','pcnt','pgrid','pmorewrap','pindex','pskel'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});if(!keepStatus)pSetStatus('');} /* renderPage 는 keepStatus 로 불러 결과가 나눠 도착하는 동안 상태 줄 문구가 깜빡 비지 않게 한다 */
 /* "검색이 느리다"는 지적의 상당 부분은 실제 지연이 아니라, 로딩 상태로
    바뀌는 순간 아무 표시 없이 화면이 뚝 끊기듯 바뀌는 데서 온다(#pld를
    display:none↔block으로 즉시 전환). 스피너를 키우고 포인트 그린으로
@@ -697,6 +697,68 @@ function pScrollResultAreaIntoView(el){
     el.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'});
   }catch(e){}
 }
+/* [2026-10-05 백로그 41 · 시안 v1 확정] 첫 화면 안 상태 줄(#pphotostatus, 마크업은 디자인 세션이 W9 에 넣는다).
+   마크업이 아직 없으면(JS 선배포) 아래 함수들은 아무것도 안 하고 기존 동작(#pld 스피너·스크롤)이 그대로 남는다.
+   줄은 항상 존재하며(role=status, aria-live=polite) 실패 때만 role=alert 로 바꾼다. 문구는 사진 분석뿐 아니라
+   이름·필터 검색에도 쓴다(스크린리더 사용자 안내 - 디자인 세션 검토 10-05): 찾는 중→N종을 찾았어요/찾는 결과가 없어요. */
+var pCountAnnounceTimer=null;
+function pV1On(){return !!document.getElementById('pphotostatus');}
+function pSetStatus(text,alertMode){
+  var el=document.getElementById('pphotostatus');
+  if(!el)return false;
+  clearTimeout(pCountAnnounceTimer);
+  el.setAttribute('role',alertMode?'alert':'status');
+  el.textContent=text||'';
+  return true;
+}
+function pAnnounceCount(n){ /* 첫 결과는 바로 알리고(「찾는 중이에요」가 결과 위에 남지 않게), 이어 도착하는 배치는 잠시 모아 마지막 값만 읽게 한다 */
+  if(!pV1On())return;
+  var el=document.getElementById('pphotostatus');
+  clearTimeout(pCountAnnounceTimer);
+  function write(){el.setAttribute('role','status');el.textContent=n+'종을 찾았어요';}
+  if(!/종을 찾았어요$/.test(el.textContent)){write();return;}
+  pCountAnnounceTimer=setTimeout(write,1200);
+}
+function pPhotoFail(msg){
+  var el=document.getElementById('pphotostatus');
+  if(!el){showError(msg);return;} /* 마크업 전: 기존 오류 화면 */
+  hideLoading();hideAll();
+  if(typeof pClearPhotoNote==='function')pClearPhotoNote();
+  if(typeof pUpdateClearBtn==='function')pUpdateClearBtn();
+  var pin=document.getElementById('pinit');if(pin)pin.style.display='block'; /* 첫 화면(사진 버튼·둘러보기)으로 돌아가 같은 자리에서 다시 시도 */
+  pSetStatus(msg,true);
+  var b=document.createElement('button');b.type='button';b.className='pg-retry';b.textContent='다시 시도';
+  b.onclick=function(){if(window.pPhotoTrigger)window.pPhotoTrigger();};
+  el.appendChild(document.createTextNode(' '));el.appendChild(b);
+}
+/* [2026-10-05 백로그 41 ⑦ 스켈레톤] 결과가 오기 전 자리를 카드 모양 회색 틀(깜빡임)로 채운다. 아래 두 조건이 모두 맞을 때만 쓰고,
+   아니면 기존 #pld 스피너가 그대로 나온다(JS 선배포·css 캐시 혼재에도 빈 칸이 생기지 않게):
+   ① 큰 사진 버튼 쪽 마크업(#pphotostatus)이 있다 = v1 화면 ② plant-guide.css 가 적용됐다(:root{--pg-css:1} 로 확인).
+   칸 수·간격은 #pgrid 의 실제 값을 그대로 따라 실제 카드로 바뀔 때 화면이 밀리지 않게 한다. 150ms 지연(B6)은 showLoading 쪽 그대로. */
+function pPgCssLoaded(){
+  try{return getComputedStyle(document.documentElement).getPropertyValue('--pg-css').trim()==='1';}catch(e){return false;}
+}
+function pShowSkeleton(){
+  var g=document.getElementById('pgrid');
+  if(!g||!g.parentNode||!pV1On()||!pPgCssLoaded())return false;
+  var sk=document.getElementById('pskel');
+  if(!sk){
+    sk=document.createElement('div');
+    sk.id='pskel';sk.className='pg-skel';sk.setAttribute('aria-hidden','true');
+    g.parentNode.insertBefore(sk,g);
+  }
+  var cs=getComputedStyle(g);
+  var cols=cs.gridTemplateColumns;
+  sk.style.gridTemplateColumns=(!cols||cols==='none')?'repeat(auto-fill,minmax(280px,1fr))':cols;
+  sk.style.gap=(cs.gap&&cs.gap!=='normal')?cs.gap:'28px';
+  var card='<div class="pg-skc"><div class="pg-sk pg-sk-ph"></div><div class="pg-sk pg-sk-a"></div><div class="pg-sk pg-sk-b"></div><div class="pg-sk pg-sk-c"></div></div>';
+  sk.innerHTML=card;
+  sk.style.display='grid';
+  var n=Math.min(8,Math.max(4,getComputedStyle(sk).gridTemplateColumns.split(' ').length*2)); /* 두 줄 분량(4~8장) */
+  var html='';for(var i=0;i<n;i++)html+=card;
+  sk.innerHTML=html;
+  return true;
+}
 /* [2026-09-19 UX 미세점검 B6] 캐시 적중 검색은 66~80ms 안에 끝나는데 그
    짧은 순간에도 "검색 중…" 스피너가 뜨자마자 사라져 번쩍였다(실측). 150ms
    이상 걸릴 때만 보이게 지연 표시한다 - hideAll()로 이전 화면(결과·오류
@@ -712,17 +774,24 @@ function showLoading(immediate){
   hideAll();
   clearTimeout(pShowLoadingTimer);
   function reveal(){
+    if(pShowSkeleton()){ /* v1 화면: 스피너 대신 결과 자리에 스켈레톤, 안내는 상태 줄이 맡는다 */
+      if(!immediate)pSetStatus('찾는 중이에요');
+      var gs=document.getElementById('pgrid');if(gs)gs.setAttribute('aria-busy','true');
+      return;
+    }
     var pld=document.getElementById('pld');
     if(pld){
       pEnsureSpinStyle();
       var msgEl=pld.querySelector('p');
       if(msgEl)msgEl.textContent='검색 중...';
+      if(!immediate)pSetStatus('찾는 중이에요'); /* 이름·필터 검색 안내(사진 경로는 pSetPhotoMsg 가 단계 문구를 씀) */
       pld.style.transition='opacity .25s ease';
       pld.style.opacity='0';
       pld.style.display='block';
       requestAnimationFrame(function(){pld.style.opacity='1';});
-      if(immediate)pScrollResultAreaIntoView(pld);
+      if(immediate&&!pV1On())pScrollResultAreaIntoView(pld); /* 상태 줄이 첫 화면 안에 있으면 스크롤하지 않는다 */
     }
+    var gb=document.getElementById('pgrid');if(gb)gb.setAttribute('aria-busy','true');
     pSpin(true);
   }
   if(immediate)reveal();
@@ -732,8 +801,10 @@ function hideLoading(){
   clearTimeout(pShowLoadingTimer);
   pClearPhotoMsgTimers();
   pSpin(false);
+  var gb=document.getElementById('pgrid');if(gb)gb.setAttribute('aria-busy','false');
   var pld=document.getElementById('pld');
   if(pld){pld.style.display='none';pld.style.opacity='';}
+  var psk=document.getElementById('pskel');if(psk)psk.style.display='none';
 }
 function showError(msg){hideLoading();hideAll();if(typeof pClearPhotoNote==='function')pClearPhotoNote();if(typeof pUpdateClearBtn==='function')pUpdateClearBtn();document.getElementById('perrmsg').textContent=msg;document.getElementById('perr').style.display='block';}
 
@@ -1469,11 +1540,11 @@ function pEnsureCreditStyle(){
   document.head.appendChild(st);
 }
 function pAddCardCredit(imgWrap,result){
-  if(!imgWrap||!imgWrap.classList||!imgWrap.classList.contains('pc-img')||!result||!result.credit)return;
+  if(!imgWrap||!imgWrap.classList||!(imgWrap.classList.contains('pc-img')||imgWrap.classList.contains('pg-bc-img'))||!result||!result.credit)return; /* 결과 카드 + 이달의 꽃 줄 카드(41-4) */
   pEnsureCreditStyle();
   var old=imgWrap.querySelector('.pc-credit');if(old)old.remove();
   var t=String(result.credit).replace(/^사진\s*·\s*/,'').replace(/\s*\(iNaturalist\)$/,'');
-  var src=t,lic='',m=/^(.*?)(?:\s*[·,]\s*)((?:CC[ 0]|공공누리|KOGL).*)$/.exec(t); /* 마지막 「· CC …」/「, CC …」를 라이선스 칸으로 분리 */
+  var src=t,lic='',m=/^(.*?)(?:\s*[·,]\s*)((?:CC[ 0]|공공누리|KOGL|Public domain).*)$/.exec(t); /* 마지막 「· CC …」/「, CC …」를 라이선스 칸으로 분리 */
   if(m){src=m[1];lic=m[2];}
   var sp=document.createElement('span');sp.className='pc-credit';sp.title=result.credit;
   var a=document.createElement('span');a.className='pc-credit-src';a.textContent='사진 · '+src;sp.appendChild(a);
@@ -2178,7 +2249,7 @@ function loadAndRenderAttrs(d,it){
     if(pAttrCache[oldKey])pAttrCache[key]=pAttrCache[oldKey];
   }
   if(pAttrCache[key]){
-    renderCardAttrs(d,pAttrCache[key]);
+    renderCardAttrs(d,pAttrCache[key],it);
     it._attrsRich=isAttrsRich(pAttrCache[key]);
     reflowGrid();
     return;
@@ -2189,7 +2260,7 @@ function loadAndRenderAttrs(d,it){
   };
   limitCard(task).then(function(attrs){
     if(attrs&&d.isConnected){
-      renderCardAttrs(d,attrs); /* 기존 .pc-attrs 제거는 renderCardAttrs 안에서 항상 처리 */
+      renderCardAttrs(d,attrs,it); /* 기존 .pc-attrs 제거는 renderCardAttrs 안에서 항상 처리 */
     }
     it._attrsRich=isAttrsRich(attrs);
     applyFiltersThrottled();
@@ -2249,7 +2320,7 @@ function attrChipsHtml(attrs,small){
    그냥 append해, refreshCard가 같은 카드에 반복 호출될 때마다(승급마다) 칩
    줄이 쌓였다(실측: 칩 9개=3줄). 제거를 이 함수 안으로 옮겨 두 경로 모두
    항상 하나만 남게 한다. */
-function renderCardAttrs(cardEl,attrs){
+function renderCardAttrs(cardEl,attrs,it){
   var old=cardEl.querySelector('.pc-attrs');if(old)old.remove();
   var body=cardEl.querySelector('.pc-body');
   var html=attrChipsHtml(attrs,true);
@@ -2259,6 +2330,43 @@ function renderCardAttrs(cardEl,attrs){
     wrap.innerHTML=html;
     body.appendChild(wrap);
   }
+  pRenderCardFacts(cardEl,attrs,it);
+}
+/* [2026-10-05 백로그 41-5 · 시안 v1 ④] 데스크톱 결과 카드의 「정원 정보 한 줄」(햇빛·키·개화기). v1 마크업이 있을 때만 그린다(JS 선배포 안전)
+   — 390 모바일 2열 카드에서는 css 가 숨긴다. 값이 있는 칸만 보여주고 하나도 없으면 줄 자체를 만들지 않는다.
+   ※ 시안의 「물」 칸은 데이터 출처가 없어(농사로·책 어디에도 물주기 정보가 구조화돼 있지 않다) 「키」로 바꿨다 — 추정값을 보여주지 않는다.
+   햇빛은 sunlightLabel 의 기본값('반음지')이 아니라 실제 광조건 문구(attrs.light)가 있을 때만 쓴다. */
+function pFormatMonths(ms){
+  if(!ms||!ms.length)return '';
+  var a=ms[0],b=ms[ms.length-1];
+  return a===b?a+'월':a+'~'+b+'월';
+}
+function pRenderCardFacts(cardEl,attrs,it){
+  var oldF=cardEl.querySelector('.pg-facts');if(oldF)oldF.remove();
+  if(!pV1On()||!pPgCssLoaded()||!attrs)return; /* css 없이 정보 줄만 그려지면 스타일 없는 글자가 카드에 붙으므로 css 확인 뒤에만 */
+  var body=cardEl.querySelector('.pc-body');
+  if(!body)return;
+  var sun=attrs.light?attrs.sunlight:'';
+  var bloom=pFormatMonths(attrs.bloomMonths);
+  function draw(height,bloomTxt){
+    if(!cardEl.isConnected)return;
+    var again=cardEl.querySelector('.pg-facts');if(again)again.remove();
+    var items=[['햇빛',sun],['키',height],['개화기',bloomTxt]].filter(function(x){return x[1];});
+    if(!items.length)return;
+    var f=document.createElement('div');
+    f.className='pg-facts';
+    f.innerHTML=items.map(function(x){return '<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>';}).join('');
+    body.appendChild(f);
+  }
+  if(!it||!it.sc){draw('',bloom);return;}
+  bookSummaryFields(it.sc).then(function(b){
+    var h=(b&&b.height)||'';
+    if(!/\d/.test(h))h=''; /* 숲정원 책의 '-' 같은 빈 값(→ '-m')은 쓰지 않는다 */
+    if(h.length>14)h=h.slice(0,14);
+    var bl=bloom;
+    if(!bl&&b&&b.bloom){var ms=pBloomMonthsOf(b.bloom);bl=ms.length?pFormatMonths(ms):String(b.bloom).split(',')[0].trim().slice(0,10);}
+    draw(h,bl);
+  });
 }
 /* 농사로 gardenList에서 이름으로 관리난이도 등을 찾을 때 쓰는 헬퍼(비교표에서 사용). */
 function nongsaroGardenByName(korNm){
@@ -2463,6 +2571,7 @@ function renderIndexBar(){
     +INITIAL_CHARS.map(function(ch){
       return '<span class="fchip'+(pFilter.initial===ch?' active':'')+'" onclick="pSetInitial(\''+ch+'\')">'+ch+'</span>';
     }).join('');
+  pRenderExploreIndex();
 }
 window.pSetInitial=function(ch){
   pFilter.initial=(pFilter.initial===ch)?null:ch;
@@ -2548,6 +2657,211 @@ function applyFiltersThrottled(){
    검색창에 아무것도 입력하지 않아도 이 정적 데이터셋 전체를 대상으로 필터
    조건에 맞는 종을 직접 찾아 보여줄 수 있다. 정적 데이터에 없는 개념(민속식물/
    종자정보 등 목록 API 전용 배지)은 이 모드에서는 자연히 매치되지 않는다. */
+/* [2026-10-05 백로그 41 · 시안 v1 ②③] 검색 전 첫 화면 「둘러보기」(#pexplore — 그릇은 디자인 세션 마크업, 내용은 여기서 그린다).
+   그릇이 없으면 아무것도 하지 않는다(JS 선배포·기사 페이지 안전). 구성: ① 이달에 피는 꽃 줄(책 2종의 숫자 개화월 429종 기준, 이달 6종 미만이면 줄 숨김 — 12~2월)
+   ② 바로가기(꽃 색·햇빛·식물 유형 = 이미 있는 필터를 그대로 켠다) ③ 초성 색인. 「인기」는 데이터가 없어 넣지 않는다.
+   외부 사진 조회 부담(종당 최대 6곳)을 줄이려고 줄은 최대 10장·앞 4장만 즉시·나머지는 기존 동시요청 대기열(limitCard)로 부른다.
+   IntersectionObserver 는 쓰지 않는다(위 3908행 부근에 폐기 기록). 끄기 스위치: 아래 PG_EXPLORE_RAIL_ON 을 false 로 바꿔 배포(시험은 주소에 ?pgrail=0). */
+var PG_EXPLORE_RAIL_ON=true;
+var PG_RAIL_STATIC_ON=true; /* 끄기 스위치 2: false 로 바꿔 배포하면 사전 생성 사진(rail/photos.json)을 안 쓰고 실시간 조회만 한다 */
+var PG_PAGES_BASE='https://thegardenedition.github.io/plant-guide-assets/';
+var PG_RAIL_MAX=10,PG_RAIL_MIN=4,PG_RAIL_EAGER=4,PG_RAIL_CAND_MAX=24,PG_RAIL_FIRST=6; /* 후보는 최대 24종까지 훑고, 사진이 확정된 종만 줄에 올린다(대표 결정 10-05 A안) */
+var PG_SHORT_LIGHT=['양지','반음지','음지'];
+var PG_SHORT_USECAT=[['꽃나무/관목','꽃나무·관목'],['정원용초본(꽃/야생화)','정원용 초본'],['꽃구근','꽃구근'],['상록침엽수','상록침엽수'],['낙엽교목','낙엽교목'],['상록활엽수','상록활엽수']];
+function pBloomMonthsOf(v){ /* '5-6월'·'5~6월'·'5월' 같은 숫자 표기만(봄·초여름 같은 계절어는 제외 — 정확하지 않아 쓰지 않는다) */
+  var m=/^\s*(\d{1,2})\s*(?:[~\-–]\s*(\d{1,2}))?\s*월/.exec(v||'');
+  if(!m)return [];
+  var a=parseInt(m[1],10),b=m[2]?parseInt(m[2],10):a,out=[],i;
+  if(a<1||a>12||b<1||b>12)return [];
+  if(a<=b){for(i=a;i<=b;i++)out.push(i);}else{for(i=a;i<=12;i++)out.push(i);for(i=1;i<=b;i++)out.push(i);}
+  return out;
+}
+function pBloomPicks(month){ /* 이달에 피는 종 전부(정렬: 개화 기간이 짧고 이달이 한가운데에 가까운 종 먼저 → 이름순) */
+  var seen={},list=[];
+  [BOOK_FTC,BOOK_GARDEN].forEach(function(tbl){ /* 형태·질감·색 책(정식 학명)을 먼저 — 정원식물 사전 일부 행은 학명 칸에 영문 일반명(Shiny mint 등)이 들어 있다 */
+    Object.keys(tbl).forEach(function(k){
+      var r=tbl[k];
+      var sc=cleanSciName(r.sc||'');
+      if(!sc||/\s(mint|pine|burnet|fern)$/i.test(sc)||seen[sc]||!r.nm||seen['nm:'+r.nm])return; /* 영문 일반명이 학명 칸에 든 행은 제외 */ /* 같은 국명이 학명 표기만 다르게 두 번 나오는 경우(예: 감국) 한 번만 */
+      var ms=pBloomMonthsOf(r.bloom);
+      if(!ms.length)return;
+      var at=ms.indexOf(month);
+      if(at===-1)return;
+      seen[sc]=1;seen['nm:'+r.nm]=1;
+      var center=(ms.length-1)/2;
+      list.push({nm:r.nm,sc:r.sc,score:Math.abs(at-center)+ms.length*0.3});
+    });
+  });
+  list.sort(function(a,b){return (a.score-b.score)||a.nm.localeCompare(b.nm,'ko');});
+  return list;
+}
+function pShortSci(sc){ /* 명명자(저자) 표기를 떼고 속명+종소명(+변종·아종)만 */
+  var t=String(sc||'').split(/\s+/),out=t.slice(0,2);
+  if(t[2]&&/^(var\.|subsp\.|f\.)$/.test(t[2])&&t[3])out=out.concat(t[2],t[3]);
+  return out.join(' ');
+}
+function pExploreRailShell(month){ /* 사진이 확정되기 전에는 카드가 아니라 높이를 예약한 스켈레톤 — 확정된 카드만 아래 pRailAppend 로 그린다 */
+  var sk='';for(var i=0;i<PG_RAIL_FIRST;i++)sk+='<li class="pg-bci" aria-hidden="true"><div class="pg-skc"><div class="pg-sk pg-sk-ph"></div><div class="pg-sk pg-sk-a"></div><div class="pg-sk pg-sk-b"></div><div class="pg-sk pg-sk-c"></div></div></li>';
+  return '<section class="pg-rail-sec pg-loading" aria-labelledby="pgrailh" aria-busy="true"><div class="pg-eh"><h2 id="pgrailh">이달에 피는 꽃 <span class="pg-mo">'+month+'월</span></h2></div>'
+    +'<div class="pg-railwrap"><ul class="pg-rail" role="list">'+sk+'</ul>'
+    +'<button type="button" class="pg-railbtn" aria-label="다음 꽃 보기" onclick="pExploreRailNext(this)">&rsaquo;</button></div></section>';
+}
+function pRailCreditsHtml(list){
+  var li=list.map(function(e){
+    var t=String(e.res.credit||'').replace(/^사진\s*·\s*/,'');
+    var links=(e.res.link&&/^https:\/\//.test(e.res.link)?' <a href="'+esc(e.res.link)+'" target="_blank" rel="noopener noreferrer">원본</a>':'')
+      +(e.res.licUrl&&/^https:\/\//.test(e.res.licUrl)?' <a href="'+esc(e.res.licUrl)+'" target="_blank" rel="noopener noreferrer">라이선스</a>':'')
+      +(e.res.modified?' <span class="pg-mod">크기 조정·잘라냄</span>':'');
+    return '<li><b>'+esc(e.it.nm)+'</b> — '+esc(t)+links+'</li>';
+  }).join('');
+  return '<summary>사진 출처·라이선스 ('+list.length+'장)</summary><ul>'+li+'</ul>';
+}
+function pRailRefreshCredits(sec,list){
+  var d=sec.querySelector('.pg-credits');
+  if(!d){d=document.createElement('details');d.className='pg-credits';sec.appendChild(d);}
+  d.innerHTML=pRailCreditsHtml(list);
+}
+function pRailAppend(ul,e,idx){
+  var it=e.it,li=document.createElement('li');li.className='pg-bci';
+  li.innerHTML='<a class="pg-bc" href="?q='+encodeURIComponent(it.nm)+'" data-nm="'+esc(it.nm)+'" data-sc="'+esc(it.sc)+'"><span class="pg-bc-img"></span>'
+    +'<span class="pg-bc-nm">'+esc(it.nm)+'</span><span class="pg-bc-sc">'+esc(pShortSci(it.sc))+'</span></a>';
+  ul.appendChild(li);
+  var a=li.firstChild;
+  applyThumb(a.querySelector('.pg-bc-img'),e.res,idx<PG_RAIL_EAGER); /* 사진은 이미 확정·미리 받아 둠 → 빈 자리표시가 생기지 않는다 */
+  a.addEventListener('click',function(ev){
+    if(ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.button===1)return; /* 새 탭 열기는 기본 링크 동작 그대로 */
+    ev.preventDefault();
+    var sidx=null;try{sidx=buildStaticIndex();}catch(err){}
+    var fam='';
+    if(sidx){var key=cleanSciName(it.sc);for(var i=0;i<sidx.length;i++){if(cleanSciName(sidx[i].sc)===key){fam=sidx[i].fam||'';break;}}}
+    window.pDetail({nm:it.nm,sc:it.sc,fam:fam,no:'',specsId:'',origin:'static',_uid:++pCardUid});
+  });
+}
+window.pExploreRailNext=function(btn){
+  var rail=btn&&btn.parentNode&&btn.parentNode.querySelector('.pg-rail');
+  if(!rail)return;
+  try{rail.scrollBy({left:rail.clientWidth*0.8,behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});}
+  catch(e){rail.scrollLeft+=rail.clientWidth*0.8;}
+};
+function pExploreShortcutsHtml(){
+  var sw=BOOK_COLOR_OPTS.map(function(c){
+    return '<button type="button" class="pg-sw" title="'+esc(c)+'" aria-label="꽃 색 '+esc(c)+'" style="background:'+(BOOK_COLOR_HEX[c]||'#ddd')+'" onclick="pToggleFilterVal(\'color\',\''+c+'\')"></button>';
+  }).join('');
+  function chips(kind,arr){
+    return arr.map(function(o){var v=o instanceof Array?o[0]:o,l=o instanceof Array?o[1]:o;
+      return '<button type="button" class="fchip pg-chip" onclick="pToggleFilterVal(\''+kind+'\',\''+v+'\')">'+esc(l)+'</button>';}).join('');
+  }
+  return '<div class="pg-short">'
+    +'<div class="pg-sc"><h3>꽃 색으로 찾기</h3><div class="pg-sws">'+sw+'</div></div>'
+    +'<div class="pg-sc"><h3>햇빛 조건으로 찾기</h3><div class="pg-chipgrid">'+chips('light',PG_SHORT_LIGHT)+'</div></div>'
+    +'<div class="pg-sc"><h3>식물 유형으로 찾기</h3><div class="pg-chipgrid">'+chips('usecat',PG_SHORT_USECAT)+'</div></div>'
+    +'</div>';
+}
+function pExploreIndexHtml(){
+  return '<div class="pg-idx" role="group" aria-label="가나다순으로 찾기"><span class="pg-idx-l">가나다순으로 찾기</span>'
+    +'<button type="button" class="fchip pg-idxchip'+(!pFilter.initial?' active':'')+'" onclick="pSetInitial(null)">전체</button>'
+    +INITIAL_CHARS.map(function(ch){return '<button type="button" class="fchip pg-idxchip'+(pFilter.initial===ch?' active':'')+'" onclick="pSetInitial(\''+ch+'\')">'+ch+'</button>';}).join('')
+    +'</div>';
+}
+function pRenderExploreIndex(){ /* 초성 선택 표시만 다시(뒤로가기·초기화로 첫 화면에 돌아왔을 때) */
+  var host=document.getElementById('pexplore');
+  var old=host&&host.querySelector('.pg-idx');
+  if(!old)return;
+  var tmp=document.createElement('div');tmp.innerHTML=pExploreIndexHtml();
+  old.parentNode.replaceChild(tmp.firstChild,old);
+}
+/* [41-5b] 사전 생성 사진 — 허용 라이선스(CC0·CC BY·CC BY-SA·공공누리 제1유형·퍼블릭 도메인·국립수목원) 사진을 480×360 으로 줄여 rail/img 에 두고
+   출처·작성자·라이선스·원본 링크·확인일을 rail/photos.json 에 기록한다(생성기 tools/plant-guide-rail-build.py, 대표 검수를 거친 것만).
+   파일이 없거나 받지 못하면 빈 객체 → 기존 실시간 조회로 그대로 동작한다. */
+var pRailStaticP=null;
+function pLoadRailStatic(){
+  if(pRailStaticP)return pRailStaticP;
+  var base=(window.__PG_RAIL_BASE||PG_PAGES_BASE);
+  pRailStaticP=(!PG_RAIL_STATIC_ON)?Promise.resolve({_ex:{}}):fetchWithTimeout(base+'rail/photos.json',TIMEOUT_STATIC).then(function(r){return r.ok?r.json():null;}).then(function(j){
+    var out={_ex:{}};if(!j||!j.photos)return out;
+    Object.keys(j.exclude||{}).forEach(function(k){out._ex[k]=1;}); /* 대표 검수에서 제외한 종 — 줄에 올리지 않는다(실시간 조회로도) */
+    Object.keys(j.photos).forEach(function(k){var e=j.photos[k];if(!e||!e.file)return;
+      var cr=String(e.creator||'').replace(/\s*\[\d+\]\s*$/,''); /* Commons 작성자 칸의 각주 표시(「Kurt Stüber [1]」의 [1])는 이름이 아니라 링크 표식이라 뗀다 */
+      var credit=(e.source==='국립수목원')?('사진 · '+cr+' '+'표준식물목록'):((cr?cr+' · ':'')+e.source+(e.license?' · '+e.license:''));
+      out[k]={url:base+(j.dir||'rail/img/')+e.file,credit:credit,link:e.sourceUrl||'',licUrl:e.licenseUrl||'',modified:true};}); /* modified: 480×360 으로 줄이고 4:3 으로 잘라 낸 사본(CC 변경 표시 의무) */
+    return out;}).catch(function(){return {_ex:{}};});
+  return pRailStaticP;
+}
+/* 줄 사진 확정: 허용 라이선스 사진을 찾고(없으면 null) 실제로 내려받아 보이는지까지 확인한 종만 통과한다.
+   결과는 localStorage 에 7일(못 찾은 종은 1일) 기억해 재방문 때 외부 조회를 하지 않는다. 키 pgrail2|: 46(라이선스 허용 목록) 이전 기억은 쓰지 않는다.
+   ※ 41-5b(사진 사전 생성)가 들어오면 이 함수 맨 앞에서 사전 생성 파일의 사진을 돌려주면 된다 — 아래 숨김·채움 로직은 「사진이 있는가」만 보므로 그대로 동작한다. */
+function pPreloadImg(url){
+  return new Promise(function(res){var im=new Image(),done=false;function fin(v){if(!done){done=true;res(v);}}
+    im.onload=function(){fin(true);};im.onerror=function(){fin(false);};setTimeout(function(){fin(false);},8000);im.src=url;});
+}
+function pRailPhoto(it,eager,stat){
+  var key=cleanSciName(it.sc),ck='pgrail2|'+key,hit=cacheGet(ck,DETAIL_CACHE_TTL),found,st=stat&&stat[key.toLowerCase()];
+  if(st)found=Promise.resolve(st); /* 사전 생성 사진: 외부 조회 0 */
+  else if(hit&&hit.url)found=Promise.resolve(hit);
+  else if(cacheGet('pgrail2n|'+key,1000*60*60*24)!==undefined)found=Promise.resolve(null); /* 사진을 못 찾은 종은 하루 동안 다시 조회하지 않는다 */
+  else{
+    var task=function(){var ghost=document.createElement('div'); /* 화면에 안 붙인 자리에서 사진만 찾는다(결과는 pImgCache) */
+      return loadCardImage(it.nm,it.sc,ghost,null,eager).then(function(){
+        var r=pImgCache[it.nm+'|'+it.sc];
+        if(r&&r.url){var v={url:r.url,credit:r.credit||'',link:r.link||''};cacheSet(ck,v);return v;}
+        cacheSet('pgrail2n|'+key,1);return null;});};
+    found=eager?task():limitCard(task); /* 앞 4장은 즉시, 나머지는 기존 동시요청 대기열 */
+  }
+  return found.then(function(res){return res?pPreloadImg(res.url).then(function(ok){return ok?res:null;}):null;});
+}
+function pRenderExplore(){
+  var host=document.getElementById('pexplore');
+  if(!host)return;
+  /* plant-guide.css 가 안 올라온 상태(링크 누락·Pages 캐시 혼재·로드 실패)에서는 줄·바로가기·초성이 스타일 없이 깨져 보이므로 그리지 않는다. 페이지 로드가 끝난 뒤 css 가 확인되면 한 번 다시 시도 */
+  if(!pPgCssLoaded()){
+    if(!pRenderExplore._w){pRenderExplore._w=1;window.addEventListener('load',function(){if(pPgCssLoaded())pRenderExplore();});}
+    return;
+  }
+  var off=false;try{off=/[?&]pgrail=0(&|$)/.test(location.search);}catch(e){}
+  var month=new Date().getMonth()+1;
+  var all=(PG_EXPLORE_RAIL_ON&&!off)?pBloomPicks(month):[];
+  var wantRail=all.length>=PG_RAIL_MIN;
+  host.innerHTML=(wantRail?pExploreRailShell(month):'')+pExploreShortcutsHtml()+pExploreIndexHtml();
+  if(!wantRail)return;
+  pLoadRailStatic().then(function(stat){pFillRail(host,month,all,stat);});
+}
+function pFillRail(host,month,all,stat){
+  var ex=stat._ex||{};
+  all=all.filter(function(c){return !ex[cleanSciName(c.sc).toLowerCase()];});
+  var hasStat=Object.keys(stat).length>1; /* _ex 하나는 제외 */
+  var cands=all;
+  if(hasStat){ /* 사전 생성 사진이 있는 종을 먼저(점수 순서 유지), 나머지는 뒤에서 실시간 조회로 보충 */
+    var inS=[],outS=[];all.forEach(function(c){(stat[cleanSciName(c.sc).toLowerCase()]?inS:outS).push(c);});cands=inS.concat(outS);}
+  cands=cands.slice(0,PG_RAIL_CAND_MAX);
+  var sec=host.querySelector('.pg-rail-sec'),ul=sec.querySelector('.pg-rail');
+  var next=0,list=[],drawn=false;
+  function batch(){ /* 처음엔 6종을 한꺼번에(앞 4장 즉시), 모자라면 부족한 만큼, 그 뒤엔 10장까지 남은 만큼 — 확정 못 한 종은 건너뛰고 다음 후보 */
+    var need=(drawn?PG_RAIL_MAX:PG_RAIL_MIN)-list.length;
+    if(!drawn&&next===0)need=PG_RAIL_FIRST;
+    if(need<=0||next>=cands.length)return finish();
+    var items=cands.slice(next,next+need),base=next;next+=items.length;
+    Promise.all(items.map(function(it,i){return pRailPhoto(it,(base+i)<PG_RAIL_EAGER,stat).then(function(res){return res?{it:it,res:res}:null;});})).then(function(rs){
+      rs.forEach(function(e){if(e&&list.length<PG_RAIL_MAX)list.push(e);});
+      if(!drawn&&list.length>=PG_RAIL_MIN){ /* 줄을 처음 그리는 순간: 스켈레톤을 걷고 확정된 카드만 후보 순서대로 */
+        drawn=true;ul.innerHTML='';sec.classList.remove('pg-loading');sec.removeAttribute('aria-busy');
+        list.forEach(function(e,i){pRailAppend(ul,e,i);});
+        pRailRefreshCredits(sec,list);
+      }else if(drawn){
+        rs.forEach(function(e){if(e&&ul.querySelectorAll('.pg-bc').length<PG_RAIL_MAX&&list.indexOf(e)!==-1)pRailAppend(ul,e,ul.querySelectorAll('.pg-bc').length);});
+        pRailRefreshCredits(sec,list);
+      }
+      batch();
+    });
+  }
+  function finish(){
+    if(!drawn){ /* 후보를 다 훑어도 6종 미만 → 줄 자체를 숨긴다(빈 칸·자리표시 금지) */
+      sec.parentNode.removeChild(sec);
+    }else{sec.classList.remove('pg-loading');}
+  }
+  batch();
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){bookDataReady.then(pRenderExplore);});}
+else bookDataReady.then(pRenderExplore);
 var STATIC_INDEX=null;
 function buildStaticIndex(){
   if(STATIC_INDEX)return STATIC_INDEX;
@@ -2610,6 +2924,7 @@ function runFacetSearch(){
     hideLoading();hideAll();
     document.getElementById('pinit').style.display='block';
     document.getElementById('pcnt').style.display='none';
+    pRenderExploreIndex();
     return;
   }
   var myToken=++facetSearchToken;
@@ -2631,6 +2946,7 @@ function runFacetSearch(){
     if(!matches.length){
       document.getElementById('pemp').style.display='block';
       document.getElementById('pcnt').style.display='none';
+      pSetStatus('찾는 결과가 없어요');
       return;
     }
     renderPage();
@@ -2999,17 +3315,20 @@ function updatePhotoIdCardName(it){
    aria-busy·disabled만 바꾼다. */
 var pIdentifySeq=0;
 var pIdentifyAbortCtrl=null;
-function pPhotoBtnEl(){return document.querySelector('[onclick="pPhotoTrigger()"]');}
+function pPhotoBtnEls(){return document.querySelectorAll('[onclick="pPhotoTrigger()"]');}
 function pSetPhotoBtnBusy(busy){
-  var btn=pPhotoBtnEl();
-  if(!btn)return;
-  btn.disabled=!!busy;
-  btn.setAttribute('aria-busy',busy?'true':'false');
-  if(busy){
-    if(btn.dataset.origTitle===undefined)btn.dataset.origTitle=btn.getAttribute('title')||'';
-    btn.setAttribute('title','사진 분석 중…');
-  } else if(btn.dataset.origTitle!==undefined){
-    btn.setAttribute('title',btn.dataset.origTitle);
+  /* 큰 사진 버튼(#pphotocta)과 검색창 안 아이콘 버튼이 함께 있으면 둘 다 잠근다(어느 쪽으로든 이중 업로드 방지). */
+  var btns=pPhotoBtnEls();
+  for(var i=0;i<btns.length;i++){
+    var btn=btns[i];
+    btn.disabled=!!busy;
+    btn.setAttribute('aria-busy',busy?'true':'false');
+    if(busy){
+      if(btn.dataset.origTitle===undefined)btn.dataset.origTitle=btn.getAttribute('title')||'';
+      btn.setAttribute('title','사진 분석 중…');
+    } else if(btn.dataset.origTitle!==undefined){
+      btn.setAttribute('title',btn.dataset.origTitle);
+    }
   }
 }
 window.pPhotoTrigger=function(){
@@ -3068,6 +3387,7 @@ function compressImageFile(file,maxDim,quality){
 function pSetPhotoMsg(text){
   var p=document.querySelector('#pld p');
   if(p)p.textContent=text;
+  pSetStatus(text); /* 첫 화면 안 상태 줄(마크업이 있을 때만) */
 }
 var pPhotoMsgTimers=[];
 function pClearPhotoMsgTimers(){
@@ -3112,7 +3432,7 @@ var PLANTID_TIMEOUT=25000; /* 사진 인식 요청이 이 시간(ms) 안에 끝�
 function pIdentifyPhoto(files,mySeq){
   if(mySeq===undefined)mySeq=++pIdentifySeq; /* 직접 호출 등 대비 안전망 - 보통은 pOnPhotoSelected가 넘겨준 값을 그대로 쓴다 */
   if(!NONGSARO_PROXY){
-    showError('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
+    pPhotoFail('사진으로 찾기 기능을 지금은 사용할 수 없습니다.');
     pSetPhotoBtnBusy(false);
     return;
   }
@@ -3139,13 +3459,13 @@ function pIdentifyPhoto(files,mySeq){
   }).then(function(res){
     if(mySeq!==pIdentifySeq)return; /* 그사이 더 최신 선택이 들어왔으면 이 응답은 버린다(R2) */
     if(!res.ok||!res.body){
-      showError('사진에서 식물을 인식하지 못했습니다. 선명한 잎·꽃 사진으로 다시 시도해보세요.');
+      pPhotoFail('사진에서 식물을 인식하지 못했습니다. 선명한 잎·꽃 사진으로 다시 시도해보세요.');
       pSetPhotoBtnBusy(false);
       return;
     }
     var results=(res.body&&res.body.results)||[];
     if(!results.length){
-      showError('사진에서 식물을 찾지 못했습니다. 다른 각도의 사진으로 다시 시도해보세요.');
+      pPhotoFail('사진에서 식물을 찾지 못했습니다. 다른 각도의 사진으로 다시 시도해보세요.');
       pSetPhotoBtnBusy(false);
       return;
     }
@@ -3213,7 +3533,7 @@ function pIdentifyPhoto(files,mySeq){
            #pnote(Pl@ntNet 안내문, 이 분기에서 항상 채워짐)로 스크롤한다 -
            #pnote가 #pcnt보다 문서상 앞이라 block:'start'로 #pcnt를 바로
            맨 위에 붙이면 안내문이 뷰포트 위로 밀려 안 보였다. */
-        pScrollResultAreaIntoView(noteEl);
+        if(!pV1On())pScrollResultAreaIntoView(noteEl); /* 상태 줄이 첫 화면 안에 있으면 스크롤 대신 상태 줄 문구로 안내 */
         toTranslate.forEach(function(card){
           translateEnToKo(card.engNm).then(function(ko){
             if(ko&&ko.trim()&&ko.trim().toLowerCase()!==card.engNm.trim().toLowerCase()){
@@ -3227,7 +3547,8 @@ function pIdentifyPhoto(files,mySeq){
         noteEl.style.display='block';
         document.getElementById('pemp').style.display='block';
         document.getElementById('pcnt').style.display='none';
-        pScrollResultAreaIntoView(document.getElementById('pemp'));
+        pSetStatus('찾는 결과가 없어요');
+        if(!pV1On())pScrollResultAreaIntoView(document.getElementById('pemp'));
       }
       pUpdateClearBtn(); /* note/psugg 표시가 최종 확정된 뒤에 호출해야 "×" 버튼이 올바르게 나타난다 */
       }finally{pSetPhotoBtnBusy(false);} /* R13: 렌더링 중 뭐가 터져도(renderPage·pMatchLocalByName 등) 버튼은 반드시 풀린다 */
@@ -3237,9 +3558,9 @@ function pIdentifyPhoto(files,mySeq){
     if(mySeq!==pIdentifySeq)return; /* 더 최신 선택 때문에 이 요청을 직접 abort()한 경우 - 조용히 넘어간다(오류 아님, R2) */
     pSetPhotoBtnBusy(false); /* try/finally와 중복이지만 비용이 없고, staticDataReady 자체가 거부된 경우(try 블록 진입 전)에는 이 경로가 유일한 해제 지점이라 남겨둔다 */
     if(pidTimedOut){
-      showError('사진 분석이 너무 오래 걸려 중단했습니다. 사진 용량을 줄이거나 Wi-Fi 환경에서 다시 시도해주세요.');
+      pPhotoFail('사진 분석이 너무 오래 걸려 중단했습니다. 사진 용량을 줄이거나 Wi-Fi 환경에서 다시 시도해주세요.');
     } else {
-      showError('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      pPhotoFail('사진을 분석하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
   });
 }
@@ -3629,6 +3950,7 @@ function runSearch(){
         showError(govErr.message||'네트워크 오류가 발생했습니다.');
       } else {
         document.getElementById('pemp').style.display='block';
+        pSetStatus('찾는 결과가 없어요');
       }
     }
     /* [2026-09-18] 조용한 실패 금지(마스터 v1.5 16절 원칙 4, 백로그 26). 국립수목원 계열 소스가
@@ -4002,7 +4324,7 @@ function pRevealCard(el,idx){
 }
 function renderPage(){
   hideLoading();
-  hideAll();
+  hideAll(true);
   var g=document.getElementById('pgrid');
   if(pShown===0){
     g.innerHTML='';
@@ -4057,6 +4379,7 @@ function renderPage(){
   pShown+=next.length;
   document.getElementById('pcnt').style.display='flex';
   document.getElementById('pcnttxt').textContent='총 '+pAll.length.toLocaleString()+'건 중 '+pShown+'건 표시';
+  pAnnounceCount(pAll.length);
   document.getElementById('pmorewrap').style.display=(pShown<pAll.length)?'block':'none';
   var b=document.getElementById('pmorebtn');if(b)b.textContent='더 보기';
   applyFilters();
@@ -4888,7 +5211,10 @@ updateFilterBadge();
     '.psearchbar{transition:border-color .15s '+EASE_CURVE+'!important}'
     +'.psearchbar:focus-within{border-color:'+ACCENT+'!important;border-width:2px!important;box-shadow:0 0 0 3px rgba(11,83,69,.18)!important}' /* [2026-09-21 대표 실기기 재보고] 테두리 색만 바꾸니 1.5px 검정→진초록이 눈으로는 거의 같은 검은 선이었다(WCAG 2.4.11 포커스 대비 기준 미달, 총괄 세션이 실측) - 테두리를 2px로 살짝 굵게 하고, 바깥에 옅은 초록 링(box-shadow)을 더해 색만으로는 안 보이던 걸 "형태"로도 보이게 한다. radius 0 원칙은 그대로(box-shadow는 각진 링으로 나온다) */
     +'.picon-btn:focus-visible{box-shadow:0 0 0 3px rgba(11,83,69,.18)!important}' /* 아이콘 버튼도 같은 링 - 기존 outline:2px는 유지, 덧붙이는 것뿐이라 서로 안 부딪힘 */
-    +'.psearch-submit{background:'+ACCENT+'!important;transition:background .15s '+EASE_CURVE+'!important}' /* 디자인 세션 결정 - 검색 버튼 기본색을 검정에서 포인트 그린으로 */
+    +'html:not(.pg-v1) .psearch-submit{background:'+ACCENT+'!important}'
+    +'.psearch-submit{transition:background .15s '+EASE_CURVE+'!important}'
+    /* [백로그 41 시안 v1] 큰 사진 버튼(#pphotocta)이 있으면 검색 버튼은 흰 바탕+잉크 선으로 낮춘다(채워진 요소는 사진 버튼 하나). 임베드 값은 ink 채움이라 흰 바탕을 명시해야 한다. 마크업 전에는 기존 초록 그대로 */
+    +'html.pg-v1 .psearch-submit{background:#fff!important;color:#121212!important;border:0!important;border-left:1.5px solid #121212!important}' /* 디자인 세션 결정 - 검색 버튼 기본색을 검정에서 포인트 그린으로 */
     +'.picon-btn{transition:background .15s '+EASE_CURVE+',border-radius .15s}'
     +'#pfilterreset{transition:background .15s '+EASE_CURVE+'}'
     /* [2026-10-05 대표 요청 "초기화 버튼을 크게"] 실측 73×29px·11px 글자라 탭하기 작았다 -
@@ -4913,7 +5239,7 @@ updateFilterBadge();
     +'.pc-cmpbtn{transition:transform .15s '+EASE_CURVE+',background .15s '+EASE_CURVE+'}'
     +'.pc-cmpbtn:active{transform:scale(.94)}'
     +'.pc-cmpbtn.active{background:'+ACCENT+'!important;border-color:'+ACCENT+'!important}' /* 디자인 세션 결정 - 비교중 버튼 포인트 그린 */
-    +'.fchip{transition:background .15s '+EASE_CURVE+',border-color .15s '+EASE_CURVE+',color .15s '+EASE_CURVE+'}'
+    +'.fchip{transition:background .3s '+EASE_CURVE+',border-color .3s '+EASE_CURVE+',color .3s '+EASE_CURVE+'}' /* [백로그 41 ③ 대표 요청] 활성 필터 채움 전환 .15s→.3s */
     +'.fchip.active{background:'+ACCENT+'!important;border-color:'+ACCENT+'!important}' /* 디자인 세션 결정 - 선택된 필터 칩 검정→포인트 그린 */
     +'.cchip.active .cdot{box-shadow:0 0 0 2px #FAFAFA,0 0 0 3px '+ACCENT+'!important}'
     +'.cchip.active .clabel{color:'+ACCENT+'!important}'
@@ -4927,7 +5253,8 @@ updateFilterBadge();
     +'#pcmpcount.pcmpcount-pulse{animation:pcmpcount-pulse .3s ease-out}' /* 항목 추가 시 배지 펄스 */
     +'.fchip:focus-visible,.cchip:focus-visible,#pgrid .pc:focus-visible,.psearch-submit:focus-visible,.picon-btn:focus-visible{outline:2px solid '+ACCENT+';outline-offset:2px}' /* 디자인 세션 결정 - 키보드 포커스 링 */
     +'@media (hover:hover){'
-    +'.psearch-submit:hover{background:#083D33!important}' /* 디자인 세션 결정 - 포인트 그린보다 더 짙게 */
+    +'html:not(.pg-v1) .psearch-submit:hover{background:#083D33!important}'
+    +'html.pg-v1 .psearch-submit:hover{background:#F2F2F2!important}' /* 디자인 세션 결정 - 포인트 그린보다 더 짙게 */
     +'.picon-btn:hover{background:#F2F2F2;border-radius:50%}' /* 검색어 지우기(✕)·사진으로 찾기 아이콘 버튼 - 인라인 배경 없어 !important 불필요 */
     +'#pfilterreset:hover{background:#F2F2F2!important}'
     +'[onclick^="pClearCompare"]:hover{background:rgba(255,255,255,.1)!important}'
@@ -4972,6 +5299,13 @@ window.addEventListener('popstate',pOnPopState);
    DOMContentLoaded 때 placeholder 를 다시 쓴다 - 이 스크립트(defer)는 파싱이 끝난 뒤 실행돼
    그 리스너보다 나중에 등록되므로, 같은 DOMContentLoaded 에 등록하면 항상 그 뒤에 실행돼
    우리 문구가 이긴다. 근본 정리(임베드 인라인 스크립트 삭제)는 디자인 세션 몫. */
+(function pDetectV1(){
+  /* 큰 사진 버튼 마크업이 있으면 html 에 pg-v1 을 붙여 v1 규칙(검색 버튼 등)을 켠다. defer 실행 시점엔 DOM 이 이미 파싱돼 있어 즉시 확인하고, 늦게 붙는 경우를 위해 한 번 더 확인 */
+  function apply(){document.documentElement.classList.toggle('pg-v1',!!document.getElementById('pphotocta'));}
+  apply();
+  if(document.readyState!=='complete')document.addEventListener('DOMContentLoaded',apply);
+  window.addEventListener('load',apply);
+})();
 (function setSearchPlaceholder(){
   var TEXT='식물명을 작성하세요';
   function apply(){var el=document.getElementById('psi');if(el)el.placeholder=TEXT;}
