@@ -4824,6 +4824,11 @@ updateFilterBadge();
        높이 44px(터치 최소)·글자 14px. 임베드 인라인 style 이 font-size·border 를 쥐고 있어 !important 필요.
        알약 모양(radius)은 44px 높이에 맞춰 22px. */
     +'#pfilterreset{min-height:44px!important;padding:0 20px!important;font-size:14px!important;border-radius:22px!important;border-width:1.5px!important}'
+    /* [2026-10-05 대표 요청 "검색창 ✕ 지우기 버튼도 크게"] 터치 영역은 이미 44×44였지만 글자가
+       15px·#ABABAB(흰 바탕 2.3:1)라 작고 흐렸다 - 22px·#6E6E6E(5.1:1). 임베드 인라인 style 이
+       font-size·color 를 쥐고 있어 !important. */
+    +'#pclearbtn{font-size:22px!important;color:#6E6E6E!important;min-width:48px!important}'
+    +'@media (hover:hover){#pclearbtn:hover{color:#121212!important}}'
     +'[onclick^="pClearCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pOpenCompare"]{transition:background .15s '+EASE_CURVE+'}'
     +'[onclick^="pExportCompare"]{transition:background .15s '+EASE_CURVE+'}'
@@ -4891,6 +4896,21 @@ window.addEventListener('popstate',pOnPopState);
    아무 일도 하지 않았다. 한글 조합 중(isComposing)의 Enter 는 무시한다.
    ② 기사 페이지 푸터 스크립트가 만드는 딥링크 /plant-guide?q=식물명 을 읽어 검색창에 넣고
    바로 검색한다(예전엔 검색창이 빈 채 열렸다 — 마스터 v1.5 16절 D3). */
+/* [2026-10-05 대표 요청] 검색창 예시 문구("예: 구절초, 미선나무")를 "식물명을 작성하세요"로.
+   예시 문구는 임베드 안 인라인 스크립트(모바일 375px에서 길어서 잘리던 문제로 짧게 줄인 것)가
+   DOMContentLoaded 때 placeholder 를 다시 쓴다 - 이 스크립트(defer)는 파싱이 끝난 뒤 실행돼
+   그 리스너보다 나중에 등록되므로, 같은 DOMContentLoaded 에 등록하면 항상 그 뒤에 실행돼
+   우리 문구가 이긴다. 근본 정리(임베드 인라인 스크립트 삭제)는 디자인 세션 몫. */
+(function setSearchPlaceholder(){
+  var TEXT='식물명을 작성하세요';
+  function apply(){var el=document.getElementById('psi');if(el)el.placeholder=TEXT;}
+  /* defer 스크립트는 readyState 가 'interactive' 일 때 실행된다(DOMContentLoaded 는 아직 안 뜸) -
+     'loading' 만 따로 보면 바로 apply() 해 버려 그 뒤에 뜨는 임베드 리스너에 덮인다. 'complete' 가
+     아니면 항상 DOMContentLoaded 에 등록한다. */
+  if(document.readyState==='complete')apply();
+  else document.addEventListener('DOMContentLoaded',apply);
+  window.addEventListener('load',apply); /* 안전망: 늦게 실행되는 다른 스크립트가 또 덮어써도 마지막에 한 번 더 */
+})();
 (function bindEnterAndDeepLink(){
   var el=document.getElementById('psi');
   if(!el)return;
