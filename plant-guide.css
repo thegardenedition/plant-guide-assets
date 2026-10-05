@@ -80,3 +80,28 @@
 .pg-credits a{color:#0B5345;text-decoration:underline}
 .pg-credits .pg-mod{color:#6E6E6E}
 @media (max-width:640px){.pg-credits ul{columns:1}}
+
+/* ① 사진 버튼 · ② 상태 줄 · 안내 문구 · 구분선 — 임베드 마크업(디자인 세션)이 클래스만 붙이면 되도록 여기서 모양을 잡는다(사양서 41-마크업-사양서 §2, 시안 v1).
+   html.pg-v1 과 무관(요소가 있을 때만 쓰임). 초록 채움은 첫 화면의 유일한 채움 버튼, radius 0, 높이 60px(터치 44px 이상). 움직임은 transform·opacity 만. */
+button.pg-cta{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;max-width:480px;min-height:60px;margin:0;padding:0 22px;border:0;border-radius:0;background:#0B5345;color:#fff;font:600 16px/1 Pretendard,"Noto Sans KR",system-ui,sans-serif;text-align:left;cursor:pointer;transition:transform .5s cubic-bezier(.16,1,.3,1),background .5s cubic-bezier(.16,1,.3,1);-webkit-appearance:none;appearance:none}
+button.pg-cta:hover{background:#083D33;transform:translateY(-2px)}
+button.pg-cta:active{transform:scale(.98)}
+button.pg-cta:focus-visible{outline:2px solid #0B5345;outline-offset:3px}
+button.pg-cta svg{flex:0 0 auto}
+button.pg-cta .pg-cta-arrow{margin-left:auto;width:32px;height:32px;display:grid;place-items:center;background:rgba(255,255,255,.14)}
+/* 사진 분석 중(JS 가 disabled·aria-busy="true" 를 건다): 색을 낮추고 아이콘 자리에 돌아가는 표시 */
+button.pg-cta[aria-busy="true"]{background:#3F6F64;cursor:progress;transform:none}
+button.pg-cta[aria-busy="true"]>svg:first-child{display:none}
+button.pg-cta[aria-busy="true"]:before{content:"";flex:0 0 22px;width:22px;height:22px;box-sizing:border-box;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:pg-rot .8s linear infinite}
+@keyframes pg-rot{to{transform:rotate(360deg)}}
+/* 상태 줄 — 항상 존재하고 비어 있어도 22px 를 차지해 문구가 나타나도 아래가 밀리지 않는다(CLS 0). 실패는 JS 가 role="alert" 로 바꾼다. */
+.pg-status{min-height:22px;margin:10px 0 0;max-width:480px;font-size:13px;line-height:22px;color:#0B5345}
+.pg-status[role="alert"]{color:#DC2B2B}
+.pg-retry{border:0;background:none;margin:0 0 0 8px;padding:0;font:600 13px/22px Pretendard,"Noto Sans KR",system-ui,sans-serif;color:#121212;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pg-retry:focus-visible{outline:2px solid #0B5345;outline-offset:2px}
+.pg-cta-help{max-width:480px;margin:10px 0 22px;font-size:13px;line-height:1.5;color:#6E6E6E}
+.pg-help-m{display:none}
+@media (max-width:640px){.pg-help-d{display:none}.pg-help-m{display:inline}}
+.pg-or{display:flex;align-items:center;gap:12px;max-width:480px;margin:0 0 12px;font-size:12px;letter-spacing:.06em;color:#6E6E6E}
+.pg-or:before,.pg-or:after{content:"";flex:1;height:1px;background:var(--pg-line)}
+@media (prefers-reduced-motion:reduce){button.pg-cta{transition:none}button.pg-cta:hover{transform:none}button.pg-cta[aria-busy="true"]:before{animation:none}}
