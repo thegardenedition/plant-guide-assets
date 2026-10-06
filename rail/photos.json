@@ -33,22 +33,11 @@
   "cnidium japonicum": "갯사상자",
   "farfugium japonicum": "털머위",
   "orostachys iwarenge": "연화바위솔",
-  "gentiana scabra": "용담"
+  "gentiana scabra": "용담",
+  "sanguisorba": "가는오이풀",
+  "ophiopogon jaburan": "맥문아재비"
  },
  "photos": {
-  "sanguisorba": {
-   "nm": "가는오이풀",
-   "file": "sanguisorba-v1.jpg",
-   "w": 480,
-   "h": 360,
-   "source": "Wikimedia Commons",
-   "creator": "Kurt Stüber [1]",
-   "license": "CC BY-SA 3.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sanguisorba_minor0.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Sanguisorba_minor0.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
-  },
   "potentilla anemonifolia": {
    "nm": "가락지나물",
    "file": "potentilla-anemonifolia-v1.jpg",
@@ -450,19 +439,6 @@
    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Forsythia_ovata_Oulu_03.jpg",
    "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/d/da/Forsythia_ovata_Oulu_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
-  },
-  "ophiopogon jaburan": {
-   "nm": "맥문아재비",
-   "file": "ophiopogon-jaburan-v1.jpg",
-   "w": 480,
-   "h": 360,
-   "source": "Wikimedia Commons",
-   "creator": "Kurt Stüber [1]",
-   "license": "CC BY-SA 3.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ophiopogon_jaburan2.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/86/Ophiopogon_jaburan2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
    "checkedAt": "2026-10-05"
   },
   "hypericum ascyron": {

@@ -9,3 +9,9 @@
 
 ## 제외 기록
 - 2026-10-06 **용담(Gentiana scabra) 사진 제외**: Commons 메타데이터의 작성자 칸이 `~~`(업로드 때 서명 물결표가 그대로 남은 것)라 CC BY-SA 의 작성자 표기를 할 수 없고, 원본 파일 설명(de.wikipedia 이전, 작성자 Olbertz, 라이선스 GFDL 재라이선스 표기)이 허용 정책(GFDL 제외)과 맞지 않을 수 있어 정책에 따라 제외. `exclude` 맵에 올려 줄에서도 건너뛴다.
+- 2026-10-06 **가는오이풀(Sanguisorba minor)·맥문아재비(Ophiopogon jaburan) 사진 제외**(작성자 Kurt Stüber, 원문 `{{GFDL|migration=relicense}}` 단독 — Commons 는 CC BY-SA 3.0 으로 표시하나 「GFDL 제외」 정책과 충돌할 여지가 있어 보수적으로 제외, 총괄 결정).
+
+## 라이선스 제외 기준 (명문화, 2026-10-06 총괄)
+- **Commons 원문(파일 설명 위키텍스트)이 GFDL 단독(재라이선스 `migration=relicense` 포함)이면 제외, GFDL + CC 다중 라이선스(CC 선택 가능)면 허용.** API 의 「LicenseShortName」만 보지 말고 원문 템플릿을 확인한다.
+- 작성자 칸이 `~~`·빈칸 등 비정상이면 CC 작성자 표기가 불가능하므로 제외(원 작성자를 파일 이력에서 확실히 확인할 수 있을 때만 정정해 사용).
+- 허용: CC0, CC BY, CC BY-SA, 공공누리 제1유형, Public domain, 국립수목원 표준식물목록. 제외: NC/ND/GFDL 단독/라이선스 불명.
