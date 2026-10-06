@@ -32,7 +32,8 @@
   "lespedeza cyrtobotrya": "참싸리",
   "cnidium japonicum": "갯사상자",
   "farfugium japonicum": "털머위",
-  "orostachys iwarenge": "연화바위솔"
+  "orostachys iwarenge": "연화바위솔",
+  "gentiana scabra": "용담"
  },
  "photos": {
   "sanguisorba": {
@@ -670,19 +671,6 @@
    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Asyneuma_japonicum_1.JPG",
    "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/9/94/Asyneuma_japonicum_1.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
-  },
-  "gentiana scabra": {
-   "nm": "용담",
-   "file": "gentiana-scabra-v1.jpg",
-   "w": 480,
-   "h": 360,
-   "source": "Wikimedia Commons",
-   "creator": "~~",
-   "license": "CC BY-SA 3.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gentiana_scabra2.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Gentiana_scabra2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
    "checkedAt": "2026-10-05"
   },
   "disporum uniflorum": {

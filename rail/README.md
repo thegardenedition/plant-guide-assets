@@ -6,3 +6,6 @@
 - 재생성: `python3 tools/plant-guide-rail-build.py --build --reject "<제외 종>"` (프록시 키는 로컬 `.dev.vars` 에서 메모리로만 읽는다 — 키는 어디에도 쓰지 않는다).
 - **삭제 요청이 오면**: 해당 종을 `photos.json` 의 `photos` 에서 빼고(`exclude` 에 추가) `img/` 의 파일을 지운 뒤 배포 — 한 번의 커밋으로 내릴 수 있다.
 - 검수: 대표 최종 확인 10-05(제외 30종 반영).
+
+## 제외 기록
+- 2026-10-06 **용담(Gentiana scabra) 사진 제외**: Commons 메타데이터의 작성자 칸이 `~~`(업로드 때 서명 물결표가 그대로 남은 것)라 CC BY-SA 의 작성자 표기를 할 수 없고, 원본 파일 설명(de.wikipedia 이전, 작성자 Olbertz, 라이선스 GFDL 재라이선스 표기)이 허용 정책(GFDL 제외)과 맞지 않을 수 있어 정책에 따라 제외. `exclude` 맵에 올려 줄에서도 건너뛴다.
