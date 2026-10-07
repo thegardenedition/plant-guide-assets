@@ -112,3 +112,5 @@ button.pg-cta[aria-busy="true"]:before{content:"";flex:0 0 22px;width:22px;heigh
 @media (min-width:840px) and (max-width:999px){#pfusecat:empty{min-height:186px}#pforigin:empty,#pfform:empty{min-height:70px}#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfcolor:empty{min-height:42px}}
 @media (min-width:1000px) and (max-width:1049px){#pfusecat:empty{min-height:147px}#pforigin:empty,#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfform:empty{min-height:70px}#pfcolor:empty{min-height:42px}}
 @media (min-width:1050px){#pfusecat:empty{min-height:147px}#pforigin:empty,#pfform:empty,#pftexture:empty,#pfcycle:empty,#pflight:empty,#pfstory:empty{min-height:31px}#pfcolor:empty{min-height:42px}}
+/* [10-07 저작권 1단계] 「스토리 있음」 필터(원문 이름 유래 기반) 묶음 숨김 — JS(STORY_FILTER_ON)와 같은 규칙, css 가 먼저 적용돼 패널 높이가 늦게 바뀌지 않는다(:has 미지원 브라우저는 JS 가 숨김) */
+div:has(>#pfstory){display:none}
