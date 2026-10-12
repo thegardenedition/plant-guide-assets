@@ -15,3 +15,11 @@
 - **Commons 원문(파일 설명 위키텍스트)이 GFDL 단독(재라이선스 `migration=relicense` 포함)이면 제외, GFDL + CC 다중 라이선스(CC 선택 가능)면 허용.** API 의 「LicenseShortName」만 보지 말고 원문 템플릿을 확인한다.
 - 작성자 칸이 `~~`·빈칸 등 비정상이면 CC 작성자 표기가 불가능하므로 제외(원 작성자를 파일 이력에서 확실히 확인할 수 있을 때만 정정해 사용).
 - 허용: CC0, CC BY, CC BY-SA, 공공누리 제1유형, Public domain, 국립수목원 표준식물목록. 제외: NC/ND/GFDL 단독/라이선스 불명.
+
+## 카드 사진 사전 색인 (2026-10-12, 총괄 승인)
+- `cp/00~63.json`: 학명(소문자) djb2 해시 %64 로 나눈 조각 파일. 항목 `['n',파일]` 국립수목원 작은 사진 · `['h',파일,라이선스,작가,출처(w·i·g),참조]` 자체 보관 사진(위키 공용·iNaturalist·GBIF) · `['x',위키확인,iNat확인,GBIF확인]` 허용 사진이 없다고 사전 확인(해당 소스 조회 생략, 모두 확인되면 안내 아이콘 즉시). 없는 종은 기존 외부 조회로 폴백. JS: plant-guide.js `pCpGet/pCpEntry/pLocalCardPhoto`.
+- `thumb/*.webp`: 320×240 작은 사진(**축소·크롭 변형**). `-t1`=국립수목원 표준식물목록 이미지(이용허락 제한 없음, 공공데이터포털 15116414), `-t2`=위키 공용·iNaturalist·GBIF(CC0·CC BY·CC BY-SA·Public domain·KOGL 1유형, 내려받을 때 라이선스 재확인).
+- 기록(화면은 읽지 않음): `thumbs-prov.json`(수목원 레코드·원본 주소), `cp-host-prov.json`(자체 보관 원본 주소·이미지 주소·작가·라이선스·내려받은 시각), `cp-prov.json`(조각 출처 요약), `thumbs-excluded.json`·`cp-host-excluded.json`(제외 종·사유: 품종·키워드·삽화·도판·표본·재확인 불일치).
+- 제외 기준: ND·NC·GFDL 단독·「Copyrighted free use」·품종 따옴표·교잡(×)·외형 키워드·식물 삽화/도판/표본 스캔. 대표성 낮은 손 든 사진은 같은 종의 다른 허용 사진으로 교체(`alt`).
+- iNaturalist·GBIF 유래 사진을 끄려면 임베드에서 도감 스크립트 로드 전에 `window.PG_CARD_USE_INAT_GBIF=false`.
+- 재생성: scratchpad 생성 스크립트(cp_build·cp_inat·cp_gbif·cp_host·cp_alt·cp_shards)는 근거 문서 `근거/10-17-릴리스-구성-카드사진-사전색인-2026-10-11.md` 참조. 삭제 요청이 오면 해당 종 파일을 지우고 prov 에 제외 기록 후 조각 재생성·배포.

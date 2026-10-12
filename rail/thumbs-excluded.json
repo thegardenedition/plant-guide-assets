@@ -1,0 +1,746 @@
+{
+"carex okamotoi": {
+"nm": "지리대사초",
+"recordNm": "지리대사초 '골든 에저'",
+"recordSc": "Carex okamotoi 'Golden Edger'",
+"file": "carex-okamotoi-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"athyrium niponicum": {
+"nm": "개고사리",
+"recordNm": "개고사리 '코카게 니시키'",
+"recordSc": "Athyrium niponicum 'Kokage Nishiki'",
+"file": "athyrium-niponicum-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"albizia julibrissin": {
+"nm": "자귀나무",
+"recordNm": "자귀나무 '서머 초콜릿'",
+"recordSc": "Albizia julibrissin 'Summer Chocolate'",
+"file": "albizia-julibrissin-t1.webp",
+"reason": "잎이 붉은·자주·검은빛",
+"reviewed": "2026-10-11"
+},
+"schizophragma hydrangeoides": {
+"nm": "바위수국",
+"recordNm": "바위수국 '문라이트'",
+"recordSc": "Schizophragma hydrangeoides 'Moonlight'",
+"file": "schizophragma-hydrangeoides-t1.webp",
+"reason": "잎 빛깔이 다름(은빛)",
+"reviewed": "2026-10-11"
+},
+"cornus alba": {
+"nm": "흰말채나무",
+"recordNm": "흰말채나무 '스파이티'",
+"recordSc": "Cornus alba 'Spaethii'",
+"file": "cornus-alba-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"acer palmatum": {
+"nm": "단풍나무",
+"recordNm": "단풍나무 '게이샤'",
+"recordSc": "Acer palmatum 'Geisha'",
+"file": "acer-palmatum-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"hydrangea serrata": {
+"nm": "산수국",
+"recordNm": "산수국 '미도리보시테마리'",
+"recordSc": "Hydrangea serrata 'Midoriboshi-Temari'",
+"file": "hydrangea-serrata-t1.webp",
+"reason": "꽃색이 다름(연두)",
+"reviewed": "2026-10-11"
+},
+"iris laevigata": {
+"nm": "제비붓꽃",
+"recordNm": "제비붓꽃 '바리에가타'",
+"recordSc": "Iris laevigata 'Variegata'",
+"file": "iris-laevigata-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"cercidiphyllum japonicum": {
+"nm": "계수나무",
+"recordNm": "계수나무 '로트퍽스'",
+"recordSc": "Cercidiphyllum japonicum 'Rotfuchs'",
+"file": "cercidiphyllum-japonicum-t1.webp",
+"reason": "잎이 붉은·자주·검은빛",
+"reviewed": "2026-10-11"
+},
+"liriodendron tulipifera": {
+"nm": "백합나무",
+"recordNm": "백합나무 '메디오픽툼'",
+"recordSc": "Liriodendron tulipifera 'Mediopictum'",
+"file": "liriodendron-tulipifera-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"quercus rubra": {
+"nm": "루브라참나무",
+"recordNm": "루브라참나무 '선샤인'",
+"recordSc": "Quercus rubra 'Sunshine'",
+"file": "quercus-rubra-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"hydrangea arborescens": {
+"nm": "미국수국",
+"recordNm": "미국수국 '애나벨'",
+"recordSc": "Hydrangea arborescens 'Annabelle'",
+"file": "hydrangea-arborescens-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"astrantia major": {
+"nm": "아스트란티아",
+"recordNm": "아스트란티아 마요르 '로젠신포니'",
+"recordSc": "Astrantia major 'Rosensinfonie'",
+"file": "astrantia-major-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"deutzia": {
+"nm": "말발도리",
+"recordNm": "말발도리 '로세아 플레나'",
+"recordSc": "Deutzia 'Rosea Plena'",
+"file": "deutzia-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"iris sanguinea": {
+"nm": "붓꽃",
+"recordNm": "붓꽃 '스노우 퀸'",
+"recordSc": "Iris sanguinea 'Snow Queen'",
+"file": "iris-sanguinea-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"cedrus deodara": {
+"nm": "개잎갈나무",
+"recordNm": "개잎갈나무 '골든 호라이즌'",
+"recordSc": "Cedrus deodara 'Golden Horizon'",
+"file": "cedrus-deodara-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"scutellaria alpina": {
+"nm": "고산골무꽃",
+"recordNm": "고산골무꽃 '문빔'",
+"recordSc": "Scutellaria alpina 'Moonbeam'",
+"file": "scutellaria-alpina-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"asplenium scolopendrium": {
+"nm": "골고사리",
+"recordNm": "골고사리 크리스타툼 그룹",
+"recordSc": "Asplenium scolopendrium Cristatum Group",
+"file": "asplenium-scolopendrium-t1.webp",
+"reason": "잎 끝이 갈라진 변이형",
+"reviewed": "2026-10-11"
+},
+"pinus thunbergii": {
+"nm": "곰솔",
+"recordNm": "곰솔 '사요나라'",
+"recordSc": "Pinus thunbergii 'Sayonara'",
+"file": "pinus-thunbergii-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"abies koreana": {
+"nm": "구상나무",
+"recordNm": "구상나무 '그린 카펫'",
+"recordSc": "Abies koreana 'Green Carpet'",
+"file": "abies-koreana-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"pinus sylvestris": {
+"nm": "구주소나무",
+"recordNm": "구주소나무 '베우브로엔시스'",
+"recordSc": "Pinus sylvestris 'Beuvronensis'",
+"file": "pinus-sylvestris-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"catalpa bignonioides": {
+"nm": "꽃개오동",
+"recordNm": "꽃개오동 '아우레아'",
+"recordSc": "Catalpa bignonioides 'Aurea'",
+"file": "catalpa-bignonioides-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"thujopsis dolabrata": {
+"nm": "나한백",
+"recordNm": "나한백 '나나'",
+"recordSc": "Thujopsis dolabrata 'Nana'",
+"file": "thujopsis-dolabrata-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"taxodium distichum": {
+"nm": "낙우송",
+"recordNm": "낙우송 '크레이지 호스'",
+"recordSc": "Taxodium distichum 'Crazy Horse'",
+"file": "taxodium-distichum-t1.webp",
+"reason": "처진·비틀린 가지 등 모양이 다름",
+"reviewed": "2026-10-11"
+},
+"acer negundo": {
+"nm": "네군도단풍",
+"recordNm": "네군도단풍 '바리에가툼'",
+"recordSc": "Acer negundo 'Variegatum'",
+"file": "acer-negundo-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"iris pseudacorus": {
+"nm": "노랑꽃창포",
+"recordNm": "노랑꽃창포 '바리에가타'",
+"recordSc": "Iris pseudacorus 'Variegata'",
+"file": "iris-pseudacorus-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"cornus sericea": {
+"nm": "노랑말채나무",
+"recordNm": "노랑말채나무 '실버 앤드 골드'",
+"recordSc": "Cornus sericea 'Silver And Gold'",
+"file": "cornus-sericea-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"caryopteris divaricata": {
+"nm": "누린내풀",
+"recordNm": "누린내풀 '스노우 페어리'",
+"recordSc": "Caryopteris divaricata 'Snow Fairy'",
+"file": "caryopteris-divaricata-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"ulmus davidiana": {
+"nm": "당느릅나무",
+"recordNm": "당느릅나무 '피그마이아'",
+"recordSc": "Ulmus davidiana 'Pygmaea'",
+"file": "ulmus-davidiana-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"aralia elata": {
+"nm": "두릅나무",
+"recordNm": "두릅나무 '바리에가타'",
+"recordSc": "Aralia elata 'Variegata'",
+"file": "aralia-elata-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"juniperus communis": {
+"nm": "두송",
+"recordNm": "두송 '골드 콘'",
+"recordSc": "Juniperus communis 'Gold Cone'",
+"file": "juniperus-communis-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"deutzia scabra": {
+"nm": "둥근잎말발도리",
+"recordNm": "둥근잎말발도리 '배리에가타'",
+"recordSc": "Deutzia scabra 'Variegata'",
+"file": "deutzia-scabra-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"quercus dentata": {
+"nm": "떡갈나무",
+"recordNm": "떡갈나무 '아우레아'",
+"recordSc": "Quercus dentata 'Aurea'",
+"file": "quercus-dentata-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"syringa vulgaris": {
+"nm": "라일락",
+"recordNm": "라일락 '마담 르무와느'",
+"recordSc": "Syringa vulgaris 'Madame Lemoine'",
+"file": "syringa-vulgaris-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"melissa officinalis": {
+"nm": "레몬밤",
+"recordNm": "레몬밤 '골드 리프'",
+"recordSc": "Melissa officinalis 'Gold Leaf'",
+"file": "melissa-officinalis-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"prunus mume": {
+"nm": "매실나무",
+"recordNm": "매실나무 '베니치도리'",
+"recordSc": "Prunus mume 'Beni-Chidori'",
+"file": "prunus-mume-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"metasequoia glyptostroboides": {
+"nm": "메타세쿼이아",
+"recordNm": "메타세쿼이아 '골드 러시'",
+"recordSc": "Metasequoia glyptostroboides 'Gold Rush'",
+"file": "metasequoia-glyptostroboides-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"juniperus chinensis": {
+"nm": "향나무",
+"recordNm": "향나무 '가이즈카'",
+"recordSc": "Juniperus chinensis 'Kaizuka'",
+"file": "juniperus-chinensis-t1.webp",
+"reason": "처진·비틀린 가지 등 모양이 다름",
+"reviewed": "2026-10-11"
+},
+"parthenocissus quinquefolia": {
+"nm": "미국담쟁이덩굴",
+"recordNm": "미국담쟁이덩굴 '몬함'",
+"recordSc": "Parthenocissus quinquefolia 'Monham'",
+"file": "parthenocissus-quinquefolia-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"cornus alternifolia": {
+"nm": "미국층층나무",
+"recordNm": "미국층층나무 '아르겐테아'",
+"recordSc": "Cornus alternifolia 'Argentea'",
+"file": "cornus-alternifolia-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"oenanthe javanica": {
+"nm": "미나리",
+"recordNm": "미나리 '플라밍고'",
+"recordSc": "Oenanthe javanica 'Flamingo'",
+"file": "oenanthe-javanica-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"belamcanda chinensis": {
+"nm": "범부채",
+"recordNm": "범부채 '헬로 옐로'",
+"recordSc": "Belamcanda chinensis 'Hello Yellow'",
+"file": "belamcanda-chinensis-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"lonicera tatarica": {
+"nm": "분홍괴불나무",
+"recordNm": "분홍괴불나무 '해크스 레드'",
+"recordSc": "Lonicera tatarica 'Hack's Red'",
+"file": "lonicera-tatarica-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"weigela florida": {
+"nm": "붉은병꽃나무",
+"recordNm": "붉은병꽃나무 '아우레오 마르기나타'",
+"recordSc": "Weigela florida 'Aureo Marginata'",
+"file": "weigela-florida-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"sambucus nigra": {
+"nm": "블랙엘더베리",
+"recordNm": "블랙엘더베리 '아우레오마르기나타'",
+"recordSc": "Sambucus nigra 'Aureomarginata'",
+"file": "sambucus-nigra-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"cleyera japonica": {
+"nm": "비쭈기나무",
+"recordNm": "비쭈기나무 '트라이컬러'",
+"recordSc": "Cleyera japonica 'Tricolor'",
+"file": "cleyera-japonica-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"eurya japonica": {
+"nm": "사스레피나무",
+"recordNm": "사스레피나무 '컨페티'",
+"recordSc": "Eurya japonica 'Confetti'",
+"file": "eurya-japonica-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"cryptomeria japonica": {
+"nm": "삼나무",
+"recordNm": "삼나무 '글로보사 나나'",
+"recordSc": "Cryptomeria japonica 'Globosa Nana'",
+"file": "cryptomeria-japonica-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"achillea millefolium": {
+"nm": "서양톱풀",
+"recordNm": "서양톱풀 '레드 벨벳'",
+"recordSc": "Achillea millefolium 'Red Velvet'",
+"file": "achillea-millefolium-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"acorus gramineus": {
+"nm": "석창포",
+"recordNm": "석창포 '마사무네'",
+"recordSc": "Acorus gramineus 'Masamune'",
+"file": "acorus-gramineus-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"acer saccharum": {
+"nm": "설탕단풍",
+"recordNm": "설탕단풍 '템플즈 업라이트'",
+"recordSc": "Acer saccharum 'Temple's Upright'",
+"file": "acer-saccharum-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"pinus parviflora": {
+"nm": "섬잣나무",
+"recordNm": "섬잣나무 '글라우카 나나'",
+"recordSc": "Pinus parviflora 'Glauca Nana'",
+"file": "pinus-parviflora-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"pinus densiflora": {
+"nm": "소나무",
+"recordNm": "소나무 '오큘러스드라코니스'",
+"recordSc": "Pinus densiflora 'Oculus-Draconis'",
+"file": "pinus-densiflora-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"salix babylonica": {
+"nm": "수양버들",
+"recordNm": "수양버들 '크리스파'",
+"recordSc": "Salix babylonica 'Crispa'",
+"file": "salix-babylonica-t1.webp",
+"reason": "처진·비틀린 가지 등 모양이 다름",
+"reviewed": "2026-10-11"
+},
+"pinus strobus": {
+"nm": "스트로브잣나무",
+"recordNm": "스트로브잣나무 '위치스 브룸'",
+"recordSc": "Pinus strobus 'Witches' Broom'",
+"file": "pinus-strobus-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"yucca filamentosa": {
+"nm": "실유카",
+"recordNm": "실유카 '바리에가타'",
+"recordSc": "Yucca filamentosa 'Variegata'",
+"file": "yucca-filamentosa-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"hedera helix": {
+"nm": "아이비",
+"recordNm": "아이비 '골드크래프트'",
+"recordSc": "Hedera helix 'Goldcraft'",
+"file": "hedera-helix-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"cotinus coggygria": {
+"nm": "안개나무",
+"recordNm": "안개나무 '로열 퍼플'",
+"recordSc": "Cotinus coggygria 'Royal Purple'",
+"file": "cotinus-coggygria-t1.webp",
+"reason": "잎이 붉은·자주·검은빛",
+"reviewed": "2026-10-11"
+},
+"carex conica": {
+"nm": "애기사초",
+"recordNm": "애기사초 '스노우라인'",
+"recordSc": "Carex conica 'Snowline'",
+"file": "carex-conica-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"physocarpus opulifolius": {
+"nm": "양국수나무",
+"recordNm": "양국수나무 '디아볼로'",
+"recordSc": "Physocarpus opulifolius 'Diabolo'",
+"file": "physocarpus-opulifolius-t1.webp",
+"reason": "잎이 붉은·자주·검은빛",
+"reviewed": "2026-10-11"
+},
+"juniperus virginiana": {
+"nm": "연필향나무",
+"recordNm": "연필향나무 '스파클'",
+"recordSc": "Juniperus virginiana 'Sparkle'",
+"file": "juniperus-virginiana-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"rhododendron indicum": {
+"nm": "영산홍",
+"recordNm": "영산홍 '발사미니플로룸'",
+"recordSc": "Rhododendron indicum 'Balsaminiflorum'",
+"file": "rhododendron-indicum-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"dactylis glomerata": {
+"nm": "오리새",
+"recordNm": "오리새 '바리에가타'",
+"recordSc": "Dactylis glomerata 'Variegata'",
+"file": "dactylis-glomerata-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"astilbe simplicifolia": {
+"nm": "외잎승마",
+"recordNm": "외잎승마 '다윈스 스노우 스프라이트'",
+"recordSc": "Astilbe simplicifolia 'Darwin's Snow Sprite'",
+"file": "astilbe-simplicifolia-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"agave americana": {
+"nm": "용설란",
+"recordNm": "용설란 '메디오픽타'",
+"recordSc": "Agave americana 'Mediopicta'",
+"file": "agave-americana-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"hemerocallis fulva": {
+"nm": "원추리",
+"recordNm": "원추리 '배리케이티드 관소'",
+"recordSc": "Hemerocallis fulva 'Variegated Kwanso'",
+"file": "hemerocallis-fulva-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"laurus nobilis": {
+"nm": "월계수",
+"recordNm": "월계수 '아우레아'",
+"recordSc": "Laurus nobilis 'Aurea'",
+"file": "laurus-nobilis-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"barbarea vulgaris": {
+"nm": "유럽나도냉이",
+"recordNm": "유럽나도냉이 '바리에가타'",
+"recordSc": "Barbarea vulgaris 'Variegata'",
+"file": "barbarea-vulgaris-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"ginkgo biloba": {
+"nm": "은행나무",
+"recordNm": "은행나무 '골드스트라이프'",
+"recordSc": "Ginkgo biloba 'Goldstripe'",
+"file": "ginkgo-biloba-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"lonicera japonica": {
+"nm": "인동",
+"recordNm": "인동 '아우레오레티쿨라타'",
+"recordSc": "Lonicera japonica 'Aureoreticulata'",
+"file": "lonicera-japonica-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"berberis thunbergii": {
+"nm": "일본매자나무",
+"recordNm": "일본매자나무 '골든 로켓'",
+"recordSc": "Berberis thunbergii 'Golden Rocket'",
+"file": "berberis-thunbergii-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"spiraea japonica": {
+"nm": "일본조팝나무",
+"recordNm": "일본조팝나무 '겐페이'",
+"recordSc": "Spiraea japonica 'Genpei'",
+"file": "spiraea-japonica-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"ligustrum lucidum": {
+"nm": "제주광나무",
+"recordNm": "제주광나무 '엑셀숨 수페르붐'",
+"recordSc": "Ligustrum lucidum 'Excelsum Superbum'",
+"file": "ligustrum-lucidum-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"distylium racemosum": {
+"nm": "조록나무",
+"recordNm": "조록나무 '거피'",
+"recordSc": "Distylium racemosum 'Guppy'",
+"file": "distylium-racemosum-t1.webp",
+"reason": "왜성·둥근 수형 등 크기·모양이 다름",
+"reviewed": "2026-10-11"
+},
+"bromus inermis": {
+"nm": "좀참새귀리",
+"recordNm": "좀참새귀리 '스키너스 골드'",
+"recordSc": "Bromus inermis 'Skinner's Gold'",
+"file": "bromus-inermis-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"acer buergerianum": {
+"nm": "중국단풍",
+"recordNm": "중국단풍 '고시키카에데'",
+"recordSc": "Acer buergerianum 'Goshiki-Kaede'",
+"file": "acer-buergerianum-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"miscanthus sinensis": {
+"nm": "참억새",
+"recordNm": "참억새 '골드 바'",
+"recordSc": "Miscanthus sinensis 'Gold Bar'",
+"file": "miscanthus-sinensis-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"gelsemium sempervirens": {
+"nm": "캐롤라이나자스민",
+"recordNm": "캐롤라이나자스민 '플로레 플레노'",
+"recordSc": "Gelsemium sempervirens 'Flore Pleno'",
+"file": "gelsemium-sempervirens-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"poncirus trifoliata": {
+"nm": "탱자나무",
+"recordNm": "탱자나무 '플라잉 드래곤'",
+"recordSc": "Poncirus trifoliata 'Flying Dragon'",
+"file": "poncirus-trifoliata-t1.webp",
+"reason": "처진·비틀린 가지 등 모양이 다름",
+"reviewed": "2026-10-11"
+},
+"acer pictum": {
+"nm": "털고로쇠나무",
+"recordNm": "털고로쇠나무 '나구리니시키'",
+"recordSc": "Acer pictum 'Naguri-Nishiki'",
+"file": "acer-pictum-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"carex ciliatomarginata": {
+"nm": "털대사초",
+"recordNm": "털대사초 '트레저 아일랜드'",
+"recordSc": "Carex ciliatomarginata 'Treasure Island'",
+"file": "carex-ciliatomarginata-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)",
+"reviewed": "2026-10-11"
+},
+"colocasia esculenta": {
+"nm": "토란",
+"recordNm": "토란 '블랙 매직'",
+"recordSc": "Colocasia esculenta 'Black Magic'",
+"file": "colocasia-esculenta-t1.webp",
+"reason": "잎이 붉은·자주·검은빛",
+"reviewed": "2026-10-11"
+},
+"celtis sinensis": {
+"nm": "팽나무",
+"recordNm": "팽나무 '그린 캐스케이드'",
+"recordSc": "Celtis sinensis 'Green Cascade'",
+"file": "celtis-sinensis-t1.webp",
+"reason": "처진·비틀린 가지 등 모양이 다름",
+"reviewed": "2026-10-11"
+},
+"chamaecyparis obtusa": {
+"nm": "편백",
+"recordNm": "편백 '골드 레이스'",
+"recordSc": "Chamaecyparis obtusa 'Gold Lace'",
+"file": "chamaecyparis-obtusa-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"euphorbia pulcherrima": {
+"nm": "포인세티아",
+"recordNm": "포인세티아 '아네테 헤그 화이트'",
+"recordSc": "Euphorbia pulcherrima 'Annette Hegg White'",
+"file": "euphorbia-pulcherrima-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"cleome hassleriana": {
+"nm": "풍접초",
+"recordNm": "풍접초 '헬렌 캠벨'",
+"recordSc": "Cleome hassleriana 'Helen Campbell'",
+"file": "cleome-hassleriana-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"fritillaria imperialis": {
+"nm": "프리틸라리아",
+"recordNm": "프리틸라리아 임페리알리스 '루브라'",
+"recordSc": "Fritillaria imperialis 'Rubra'",
+"file": "fritillaria-imperialis-t1.webp",
+"reason": "꽃색·꽃 모양이 대표 종과 다름",
+"reviewed": "2026-10-11"
+},
+"chamaecyparis pisifera": {
+"nm": "화백",
+"recordNm": "화백 '골든 몹'",
+"recordSc": "Chamaecyparis pisifera 'Golden Mop'",
+"file": "chamaecyparis-pisifera-t1.webp",
+"reason": "잎이 금빛·노란빛",
+"reviewed": "2026-10-11"
+},
+"spiraea thunbergii": {
+"nm": "가는잎조팝나무",
+"recordNm": "가는잎조팝나무 '마운트 후지'",
+"recordSc": "Spiraea thunbergii 'Mount Fuji'",
+"file": "spiraea-thunbergii-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)(눈으로 확인)",
+"reviewed": "2026-10-11"
+},
+"juniperus sabina": {
+"nm": "사비나향나무",
+"recordNm": "사비나향나무 '브로드무어'",
+"recordSc": "Juniperus sabina 'Broadmoor'",
+"file": "juniperus-sabina-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)(눈으로 확인)",
+"reviewed": "2026-10-11"
+},
+"daphne odora": {
+"nm": "서향",
+"recordNm": "서향 '게이샤 걸'",
+"recordSc": "Daphne odora 'Geisha Girl'",
+"file": "daphne-odora-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)(눈으로 확인)",
+"reviewed": "2026-10-11"
+},
+"campanula takesimana": {
+"nm": "섬초롱꽃",
+"recordNm": "섬초롱꽃 '노블 뷰티'",
+"recordSc": "Campanula takesimana 'Noble Beauty'",
+"file": "campanula-takesimana-t1.webp",
+"reason": "잎 무늬(얼룩·테두리)(눈으로 확인)",
+"reviewed": "2026-10-11"
+},
+"acer maximowiczianum": {
+"nm": "일본복자기",
+"recordNm": "일본복장나무",
+"recordSc": "Acer maximowiczianum Miq.",
+"file": "acer-maximowiczianum-t1.webp",
+"reason": "수피 사진만 있어 카드 대표성이 낮음(눈으로 확인)",
+"reviewed": "2026-10-11"
+}
+}
