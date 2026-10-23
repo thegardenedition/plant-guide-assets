@@ -18,7 +18,7 @@
 /* ②③ 검색 전 둘러보기(#pexplore) — 이달에 피는 꽃 줄 · 바로가기 · 초성 색인. 새 요소는 radius 0, 글자 12px 이상. 칩·초성은 라이브 .fchip 컴포넌트를 그대로 재사용(토큰 예외). */
 .pg-explore,#pexplore{margin:0;text-align:left} /* 임베드 #pinit 에 인라인 text-align:center 가 있어(옛 한 줄 안내문용) 제목·출처 목록이 가운데로 나오던 것을 시안 v1 대로 왼쪽 정렬로 */
 .pg-rail-sec{margin:0 0 28px}
-.pg-eh h2{font-size:18px;font-weight:700;margin:0 0 12px;color:#121212}
+.pg-eh h2{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 14px;color:#121212}
 .pg-mo{display:inline-block;font-size:12px;font-weight:600;color:#0B5345;border:1px solid #0B5345;padding:1px 7px;margin-left:8px;vertical-align:2px}
 .pg-railwrap{position:relative}
 .pg-railwrap:after{content:"";position:absolute;right:0;top:0;bottom:0;width:48px;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);pointer-events:none}
@@ -33,19 +33,53 @@
 .pg-railbtn{display:none;position:absolute;right:6px;top:38%;z-index:2;width:36px;height:36px;border:1px solid #E6E6E6;background:#fff;font-size:22px;line-height:1;cursor:pointer;color:#121212;transition:transform .5s cubic-bezier(.16,1,.3,1)}
 .pg-railbtn:focus-visible{outline:2px solid #0B5345;outline-offset:2px}
 @media (hover:hover){.pg-bc:hover{transform:translateY(-3px);border-color:#0B5345}.pg-railbtn{display:block}.pg-railbtn:hover{transform:translateX(2px)}}
-.pg-short{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 24px}
-.pg-sc{border:1px solid #E6E6E6;padding:14px 14px 16px;background:#fff}
-.pg-sc h3{font-size:13px;font-weight:600;margin:0 0 10px;color:#121212}
-.pg-sws{display:flex;flex-wrap:wrap;gap:8px;max-width:150px}
-.pg-sw{width:22px;height:22px;padding:0;border:1px solid rgba(18,18,18,.15);cursor:pointer;transition:transform .5s cubic-bezier(.16,1,.3,1)}
-.pg-sw:focus-visible{outline:2px solid #0B5345;outline-offset:2px}
-@media (hover:hover){.pg-sw:hover{transform:scale(1.15)}}
-.pg-chipgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-.pg-chip{width:100%;text-align:center;white-space:nowrap;font-size:12px;font-family:inherit;cursor:pointer}
-.pg-idx{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.pg-idx-l{font-size:12px;color:#6E6E6E;margin-right:6px}
-.pg-idxchip{font-family:inherit;cursor:pointer}
-@media (max-width:640px){.pg-short{grid-template-columns:1fr}.pg-bci{flex-basis:150px}}
+/* [대표 10-19 「디자인 구리다」] 둘러보기 하단 — 상자 3개 대신 위 굵은 선 + 세로 구분선 한 줄 띠, 꽃 색은 이름 붙은 색 점, 햇빛은 아이콘, 칩·초성은 각진(radius 0) 한 가족 */
+.pg-short{display:grid;grid-template-columns:1.2fr 1fr 1.3fr;margin:6px 0 26px;border-top:2px solid #191919}
+.pg-sc{padding:22px 28px 6px 0;background:none;border:0}
+.pg-sc+.pg-sc{padding-left:28px;border-left:1px solid #E4E4DF}
+.pg-sc h3{font-size:13px;font-weight:700;letter-spacing:.02em;margin:0 0 16px;color:#0B5345}
+.pg-sws{display:grid;grid-template-columns:repeat(7,1fr);gap:16px 4px;max-width:360px}
+.pg-sw{display:flex;flex-direction:column;align-items:center;gap:7px;width:auto;height:auto;padding:0;border:0;background:none;cursor:pointer;font-family:inherit;color:#191919}
+.pg-sw-c{display:block;width:34px;height:34px;border-radius:50%;border:1px solid rgba(18,18,18,.16);transition:transform .5s cubic-bezier(.16,1,.3,1),box-shadow .5s cubic-bezier(.16,1,.3,1)}
+.pg-sw-t{font-size:12px;line-height:1.2;color:#3A3A38}
+.pg-sw:focus-visible{outline:2px solid #0B5345;outline-offset:5px}
+.pg-sw[title="흰색"] .pg-sw-c{border-color:#BDBDB5}
+.pg-sw.active .pg-sw-c{box-shadow:0 0 0 2px #FAFAF8,0 0 0 4px #0B5345}
+.pg-sw.active .pg-sw-t{color:#0B5345;font-weight:700}
+@media (hover:hover){.pg-sw:hover .pg-sw-c{transform:translateY(-2px);box-shadow:0 4px 10px rgba(18,18,18,.16)}.pg-sw:hover .pg-sw-t{color:#0B5345}}
+.pg-chipgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.pg-lightgrid{grid-template-columns:1fr}
+#pexplore .pg-chip,#pexplore .pg-idxchip{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 14px;border:1px solid #D6D6CF;border-radius:0;background:#fff;color:#191919;font-family:inherit;font-size:13px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;transition:border-color .3s cubic-bezier(.16,1,.3,1),color .3s cubic-bezier(.16,1,.3,1),background-color .3s cubic-bezier(.16,1,.3,1)}
+#pexplore .pg-lightgrid .pg-chip{justify-content:flex-start}
+.pg-ic{width:20px;height:20px;flex:none;color:#0B5345}
+@media (hover:hover){#pexplore .pg-chip:hover,#pexplore .pg-idxchip:hover{border-color:#0B5345;color:#0B5345}}
+#pexplore .pg-chip:focus-visible,#pexplore .pg-idxchip:focus-visible{outline:2px solid #0B5345;outline-offset:2px}
+#pexplore .pg-idxchip.active,#pexplore .pg-chip.active{background:#0B5345;border-color:#0B5345;color:#fff}
+#pexplore .pg-chip.active .pg-ic{color:#fff}
+.pg-idx{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:18px 0 4px;border-top:1px solid #E4E4DF}
+.pg-idx-l{font-size:13px;font-weight:700;color:#0B5345;margin-right:12px}
+#pexplore .pg-idxchip{min-width:40px;height:38px;padding:0 10px}
+#pexplore .pg-short,#pexplore .pg-idx,#pexplore .pg-credits,#pexplore .pg-eh{word-break:keep-all}
+/* 이달의 꽃 줄 사진 위 출처: 진한 띠 대신 아래쪽만 옅게 어두워지는 그라데이션(글자는 그대로, 라이선스 표기 유지) */
+.pg-bc-img .pc-credit{padding:22px 10px 7px;font-size:11px;background:linear-gradient(180deg,rgba(18,18,18,0) 0%,rgba(18,18,18,.78) 38%,rgba(18,18,18,.9) 100%);text-shadow:0 1px 2px rgba(18,18,18,.6)}
+@media (min-width:641px) and (max-width:900px){.pg-sc{padding-right:18px}.pg-sc+.pg-sc{padding-left:18px}.pg-sws{grid-template-columns:repeat(4,1fr);max-width:220px}.pg-sw-c{width:30px;height:30px}#pexplore .pg-chip{padding:0 8px;font-size:12px}#pexplore .pg-lightgrid .pg-chip{gap:6px}}
+@media (max-width:640px){
+  .pg-bci{flex-basis:150px}
+  .pg-short{grid-template-columns:1fr}
+  .pg-sc,.pg-sc+.pg-sc{padding:20px 0 6px;border-left:0}
+  .pg-sc+.pg-sc{border-top:1px solid #E4E4DF;margin-top:8px}
+  .pg-sc-type{margin-top:8px}
+  .pg-sws{max-width:none;grid-template-columns:repeat(7,1fr);gap:14px 2px}
+  .pg-sw-c{width:32px;height:32px}
+  .pg-lightgrid{grid-template-columns:repeat(3,1fr)}
+  #pexplore .pg-lightgrid .pg-chip{justify-content:center;padding:0 6px;gap:6px}
+  .pg-idx{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:10px;margin-right:-16px;padding-right:16px}
+  .pg-idx::-webkit-scrollbar{display:none}
+  .pg-idx{-webkit-mask-image:linear-gradient(90deg,#000 90%,transparent);mask-image:linear-gradient(90deg,#000 90%,transparent)}
+  .pg-idx-l{flex:none}
+  #pexplore .pg-idxchip{flex:none}
+  #pexplore .pg-chip,#pexplore .pg-idxchip{height:44px}
+}
 @media (prefers-reduced-motion:reduce){.pg-bc,.pg-railbtn,.pg-sw{transition:none!important}}
 
 /* ④ 데스크톱 결과 카드 보강 — v1 마크업이 있을 때만(html.pg-v1): 사진 4:3·이름 16px·학명 12px·정원 정보 한 줄. 390 이하 2열 카드는 기존 그대로(요약 숨김). */
@@ -71,8 +105,11 @@
 @media (max-width:640px){.pg-rail-sec.pg-loading{min-height:252px}.pg-rail-sec.pg-loading .pg-bci{flex-basis:150px}}
 
 /* 사진 출처·라이선스 목록(펼침) — 카드에는 짧은 출처만 있으므로 작성자·라이선스(링크)·원본 링크·변경 표시(크기 조정·잘라냄)를 모아 둔다(CC BY·BY-SA 표기 의무) */
-.pg-credits{margin:10px 0 0;font-size:12px;line-height:1.6;color:#6E6E6E}
-.pg-credits summary{cursor:pointer;display:inline-block;padding:4px 0;color:#121212;font-weight:600}
+.pg-credits{margin:10px 0 26px;font-size:12px;line-height:1.6;color:#6E6E6E}
+.pg-credits summary{cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:3px 0;color:#6E6E6E;font-weight:500;list-style:none;border-bottom:1px solid #C9C9C2}
+.pg-credits summary::-webkit-details-marker{display:none}
+.pg-credits summary::after{content:"+";font-size:14px;line-height:1;color:#0B5345}
+.pg-credits[open] summary::after{content:"2"}
 .pg-credits summary:focus-visible{outline:2px solid #0B5345;outline-offset:2px}
 .pg-credits ul{list-style:none;margin:6px 0 0;padding:0;columns:2;column-gap:28px}
 .pg-credits li{break-inside:avoid;margin:0 0 5px}
