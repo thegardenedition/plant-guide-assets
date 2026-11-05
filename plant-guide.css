@@ -60,8 +60,7 @@
 .pg-idx-l{font-size:13px;font-weight:700;color:#0B5345;margin-right:12px}
 #pexplore .pg-idxchip{min-width:40px;height:38px;padding:0 10px}
 #pexplore .pg-short,#pexplore .pg-idx,#pexplore .pg-credits,#pexplore .pg-eh{word-break:keep-all}
-/* 이달의 꽃 줄 사진 위 출처: 진한 띠 대신 아래쪽만 옅게 어두워지는 그라데이션(글자는 그대로, 라이선스 표기 유지) */
-.pg-bc-img .pc-credit{padding:22px 10px 7px;font-size:11px;background:linear-gradient(180deg,rgba(18,18,18,0) 0%,rgba(18,18,18,.78) 38%,rgba(18,18,18,.9) 100%);text-shadow:0 1px 2px rgba(18,18,18,.6)}
+/* 이달의 꽃 줄 사진 위 출처 줄은 없앴다(대표 11-04) — 출처·라이선스는 줄 아래 .pg-credits 목록 한 곳에만 */
 @media (min-width:641px) and (max-width:900px){.pg-sc{padding-right:18px}.pg-sc+.pg-sc{padding-left:18px}.pg-sws{grid-template-columns:repeat(4,1fr);max-width:220px}.pg-sw-c{width:30px;height:30px}#pexplore .pg-chip{padding:0 8px;font-size:12px}#pexplore .pg-lightgrid .pg-chip{gap:6px}}
 @media (max-width:640px){
   .pg-bci{flex-basis:150px}
