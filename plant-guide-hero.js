@@ -1,7 +1,7 @@
 /* plant-guide-hero.js — 식물도감 히어로 키네틱 띠 (백로그 44, 시안 v6 대표 확정 10-05).
    plant-guide.js 가 페이지에 #pherovid(그릇, 디자인 세션 마크업)가 있을 때만 이 파일을 load 뒤 유휴에 동적으로 불러온다 — 그릇이 없는 페이지(기사 포함)는 요청 0.
    · 데스크톱(≥1024px)·움직임 줄이기 아님: 15초(96BPM 6마디) 루프 재생, 「소리 켜기」(기본 무음·클릭할 때만 AudioContext 생성·저장 안 함)·「일시정지」(aria-pressed).
-   · 1024px 미만 또는 움직임 줄이기: 정지 컷 한 장(애니메이션·소리·사진 없음). 창 폭이 바뀌면 즉시 전환하고 소리는 끈다.
+   · 1024px 미만(모바일·태블릿): 같은 15초 장면을 세로형 무대(높이 280px 고정, 소리 없음·일시정지만, 작은 사진 hero/img/m/)로 재생한다. 움직임 줄이기·데이터 절약·2G·저사양은 정지 컷 한 장(애니메이션·소리 없음). 창 폭이 바뀌면 즉시 전환하고 소리는 끈다.
    · 띠가 화면 밖이거나 탭이 숨겨지면 자동 일시정지(소리 포함), 돌아오면 이어서 재생(사용자가 직접 멈춘 경우는 그대로 멈춤).
    · 사진 5장은 hero/img/*.webp (대표 직접 촬영), 글꼴은 Pretendard Variable 서브셋 CSS 를 재생 시작 때만 불러온다(실패하면 사이트 기본 Pretendard 로 계속).
    · 등장(대표 10-07): 띠는 히어로 뒤에 있어 스크롤로 보이게 될 때 서서히 나타나며(투명도 0→1 + 10px 아래→위, 0.6초, 한 번만) 그때 재생이 시작된다(화면 밖에서는 재생·소리 없음). 움직임 줄이기·IntersectionObserver 없음이면 기다리지 않고 바로 보인다.
@@ -60,6 +60,7 @@ function kick(t){var ph=(t%(2*B))/(2*B);return Math.exp(-ph*6);}
 '#pherovid .pgh-ctl:hover{transform:translateY(-1px)}#pherovid .pgh-ctl:active{transform:scale(.97)}#pherovid .pgh-ctl:focus-visible{outline:2px solid var(--pgh-green);outline-offset:2px}'+
 '#pherovid .pgh-ctl[hidden]{display:none}'+
 '#pherovid[data-pgw="narrow"] .pgh-ctl{height:40px;min-width:40px}'+
+'@media (pointer:coarse){#pherovid[data-pgw="wide"] .pgh-ctl{height:40px;min-width:40px}#pherovid[data-pgw="wide"] .pgh-sound{right:58px}}'+
 '#pherovid[data-pgh-nophoto] .pgh-win{background:var(--pgh-green)}'+
 '#pherovid .pgh-pause{right:12px}#pherovid .pgh-sound{right:50px}'+
 '@media (prefers-reduced-motion:reduce){#pherovid .pgh-ctl{transition:none}}';
@@ -87,7 +88,7 @@ var scan=el('div','pgh-scan',win);
 var LAY=[];for(var p=0;p<PHOTOS;p++){var lay=el('div','pgh-lay',layers);var sl=[];
   for(var i=0;i<6;i++){var s=el('div','pgh-sl',lay);s.style.left=(i*100)+'px';var bb=el('b','',s);bb.style.left=(-i*100)+'px';sl.push({s:s,b:bb});}
   LAY.push({el:lay,sl:sl});}
-var bSound=el('button','pgh-ctl pgh-sound',host,'소리 켜기');bSound.type='button';bSound.setAttribute('aria-pressed','false');
+var bSound=el('button','pgh-ctl pgh-sound',host,'소리 켜기');bSound.type='button';
 var bPause=el('button','pgh-ctl pgh-pause',host,'❚❚');bPause.type='button';bPause.setAttribute('aria-pressed','false');bPause.setAttribute('aria-label','애니메이션 일시정지');
 bSound.hidden=true;bPause.hidden=true;
 if(!host.getAttribute('role')){host.setAttribute('role','img');host.setAttribute('aria-label','식물도감. 이름으로 찾고, 사진으로 찾고. 꽃 색상·햇빛·식물 유형으로 고르고. 이름을 알면 정원이 보인다. 오른쪽에 매거진 그린이 찍은 그라스, 사초, 살비아, 꿀벌이 앉은 꽃, 정원 전경 사진이 차례로.');}
@@ -111,7 +112,7 @@ function layout(){
     var lh=Math.round(FS*1.18);Y1=40;Y2=Y1+lh+4;DOTR=5;
     chipsTop=Y1+Math.round((lh-38)/2);railTop=Y2+lh+10;winTop=railTop+8;WINH=MH-winTop;winW=w;slW=w/6;DRIFT=WINH/200;
     stage.style.width=w+'px';stage.style.height=MH+'px';
-    eye.style.left=gx+'px';eye.style.top='14px';eye.style.width=(w-2*gx)+'px';eye.style.fontSize='11px';eye.style.letterSpacing='.14em';
+    eye.style.left=gx+'px';eye.style.top='14px';eye.style.width=(w-2*gx)+'px';eye.style.fontSize='12px';eye.style.letterSpacing='.14em';
     rail.style.left=gx+'px';rail.style.width=(w-2*gx)+'px';rail.style.top=railTop+'px';
     win.style.left='0px';
   }
@@ -224,12 +225,12 @@ var lowEnd=false; /* 저사양 안전장치가 한 번 켜지면 새로고침 �
 function canPlay(){return !reduced()&&!saveData()&&!lowEnd;} /* 모바일도 재생(소리만 데스크톱) */
 function now(){return soundOn&&ctx?((ctx.currentTime-origin)%LOOP+LOOP)%LOOP:((performance.now()/1000-pOrigin)%LOOP+LOOP)%LOOP;}
 function tick(){if(!ctx)return;while(nextTime<ctx.currentTime+.12){schedStep(ctx,out,nextStep%STEPS,nextTime);nextStep++;nextTime=origin+nextStep*STEP;}}
-function setSoundUi(on){bSound.setAttribute('aria-pressed',on?'true':'false');bSound.textContent=on?'소리 끄기':'소리 켜기';}
+function setSoundUi(on){bSound.textContent=on?'소리 끄기':'소리 켜기';}
 function soundOff(){if(!soundOn)return;var tv=now();soundOn=false;clearInterval(timer);timer=null;if(ctx){try{var cr=ctx.close();if(cr&&cr['catch'])cr['catch'](function(){});}catch(e){}ctx=null;out=null;}pOrigin=performance.now()/1000-tv;setSoundUi(false);}
 function ctxDo(m){if(ctx&&ctx.state!=='closed'){try{var r=ctx[m]();if(r&&r['catch'])r['catch'](function(){});}catch(e){}}}
 function pauseNow(){if(paused)return;tFrozen=now();paused=true;ctxDo('suspend');}
 function resumeNow(){if(!paused)return;paused=false;if(ctx&&ctx.state!=='closed')ctxDo('resume');else pOrigin=performance.now()/1000-tFrozen;}
-function setPauseUi(on){bPause.textContent=on?'▶':'❚❚';bPause.setAttribute('aria-pressed',on?'true':'false');bPause.setAttribute('aria-label',on?'애니메이션 재생':'애니메이션 일시정지');}
+function setPauseUi(on){bPause.textContent=on?'▶':'❚❚';bPause.setAttribute('aria-pressed',on?'true':'false');}
 bSound.addEventListener('click',function(){
   if(soundOn){soundOff();return;}
   var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
@@ -258,7 +259,10 @@ setInterval(watch,500);
 function fit(){
   var w=host.clientWidth;
   layout();
-  stage.style.transform=window.innerWidth>=1024?'scale('+(w/1440)+')':'none';
+  var wide=window.innerWidth>=1024,sc=w/1440;
+  stage.style.transform=wide?'scale('+sc+')':'none';
+  /* 라벨(MAGAZINE GREEN·번호)은 무대를 줄여도 화면에서 12px 아래로 내려가지 않게 역배율(디자인 세션 11-06). 모바일은 무대를 줄이지 않으므로 12px 그대로 */
+  if(wide)eye.style.fontSize=(sc<1?12/sc:12).toFixed(2)+'px';
 }
 function applyMode(){
   fit();var ok=canPlay();
