@@ -35,7 +35,8 @@
   "orostachys iwarenge": "연화바위솔",
   "gentiana scabra": "용담",
   "sanguisorba": "가는오이풀",
-  "ophiopogon jaburan": "맥문아재비"
+  "ophiopogon jaburan": "맥문아재비",
+  "lycoris": "제주상사화"
  },
  "photos": {
   "potentilla anemonifolia": {
@@ -53,16 +54,16 @@
   },
   "exochorda serratifolia": {
    "nm": "가침박달",
-   "file": "exochorda-serratifolia-v1.jpg",
+   "file": "exochorda-serratifolia-v2.jpg",
    "w": 480,
    "h": 360,
    "source": "Wikimedia Commons",
-   "creator": "Chrumps",
+   "creator": "Tamaravn1973",
    "license": "CC BY-SA 4.0",
    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Exochorda_racemosa.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Exochorda_racemosa.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
+   "sourceUrl": "https://commons.wikimedia.org/wiki/File:%D0%A1%D1%82%D1%80%D1%83%D0%BD%D0%BD%D0%BE%D0%BF%D0%BB%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA_%D0%BF%D0%B8%D0%BB%D1%8C%D1%87%D0%B0%D1%82%D0%BE%D0%BB%D0%B8%D1%81%D1%82%D0%BD%D1%8B%D0%B9_(%D1%8D%D0%BA%D0%B7%D0%BE%D1%85%D0%BE%D1%80%D0%B4%D0%B0_%D0%BF%D0%B8%D0%BB%D1%8C%D1%87%D0%B0%D1%82%D0%BE%D0%BB%D0%B8%D1%81%D1%82%D0%BD%D0%B0%D1%8F)_(3).jpg",
+   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5c/%D0%A1%D1%82%D1%80%D1%83%D0%BD%D0%BD%D0%BE%D0%BF%D0%BB%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA_%D0%BF%D0%B8%D0%BB%D1%8C%D1%87%D0%B0%D1%82%D0%BE%D0%BB%D0%B8%D1%81%D1%82%D0%BD%D1%8B%D0%B9_%28%D1%8D%D0%BA%D0%B7%D0%BE%D1%85%D0%BE%D1%80%D0%B4%D0%B0_%D0%BF%D0%B8%D0%BB%D1%8C%D1%87%D0%B0%D1%82%D0%BE%D0%BB%D0%B8%D1%81%D1%82%D0%BD%D0%B0%D1%8F%29_%283%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "checkedAt": "2026-11-10"
   },
   "iris rossii": {
    "nm": "각시붓꽃",
@@ -287,16 +288,16 @@
   },
   "hepatica asiatica": {
    "nm": "노루귀",
-   "file": "hepatica-asiatica-v1.jpg",
+   "file": "hepatica-asiatica-v2.jpg",
    "w": 480,
    "h": 360,
-   "source": "국립수목원",
-   "creator": "국립수목원",
-   "license": "국립수목원 표준식물목록(이용허락 제한 없음)",
-   "licenseUrl": "https://www.data.go.kr/data/15116414/fileData.do",
-   "sourceUrl": "https://www.data.go.kr/data/15116414/fileData.do",
-   "originalUrl": "https://www.nature.go.kr/fileUpload/stplt/scnm/image/common/Hepatica_nobilis_1K.JPG",
-   "checkedAt": "2026-10-05"
+   "source": "Wikimedia Commons",
+   "creator": "Alpsdake",
+   "license": "Public domain",
+   "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hepatica_asiatica,_Ryozensan_2009-3-16.jpg",
+   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/87/Hepatica_asiatica%2C_Ryozensan_2009-3-16.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "checkedAt": "2026-11-10"
   },
   "tripora divaricata": {
    "nm": "누린내풀",
@@ -482,29 +483,29 @@
   },
   "daphne kiusiana": {
    "nm": "백서향",
-   "file": "daphne-kiusiana-v1.jpg",
-   "w": 480,
-   "h": 360,
-   "source": "Wikimedia Commons",
-   "creator": "Ryuch",
-   "license": "CC BY-SA 3.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:White_Daphne_Odora.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/23/White_Daphne_Odora.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
-  },
-  "geum japonicum": {
-   "nm": "뱀무",
-   "file": "geum-japonicum-v1.jpg",
+   "file": "daphne-kiusiana-v2.jpg",
    "w": 480,
    "h": 360,
    "source": "Wikimedia Commons",
    "creator": "Alpsdake",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Geum_aleppicum_in_Mount_Ibuki_2010-07-10.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2b/Geum_aleppicum_in_Mount_Ibuki_2010-07-10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Daphne_kiusiana_s5.jpg",
+   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/60/Daphne_kiusiana_s5.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "checkedAt": "2026-11-10"
+  },
+  "geum japonicum": {
+   "nm": "뱀무",
+   "file": "geum-japonicum-v2.jpg",
+   "w": 480,
+   "h": 360,
+   "source": "Wikimedia Commons",
+   "creator": "Qwert1234",
+   "license": "CC BY-SA 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Geum_japonicum_2.JPG",
+   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5c/Geum_japonicum_2.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "checkedAt": "2026-11-10"
   },
   "illicium anisatum": {
    "nm": "붓순나무",
@@ -701,19 +702,6 @@
    "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Pogostemon_yatabeanus1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
    "checkedAt": "2026-10-05"
   },
-  "lycoris": {
-   "nm": "제주상사화",
-   "file": "lycoris-v1.jpg",
-   "w": 480,
-   "h": 360,
-   "source": "Wikimedia Commons",
-   "creator": "Wikimedia Commons contributors",
-   "license": "Public domain",
-   "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lycoris_aurea.jpg",
-   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Lycoris_aurea.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-   "checkedAt": "2026-10-05"
-  },
   "aster maackii": {
    "nm": "좀개미취",
    "file": "aster-maackii-v1.jpg",
@@ -755,16 +743,16 @@
   },
   "rosa": {
    "nm": "찔레꽃",
-   "file": "rosa-v1.jpg",
+   "file": "rosa-v2.jpg",
    "w": 480,
    "h": 360,
-   "source": "국립수목원",
-   "creator": "국립수목원",
-   "license": "국립수목원 표준식물목록(이용허락 제한 없음)",
-   "licenseUrl": "https://www.data.go.kr/data/15116414/fileData.do",
-   "sourceUrl": "https://www.data.go.kr/data/15116414/fileData.do",
-   "originalUrl": "https://www.nature.go.kr/fileUpload/stplt/scnm/image/common/Rosa_-Oklahoma-_1C.JPG",
-   "checkedAt": "2026-10-05"
+   "source": "Wikimedia Commons",
+   "creator": "Krzysztof Ziarnek, Kenraiz",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "sourceUrl": "https://commons.wikimedia.org/wiki/File:Rosa_multiflora_kz10.jpg",
+   "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Rosa_multiflora_kz10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+   "checkedAt": "2026-11-10"
   },
   "aster scaber": {
    "nm": "참취",
